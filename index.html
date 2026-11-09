@@ -295,7 +295,7 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
       <li><strong>Funded to in profit.</strong> 1 − (1 − trade win)<sup>tries</sup>. Two tries because a $1,000 risk fits twice in a 50K account's $2,000 drawdown.</li>
       <li><strong>Payouts.</strong> 50% of profit per request, capped at $2,000 on a 50K, 90% to you (<a href="https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts" target="_blank" rel="noopener">LucidFlex payouts</a>, <a href="https://help.topstep.com/en/articles/8284233" target="_blank" rel="noopener">Topstep payout policy</a>). The Lucid figures are your real $891 payouts; Topstep's are $2,000, $1,000 and $500 withdrawals at 90%.</li>
       <li><strong>Prices.</strong> Topstep 50K is $49 a month plus a $149 activation on the Standard path (<a href="https://intercom.help/topstep-llc/en/articles/9208217-topstep-pricing" target="_blank" rel="noopener">pricing</a>). Lucid 50K runs about $70 with a code and $130–175 without. Use your checkout price.</li>
-      <li><strong>Buying rule.</strong> Every second week the model buys enough evals to fill the open slots, counting slots that free within two weeks. It caps a batch at 25, or at 5 once a firm holds 3 accounts.</li>
+      <li><strong>Buying rule.</strong> Every second week the model buys enough evals to fill the open slots, counting slots that free within two weeks. Funded accounts not yet in profit hold their slot, so a full size buys nothing until a slot frees up. It caps a batch at 25, or at 5 once a firm holds 3 accounts.</li>
       <li><strong>After the last payout.</strong> The account counts as lost and its slot frees up, as in the chat's "expect to lose some funded after the third cycle". Topstep accounts without a good flip are lost after payout 2. Any account that keeps trading is extra upside.</li>
       <li><strong>Fees.</strong> Put platform, data or subscription fees in <em>Monthly fee per account</em>. It is charged every 4 weeks for every held account and open eval.</li>
       <li><strong>Bad luck.</strong> The tiles are averages. The bad-luck line replays the 12 weeks 1,000 times, passing and failing whole accounts at random, and shows the worst run in 10.</li>
@@ -357,7 +357,7 @@ function simulateFirm(f, r, weeks, rnd){
     var buy = 0;
     if (t % 2 === 0 && pc > 0 && slots > 0){
       var soonFree = winFree[t + 1] + winFree[t + 2];
-      var covered = Math.max(0, winning - soonFree) + (trying + wait) * c + pending * pc;
+      var covered = Math.max(0, winning - soonFree) + trying + wait * c + pending * pc;
       var need = slots - covered;
       var maxBatch = occupied >= 3 - 1e-6 ? 5 : 25;
       if (need >= 0.5) buy = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
