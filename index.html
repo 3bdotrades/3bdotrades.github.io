@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="How many evals to buy per firm, what they cost, and when Lucid and Topstep payouts land over the next 12 weeks.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%232f47c2%22/%3E%3Cpath d=%22M7 22l6-6 4 4 8-9%22 stroke=%22white%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Funded Slots Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: one desk sheet. Rates and the four numbers on top, one card per firm, the 12-week cash ledger, then the playbook and yardsticks. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --sunk:#f5f7fa; --ink:#131b26; --muted:#566373; --line:#d6dde6; --line-strong:#b9c3cf;
+  --accent:#2f47c2; --accent-soft:#e7ebff; --accent-ink:#ffffff;
+  --in:#12866a; --out:#d1602a; --net:#3048c4;
+  --good:#1b6e47; --good-bg:#e1f3ea; --warn:#8a5a06; --warn-bg:#fbefd6; --bad:#a8352a; --bad-bg:#fbe4e0;
+  --font-display:"Archivo","Arial Narrow",Arial,sans-serif;
+  --font-body:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c1117; --surface:#141b23; --sunk:#10161d; --ink:#e4eaf1; --muted:#9daab9; --line:#26313d; --line-strong:#3a4756;
+    --accent:#8e9cff; --accent-soft:#1c2350; --accent-ink:#0c1117;
+    --in:#23998a; --out:#d06a36; --net:#7c79e2;
+    --good:#66d09e; --good-bg:#11291e; --warn:#e6b553; --warn-bg:#2c2310; --bad:#f39383; --bad-bg:#301815;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c1117; --surface:#141b23; --sunk:#10161d; --ink:#e4eaf1; --muted:#9daab9; --line:#26313d; --line-strong:#3a4756;
+  --accent:#8e9cff; --accent-soft:#1c2350; --accent-ink:#0c1117;
+  --in:#23998a; --out:#d06a36; --net:#7c79e2;
+  --good:#66d09e; --good-bg:#11291e; --warn:#e6b553; --warn-bg:#2c2310; --bad:#f39383; --bad-bg:#301815;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 72px;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--font-display);font-variation-settings:"wdth" 112;margin:0;text-wrap:balance;letter-spacing:-0.005em}
+h1{font-size:clamp(26px,4.2vw,34px);font-weight:760;line-height:1.1}
+h2{font-size:19px;font-weight:700;line-height:1.25}
+h3{font-size:16px;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+.eyebrow{font-family:var(--font-data);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{max-width:68ch;color:var(--muted);font-size:16px}
+.num{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:13.5px}
+header.top{display:flex;flex-direction:column;gap:10px}
+
+/* rates bar */
+.rates{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
+.seg button{font:600 14px/1 var(--font-body);padding:10px 14px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:focus-visible,.btn:focus-visible,.chartbox:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12.5px;color:var(--muted);line-height:1.2}
+.inp{display:flex;align-items:center;border:1px solid var(--line-strong);border-radius:7px;background:var(--sunk);min-width:0}
+.inp span{font-family:var(--font-data);font-size:13px;color:var(--muted);padding:0 0 0 9px}
+.inp span.after{padding:0 9px 0 0}
+.inp input{font:500 14px var(--font-data);font-variant-numeric:tabular-nums;color:var(--ink);background:transparent;border:0;padding:8px 9px;width:100%;min-width:0;text-align:right}
+.inp input[type="text"]{text-align:left;font-family:var(--font-body);font-weight:600}
+.rates .field{width:118px}
+.derived{flex:1 1 260px;font-size:14px;color:var(--muted);min-width:0}
+.derived strong{color:var(--ink);font-weight:600}
+.tag{display:inline-block;font:600 12px/1 var(--font-data);letter-spacing:.04em;padding:5px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+
+/* summary */
+.summary{display:flex;flex-direction:column;gap:12px}
+.sumhead{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:baseline}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
+.tile{padding:14px 16px 16px 0;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tile+.tile{padding-left:16px;border-left:1px solid var(--line)}
+.tile .k{font-size:13px;color:var(--muted)}
+.tile .v{font-family:var(--font-display);font-variation-settings:"wdth" 108;font-size:clamp(24px,3.4vw,32px);font-weight:720;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .s{font-size:13px;color:var(--muted)}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.alt{font-size:14px;color:var(--muted)}
+.alt strong{color:var(--ink);font-weight:600}
+
+.btn{font:600 14px/1 var(--font-body);padding:9px 13px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toast{font-size:13px;color:var(--good)}
+
+/* firms */
+.section-head{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:baseline}
+.firms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,470px),1fr));gap:16px}
+.firm{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.firm-top{display:flex;gap:10px;align-items:flex-end}
+.firm-top .field{flex:1}
+.firm-top .inp input{font-size:17px;padding:8px 10px}
+.group{display:flex;flex-direction:column;gap:8px}
+.group .gl{font-family:var(--font-data);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.out{border-top:1px solid var(--line);padding-top:12px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:baseline}
+.out dt{font-size:13px;color:var(--muted)}
+.out dd{margin:0;font-size:14.5px;min-width:0}
+.buynow{font-family:var(--font-display);font-variation-settings:"wdth" 108;font-size:22px;font-weight:720}
+.note{font-size:13.5px;color:var(--muted);background:var(--sunk);border-left:3px solid var(--line-strong);padding:8px 10px;border-radius:0 6px 6px 0}
+
+/* chart */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend i.line{height:3px;border-radius:2px;vertical-align:3px;width:16px}
+.chartbox{position:relative;min-width:0;border-radius:6px}
+.chartbox svg{display:block;width:100%;height:auto;overflow:visible}
+.chartbox text{font-family:var(--font-data);font-size:11.5px;fill:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:13px;box-shadow:0 6px 18px rgba(10,16,24,.12);min-width:190px;z-index:2}
+.tip .h{font-weight:700;margin-bottom:4px}
+.tip .r{display:flex;justify-content:space-between;gap:16px}
+.tip .r span:first-child{color:var(--muted)}
+.tip i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+
+/* table */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);background:var(--sunk);font-size:12.5px}
+td{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+th.l,td.l{text-align:left}
+td.l{font-family:var(--font-body)}
+tr:last-child td{border-bottom:0}
+tr.now td{background:var(--accent-soft)}
+.chip{display:inline-block;font:600 11.5px/1 var(--font-body);padding:4px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn);margin-right:4px}
+.status{display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 var(--font-body);padding:5px 9px;border-radius:999px}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.status.good{background:var(--good-bg);color:var(--good)}
+.status.warn{background:var(--warn-bg);color:var(--warn)}
+.status.bad{background:var(--bad-bg);color:var(--bad)}
+
+/* playbook */
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ol.steps li{display:grid;grid-template-columns:86px minmax(0,1fr);gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+ol.steps li:first-child{border-top:0;padding-top:2px}
+ol.steps .when{font-family:var(--font-data);font-size:12.5px;font-weight:600;color:var(--accent);padding-top:2px}
+ol.steps p{max-width:62ch}
+ul.notes{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:14px;max-width:80ch}
+ul.notes strong{color:var(--ink);font-weight:600}
+textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:var(--ink);background:var(--sunk);border:1px solid var(--line-strong);border-radius:8px;padding:10px}
+
+@media (max-width:860px){
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tile:nth-child(3){padding-left:0;border-left:0}
+  .tile:nth-child(n+3){border-top:1px solid var(--line)}
+  .cols{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:520px){
+  .grid4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rates .field{width:calc(50% - 11px)}
+  ol.steps li{grid-template-columns:minmax(0,1fr);gap:2px}
+  .out{grid-template-columns:minmax(0,1fr)}
+  .out dt{margin-top:4px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow" id="eyebrow">Prop roadmap</div>
+    <h1>Funded Slots Roadmap</h1>
+    <p class="lede">Five funded slots per firm. Buy evals to fill them, turn funded accounts into winners, then collect two payouts from each. The starting numbers are examples from the chat and public prices. Set your own accounts and prices and everything below updates.</p>
+  </header>
+
+  <section class="rates" aria-labelledby="rates-h">
+    <div class="field" style="width:auto">
+      <span class="field-label muted small" id="rates-h">Rates</span>
+      <div class="seg" role="group" aria-label="Rate preset">
+        <button type="button" id="preset-live" aria-pressed="true">Live so far</button>
+        <button type="button" id="preset-plan" aria-pressed="false">Backtest plan</button>
+      </div>
+    </div>
+    <div class="field"><label for="r-pass">Eval pass rate</label><div class="inp"><input id="r-pass" type="number" inputmode="decimal" min="0" max="100" step="1"><span class="after">%</span></div></div>
+    <div class="field"><label for="r-win">Funded trade win</label><div class="inp"><input id="r-win" type="number" inputmode="decimal" min="0" max="100" step="1"><span class="after">%</span></div></div>
+    <div class="field"><label for="r-tries">Tries per funded</label><div class="inp"><input id="r-tries" type="number" inputmode="numeric" min="1" max="4" step="1"></div></div>
+    <div class="field"><label for="r-land">Payouts that land</label><div class="inp"><input id="r-land" type="number" inputmode="decimal" min="0" max="100" step="5"><span class="after">%</span></div></div>
+    <p class="derived" id="derived"></p>
+  </section>
+
+  <section class="summary" aria-labelledby="sum-h">
+    <div class="sumhead">
+      <h2 id="sum-h">Both firms together</h2>
+      <div class="btnrow"><button type="button" class="btn" id="copy">Copy summary for the chat</button><span class="toast" id="toast" role="status"></span></div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><span class="k">Buy this week</span><span class="v num" id="t-buy">–</span><span class="s" id="t-buy-s"></span></div>
+      <div class="tile"><span class="k">Cash needed before payouts</span><span class="v num" id="t-need">–</span><span class="s" id="t-need-s"></span></div>
+      <div class="tile"><span class="k">Net after 12 weeks</span><span class="v num" id="t-net">–</span><span class="s" id="t-net-s"></span></div>
+      <div class="tile"><span class="k">Once running</span><span class="v num" id="t-run">–</span><span class="s">average month after the first wave</span></div>
+    </div>
+    <p class="alt" id="alt"></p>
+    <div id="copyfall" hidden></div>
+  </section>
+
+  <section class="summary" aria-labelledby="firms-h">
+    <div class="section-head">
+      <h2 id="firms-h">Per firm</h2>
+      <div class="btnrow"><button type="button" class="btn" id="add">Add a firm</button><button type="button" class="btn ghost" id="reset">Reset to example numbers</button></div>
+    </div>
+    <div class="firms" id="firms"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="chart-h">
+    <div class="section-head">
+      <h2 id="chart-h">Cash by week</h2>
+      <span class="muted small" id="chart-sub"></span>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span><i style="background:var(--in)"></i>Payouts in</span>
+      <span><i style="background:var(--out)"></i>Evals and activations out</span>
+      <span><i class="line" style="background:var(--net)"></i>Running total</span>
+    </div>
+    <div class="chartbox" id="chart" tabindex="0" role="img" aria-label="Weekly cash in and out with the running total. Use the left and right arrow keys to read each week."></div>
+    <div class="tablewrap">
+      <table id="ledger" aria-label="Week by week plan"></table>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="play-h">
+      <h2 id="play-h">How to run it</h2>
+      <ol class="steps">
+        <li><span class="when">W0</span><p>Buy each firm's batch from the cards above. At 0 of 5 that is about 25 evals a firm. Once you hold 3 or more accounts, buy 3 to 5 at a time.</p></li>
+        <li><span class="when">W1–W2</span><p>Evals resolve: two winning days pass one. Move passes into free slots. Extra passes wait for a slot, so overbuying only means a pass sits for a week.</p></li>
+        <li><span class="when">W2–W3</span><p>Funded trade at 4:1, then 5:1 after one loss. Two losses and the account is gone; fill its slot from a waiting pass the same day.</p></li>
+        <li><span class="when">W4</span><p>Payout 1 after the flip days: about $1,900 per Lucid account; Topstep takes $2,000 out (+$4k becomes +$2k).</p></li>
+        <li><span class="when">W6</span><p>Payout 2: about $900 per Lucid account; Topstep takes $1,000 out (+$2k becomes +$1k). Five Lucid in profit pays about $9.5k, then $4.5k.</p></li>
+        <li><span class="when">W8</span><p>Topstep payout 3 only after a good flip. After a bad one the account goes back to funded trading. Expect to lose some funded after the third cycle.</p></li>
+        <li><span class="when">Every 2 weeks</span><p>Recount each firm: accounts held, waiting passes, accounts in profit. Re-buy from the table and check the yardsticks.</p></li>
+      </ol>
+    </section>
+    <section class="panel" aria-labelledby="yard-h">
+      <h2 id="yard-h">Yardsticks</h2>
+      <p class="muted small">Live results against the plan, from the chat. Check your own every two weeks.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th class="l">Measure</th><th>Plan</th><th>Live</th><th class="l">Read</th></tr></thead>
+          <tbody>
+            <tr><td class="l">Eval pass rate</td><td>28–32%</td><td>28% <span class="muted">(17/60)</span></td><td class="l"><span class="status good">On plan</span></td></tr>
+            <tr><td class="l">Eval trades per pass</td><td>10–12</td><td>12.5</td><td class="l"><span class="status good">Normal</span></td></tr>
+            <tr><td class="l">Funded trade win</td><td>20–22%</td><td>50% <span class="muted">(9/18)</span></td><td class="l"><span class="status warn">Partly luck</span></td></tr>
+            <tr><td class="l">Flips, 15/16 box<br><span class="muted small">Topstep XFA, Lucid 50K</span></td><td>48%</td><td>18% <span class="muted">(5/28)</span></td><td class="l"><span class="status bad">Off plan</span></td></tr>
+            <tr><td class="l">Flips, 10.75/15 box<br><span class="muted small">Lucid 25K</span></td><td>58%</td><td>53% <span class="muted">(9/17)</span></td><td class="l"><span class="status good">Normal</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small muted">The 25-evals-for-5 rule holds while funded trades win near the live 50%. At the plan's 21% the same 25 evals make about 2.6 winners, so budget on the plan. Flips on the 15/16 box are the weak spot: if they stay near 18%, lower <em>Payouts that land</em>.</p>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="notes-h">
+    <h2 id="notes-h">What the numbers assume</h2>
+    <ul class="notes">
+      <li><strong>Timing.</strong> An eval resolves within a week, a funded account within a week of activation, and payouts land 2 and 4 weeks after it is in profit (6 for a third). Holiday and roll weeks run slower.</li>
+      <li><strong>Funded to in profit.</strong> 1 − (1 − trade win)<sup>tries</sup>. Two tries because a $1,000 risk fits twice in a 50K account's $2,000 drawdown.</li>
+      <li><strong>Payouts.</strong> 50% of profit per request, capped at $2,000 on a 50K, 90% to you (<a href="https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts" target="_blank" rel="noopener">LucidFlex payouts</a>, <a href="https://help.topstep.com/en/articles/8284233" target="_blank" rel="noopener">Topstep payout policy</a>). The Lucid figures are the chat's own; Topstep's are $2,000, $1,000 and $500 withdrawals at 90%.</li>
+      <li><strong>Prices.</strong> Topstep 50K is $49 a month plus a $149 activation on the Standard path (<a href="https://intercom.help/topstep-llc/en/articles/9208217-topstep-pricing" target="_blank" rel="noopener">pricing</a>). Lucid 50K runs about $70 with a code and $130–175 without. Use your checkout price.</li>
+      <li><strong>Buying rule.</strong> Every second week the model buys enough evals to fill the open slots, counting slots that free within two weeks. It caps a batch at 25, or at 5 once a firm holds 3 accounts.</li>
+      <li><strong>Left out.</strong> Accounts that go back to funded trading after their last payout (extra upside), platform and data fees, and renewals for evals that run past a month. Counts are expected values, so real weeks come in whole accounts and streaks.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function(){
+'use strict';
+// ---------- MODEL START ----------
+function num(v, d){ v = Number(v); return isFinite(v) ? v : d; }
+function clamp01(v){ v = Number(v); return isFinite(v) ? Math.min(1, Math.max(0, v)) : 0; }
+function fundedToProfit(win, tries){ return 1 - Math.pow(1 - clamp01(win), Math.max(1, Math.round(num(tries, 1)))); }
+
+// One firm, week by week, in expected values. Rates are fractions (0..1).
+function simulateFirm(f, r, weeks){
+  var pass = clamp01(r.pass), c = fundedToProfit(r.win, r.tries), land = clamp01(r.land), pc = pass * c;
+  var slots = Math.max(0, Math.floor(num(f.slots, 0)));
+  var q3 = clamp01(f.q3);
+  var pay1 = Math.max(0, num(f.pay1, 0)), pay2 = Math.max(0, num(f.pay2, 0)), pay3 = Math.max(0, num(f.pay3, 0));
+  var price = Math.max(0, num(f.evalPrice, 0)), actFee = Math.max(0, num(f.activation, 0));
+  var L = weeks + 12, i;
+  function zeros(){ var a = new Array(L); for (var k = 0; k < L; k++) a[k] = 0; return a; }
+  var passesAt = zeros(), evalsDone = zeros(), triesDone = zeros(), payAt = zeros(), winFree = zeros();
+  var wait = 0, pending = 0, trying = 0, winning = 0, occupied = 0;
+  function addWinning(t, n){
+    if (!(n > 0)) return;
+    winning += n;
+    payAt[t + 2] += n * pay1 * land;
+    payAt[t + 4] += n * pay2 * land;
+    payAt[t + 6] += n * q3 * pay3 * land;
+    winFree[t + 4] += n * (1 - q3);
+    winFree[t + 6] += n * q3;
+  }
+  var fundedNow = Math.max(0, num(f.fundedNow, 0)), inProfitNow = Math.max(0, num(f.inProfitNow, 0)), openEvals = Math.max(0, num(f.openEvals, 0));
+  occupied = fundedNow + inProfitNow;
+  trying = fundedNow; triesDone[1] += fundedNow;
+  addWinning(0, inProfitNow);
+  pending = openEvals; passesAt[1] += openEvals * pass; evalsDone[1] += openEvals;
+  var rows = [];
+  for (var t = 0; t < weeks; t++){
+    wait += passesAt[t];
+    pending = Math.max(0, pending - evalsDone[t]);
+    var done = triesDone[t], won = 0, lost = 0;
+    if (done > 0){ won = done * c; lost = done - won; trying -= done; occupied -= lost; addWinning(t, won); }
+    winning -= winFree[t]; occupied -= winFree[t];
+    if (Math.abs(winning) < 1e-9) winning = 0;
+    if (Math.abs(occupied) < 1e-9) occupied = 0;
+    if (Math.abs(trying) < 1e-9) trying = 0;
+    var cashIn = payAt[t];
+    var free = Math.max(0, slots - occupied);
+    var act = Math.min(wait, free);
+    wait -= act; occupied += act; trying += act; triesDone[t + 1] += act;
+    var buy = 0;
+    if (t % 2 === 0 && pc > 0 && slots > 0){
+      var soonFree = winFree[t + 1] + winFree[t + 2];
+      var covered = Math.max(0, winning - soonFree) + (trying + wait) * c + pending * pc;
+      var need = slots - covered;
+      var maxBatch = occupied >= 3 - 1e-6 ? 5 : 25;
+      if (need >= 0.5) buy = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
+    }
+    pending += buy; passesAt[t + 1] += buy * pass; evalsDone[t + 1] += buy;
+    var evalCost = buy * price, actCost = act * actFee;
+    rows.push({ t: t, buy: buy, act: act, evalCost: evalCost, actCost: actCost, out: evalCost + actCost, inn: cashIn,
+                won: won, lost: lost, winning: winning, trying: trying, wait: wait, occupied: occupied });
+  }
+  return { c: c, pc: pc, rows: rows };
+}
+
+function runAll(firms, r, weeks){
+  var per = firms.map(function(f){ return simulateFirm(f, r, weeks); });
+  var rows = [], t, cum = 0, low = 0, lowAt = 0, firstIn = -1, even = -1;
+  for (t = 0; t < weeks; t++){
+    var row = { t: t, buy: 0, out: 0, inn: 0, winning: 0, trying: 0, wait: 0, buys: [] };
+    per.forEach(function(p){ var x = p.rows[t]; row.buy += x.buy; row.out += x.out; row.inn += x.inn; row.winning += x.winning; row.trying += x.trying; row.wait += x.wait; row.buys.push(x.buy); });
+    cum += row.inn - row.out; row.cum = cum;
+    if (cum < low){ low = cum; lowAt = t; }
+    if (firstIn < 0 && row.inn > 0.5) firstIn = t;
+    rows.push(row);
+  }
+  if (low < 0){ for (t = lowAt + 1; t < weeks; t++){ if (rows[t].cum >= 0){ even = t; break; } } }
+  var totOut = 0, totIn = 0;
+  rows.forEach(function(x){ totOut += x.out; totIn += x.inn; });
+  return { per: per, rows: rows, totOut: totOut, totIn: totIn, net: totIn - totOut, need: -low, lowAt: lowAt, firstIn: firstIn, even: even };
+}
+
+// Average month once the first wave is through (weeks 24-63 of a long run).
+function monthlyRunRate(firms, r){
+  var W = 64, from = 24, s = 0;
+  firms.forEach(function(f){ var rows = simulateFirm(f, r, W).rows; for (var t = from; t < W; t++) s += rows[t].inn - rows[t].out; });
+  return s / (W - from) * 52 / 12;
+}
+
+function perWinning(f, r){
+  var pass = clamp01(r.pass), c = fundedToProfit(r.win, r.tries), land = clamp01(r.land), pc = pass * c;
+  if (!(pc > 0)) return null;
+  var evals = 1 / pc;
+  var cost = evals * Math.max(0, num(f.evalPrice, 0)) + Math.max(0, num(f.activation, 0)) / c;
+  var cash = (Math.max(0, num(f.pay1, 0)) + Math.max(0, num(f.pay2, 0)) + clamp01(f.q3) * Math.max(0, num(f.pay3, 0))) * land;
+  return { evals: evals, cost: cost, cash: cash, net: cash - cost };
+}
+// ---------- MODEL END ----------
+
+var WEEKS = 12;
+var STORE = 'funded-slots-roadmap-v1';
+var PRESETS = { live: { pass: 28, win: 50, tries: 2, land: 100 }, plan: { pass: 28, win: 21, tries: 2, land: 100 } };
+var NEW_FIRM = { name: 'New firm', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 100, activation: 0, pay1: 1000, pay2: 500, pay3: 0, q3: 0, note: '' };
+var DEFAULTS = {
+  rates: PRESETS.live,
+  firms: [
+    { name: 'Lucid 50K', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 70, activation: 0, pay1: 1900, pay2: 900, pay3: 0, q3: 0,
+      note: 'From the chat: 5 Lucid in profit pay about $1,900 each in the first 2 weeks and $900 each in the next 2, about $2,800 an account.' },
+    { name: 'Topstep 50K', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 49, activation: 149, pay1: 1800, pay2: 900, pay3: 450, q3: 50,
+      note: 'The buffer shrinks with each payout: +$4k, then +$2k, then +$1k. Payout 3 only after a good flip; otherwise back to funded trading.' }
+  ]
+};
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+var state = clone(DEFAULTS);
+try { var saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved && saved.rates && Array.isArray(saved.firms) && saved.firms.length) state = saved; } catch (e) {}
+function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+function fracRates(r){ return { pass: num(r.pass, 0) / 100, win: num(r.win, 0) / 100, tries: num(r.tries, 2), land: num(r.land, 100) / 100 }; }
+function firmFrac(f){ var g = clone(f); g.q3 = num(f.q3, 0) / 100; return g; }
+
+// ---------- dates ----------
+var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function mondayOf(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
+var START = mondayOf(new Date());
+function weekStart(t){ var d = new Date(START.getTime()); d.setDate(d.getDate() + 7 * t); return d; }
+function dShort(d){ return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
+var CAL = [['2026-11-26','Thanksgiving'],['2026-12-10','NQ roll'],['2026-12-25','Christmas'],['2027-01-01','New Year'],['2027-01-18','MLK Day'],
+  ['2027-02-15','Presidents Day'],['2027-03-11','NQ roll'],['2027-03-26','Good Friday'],['2027-05-31','Memorial Day'],['2027-06-10','NQ roll'],['2027-06-18','Juneteenth'],['2027-07-05','July 4th']];
+function calFor(t){
+  var a = weekStart(t).getTime(), b = weekStart(t + 1).getTime(), out = [];
+  CAL.forEach(function(c){ var p = c[0].split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]).getTime(); if (d >= a && d < b) out.push(c[1]); });
+  return out;
+}
+
+// ---------- format ----------
+function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
+function signed(v){ return (v > 0.5 ? '+' : '') + money(v); }
+function kmoney(v){ var a = Math.abs(v), s; if (a >= 1000){ s = (a / 1000).toFixed(a % 1000 === 0 ? 0 : 1).replace(/\.0$/, '') + 'k'; } else s = String(Math.round(a)); return (v < 0 ? '−$' : '$') + s; }
+function acc(v){ return (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, ''); }
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function wk(t){ return 'W' + t + ' (' + dShort(weekStart(t)) + ')'; }
+
+// ---------- firm cards ----------
+var firmsEl = document.getElementById('firms');
+var FIELDS = [
+  ['Accounts now', [['fundedNow','Funded, not in profit',''],['inProfitNow','In profit, awaiting payouts',''],['openEvals','Open evals',''],['slots','Slot cap','']]],
+  ['Costs', [['evalPrice','Eval price','$'],['activation','Activation per funded','$']]],
+  ['Cash to you per winning funded', [['pay1','Payout 1, week +2','$'],['pay2','Payout 2, week +4','$'],['pay3','Payout 3, week +6','$'],['q3','Chance of payout 3','%']]]
+];
+function buildFirms(){
+  firmsEl.innerHTML = state.firms.map(function(f, i){
+    var groups = FIELDS.map(function(g){
+      var cls = g[1].length === 2 ? 'grid2' : 'grid4';
+      return '<div class="group"><span class="gl">' + g[0] + '</span><div class="' + cls + '">' + g[1].map(function(x){
+        var id = 'f' + i + '-' + x[0];
+        var pre = x[2] === '$' ? '<span>$</span>' : '';
+        var post = x[2] === '%' ? '<span class="after">%</span>' : '';
+        return '<div class="field"><label for="' + id + '">' + x[1] + '</label><div class="inp">' + pre +
+          '<input id="' + id + '" type="number" inputmode="decimal" min="0" step="' + (x[2] === '$' ? 10 : 1) + '" data-i="' + i + '" data-k="' + x[0] + '" value="' + esc(f[x[0]]) + '">' + post + '</div></div>';
+      }).join('') + '</div></div>';
+    }).join('');
+    var rm = state.firms.length > 1 ? '<button type="button" class="btn ghost" data-rm="' + i + '" aria-label="Remove ' + esc(f.name) + '">Remove</button>' : '';
+    return '<article class="firm" aria-label="' + esc(f.name) + '">' +
+      '<div class="firm-top"><div class="field"><label for="f' + i + '-name">Firm and size</label><div class="inp"><input id="f' + i + '-name" type="text" data-i="' + i + '" data-k="name" value="' + esc(f.name) + '"></div></div>' + rm + '</div>' +
+      groups +
+      '<dl class="out" id="f' + i + '-out"></dl>' +
+      (f.note ? '<p class="note">' + esc(f.note) + '</p>' : '') +
+      '</article>';
+  }).join('');
+}
+firmsEl.addEventListener('input', function(e){
+  var el = e.target; if (!el.dataset || el.dataset.i === undefined) return;
+  var f = state.firms[+el.dataset.i], k = el.dataset.k;
+  if (k === 'name') f.name = el.value; else f[k] = el.value === '' ? 0 : Number(el.value);
+  if (k === 'slots') f.slots = Math.max(0, Math.round(num(f.slots, 0)));
+  save(); update();
+});
+firmsEl.addEventListener('click', function(e){
+  var b = e.target.closest('[data-rm]'); if (!b) return;
+  state.firms.splice(+b.dataset.rm, 1); save(); buildFirms(); update();
+});
+document.getElementById('add').addEventListener('click', function(){ state.firms.push(clone(NEW_FIRM)); save(); buildFirms(); update(); });
+document.getElementById('reset').addEventListener('click', function(){ state = clone(DEFAULTS); save(); syncRates(); buildFirms(); update(); });
+
+// ---------- rates ----------
+var RATE_IDS = { pass: 'r-pass', win: 'r-win', tries: 'r-tries', land: 'r-land' };
+function syncRates(){ Object.keys(RATE_IDS).forEach(function(k){ document.getElementById(RATE_IDS[k]).value = state.rates[k]; }); }
+function presetName(r){
+  for (var k in PRESETS){ var p = PRESETS[k]; if (+r.pass === p.pass && +r.win === p.win && +r.tries === p.tries && +r.land === p.land) return k; }
+  return 'custom';
+}
+Object.keys(RATE_IDS).forEach(function(k){
+  document.getElementById(RATE_IDS[k]).addEventListener('input', function(e){ state.rates[k] = e.target.value === '' ? 0 : Number(e.target.value); save(); update(); });
+});
+['live','plan'].forEach(function(k){
+  document.getElementById('preset-' + k).addEventListener('click', function(){ state.rates = clone(PRESETS[k]); save(); syncRates(); update(); });
+});
+
+// ---------- chart ----------
+var chartEl = document.getElementById('chart');
+var tipEl = document.createElement('div'); tipEl.className = 'tip'; tipEl.hidden = true;
+var lastRows = [], focusIdx = -1, geom = null;
+function niceStep(range, n){ var raw = range / Math.max(1, n), mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag; }
+function barPath(x0, x1, yb, yt, up){
+  var h = Math.abs(yb - yt); if (h < 0.5) return '';
+  var r = Math.min(4, h / 2, (x1 - x0) / 2);
+  if (up) return 'M' + x0 + ',' + yb + 'L' + x0 + ',' + (yt + r) + 'Q' + x0 + ',' + yt + ' ' + (x0 + r) + ',' + yt + 'L' + (x1 - r) + ',' + yt + 'Q' + x1 + ',' + yt + ' ' + x1 + ',' + (yt + r) + 'L' + x1 + ',' + yb + 'Z';
+  return 'M' + x0 + ',' + yb + 'L' + x0 + ',' + (yt - r) + 'Q' + x0 + ',' + yt + ' ' + (x0 + r) + ',' + yt + 'L' + (x1 - r) + ',' + yt + 'Q' + x1 + ',' + yt + ' ' + x1 + ',' + (yt - r) + 'L' + x1 + ',' + yb + 'Z';
+}
+function drawChart(rows){
+  lastRows = rows;
+  var W = Math.max(280, Math.floor(chartEl.clientWidth || 600)), narrow = W < 560;
+  var H = narrow ? 240 : 290, m = { l: narrow ? 44 : 54, r: narrow ? 14 : 70, t: 14, b: 40 };
+  var iw = W - m.l - m.r, ih = H - m.t - m.b, n = rows.length;
+  var hi = 1, lo = 0;
+  rows.forEach(function(r){ hi = Math.max(hi, r.inn, r.cum); lo = Math.min(lo, -r.out, r.cum); });
+  var step = niceStep(hi - lo, narrow ? 4 : 5);
+  var y0 = Math.floor(lo / step) * step, y1 = Math.ceil(hi / step) * step; if (y1 === y0) y1 = y0 + step;
+  function y(v){ return m.t + ih - (v - y0) / (y1 - y0) * ih; }
+  var band = iw / n; function x(i){ return m.l + band * (i + 0.5); }
+  var bw = Math.max(5, Math.min(24, band * 0.46));
+  var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+  for (var v = y0; v <= y1 + step / 2; v += step){
+    var yy = Math.round(y(v)) + 0.5;
+    s += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--line)" stroke-width="1"' + (Math.abs(v) < 1e-6 ? '' : ' stroke-dasharray="2 4"') + '/>';
+    s += '<text x="' + (m.l - 8) + '" y="' + (yy + 4) + '" text-anchor="end">' + kmoney(v) + '</text>';
+  }
+  var zy = y(0);
+  var every = narrow ? 2 : 1;
+  rows.forEach(function(r, i){
+    var cx = x(i), x0 = cx - bw / 2, x1 = cx + bw / 2;
+    if (r.inn > 0.5) s += '<path d="' + barPath(x0, x1, zy - 1, y(r.inn), true) + '" fill="var(--in)"/>';
+    if (r.out > 0.5) s += '<path d="' + barPath(x0, x1, zy + 1, y(-r.out), false) + '" fill="var(--out)"/>';
+    if (i % every === 0){
+      s += '<text x="' + cx + '" y="' + (H - m.b + 16) + '" text-anchor="middle" style="fill:var(--ink)">W' + i + '</text>';
+      s += '<text x="' + cx + '" y="' + (H - m.b + 30) + '" text-anchor="middle">' + dShort(weekStart(i)) + '</text>';
+    }
+  });
+  var d = rows.map(function(r, i){ return (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(r.cum).toFixed(1); }).join('');
+  s += '<path d="' + d + '" fill="none" stroke="var(--net)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  rows.forEach(function(r, i){ s += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(r.cum).toFixed(1) + '" r="' + (i === n - 1 ? 5 : 3.5) + '" fill="var(--net)" stroke="var(--surface)" stroke-width="2"/>'; });
+  var last = rows[n - 1];
+  if (!narrow) s += '<text x="' + (x(n - 1) + 10) + '" y="' + (y(last.cum) + 4) + '" style="fill:var(--ink);font-weight:600">' + signed(last.cum) + '</text>';
+  s += '<line id="xhair" x1="0" x2="0" y1="' + m.t + '" y2="' + (m.t + ih) + '" stroke="var(--line-strong)" stroke-width="1" visibility="hidden"/>';
+  s += '</svg>';
+  chartEl.innerHTML = s;
+  chartEl.appendChild(tipEl);
+  geom = { x: x, band: band, m: m, W: W, n: n, ih: ih };
+  if (focusIdx >= 0) showTip(Math.min(focusIdx, n - 1));
+}
+function showTip(i){
+  if (!geom || !lastRows[i]) return;
+  var r = lastRows[i], cx = geom.x(i), xh = chartEl.querySelector('#xhair');
+  if (xh){ xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('visibility', 'visible'); }
+  var cal = calFor(i);
+  tipEl.innerHTML = '<div class="h">W' + i + ' · from ' + dShort(weekStart(i)) + (cal.length ? ' · ' + esc(cal.join(', ')) : '') + '</div>' +
+    '<div class="r"><span><i style="background:var(--in)"></i>Payouts in</span><span class="num">' + money(r.inn) + '</span></div>' +
+    '<div class="r"><span><i style="background:var(--out)"></i>Evals and activations</span><span class="num">' + money(r.out) + '</span></div>' +
+    '<div class="r"><span><i style="background:var(--net)"></i>Running total</span><span class="num">' + signed(r.cum) + '</span></div>' +
+    '<div class="r"><span>Evals to buy</span><span class="num">' + r.buy + '</span></div>';
+  tipEl.hidden = false;
+  var tw = tipEl.offsetWidth, left = cx + 14;
+  if (left + tw > geom.W) left = cx - tw - 14;
+  tipEl.style.left = Math.max(0, left) + 'px';
+  tipEl.style.top = '6px';
+}
+function hideTip(){ tipEl.hidden = true; var xh = chartEl.querySelector('#xhair'); if (xh) xh.setAttribute('visibility', 'hidden'); }
+chartEl.addEventListener('pointermove', function(e){
+  if (!geom) return;
+  var rect = chartEl.getBoundingClientRect(), px = e.clientX - rect.left;
+  var i = Math.floor((px - geom.m.l) / geom.band);
+  if (i < 0 || i >= geom.n){ hideTip(); return; }
+  focusIdx = -1; showTip(i);
+});
+chartEl.addEventListener('pointerleave', function(){ if (focusIdx < 0) hideTip(); });
+chartEl.addEventListener('keydown', function(e){
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  e.preventDefault();
+  focusIdx = focusIdx < 0 ? 0 : Math.max(0, Math.min(lastRows.length - 1, focusIdx + (e.key === 'ArrowRight' ? 1 : -1)));
+  showTip(focusIdx);
+});
+chartEl.addEventListener('blur', function(){ focusIdx = -1; hideTip(); });
+if (window.ResizeObserver){ var lastW = 0; new ResizeObserver(function(){ var w = chartEl.clientWidth; if (Math.abs(w - lastW) > 2 && lastRows.length){ lastW = w; drawChart(lastRows); } }).observe(chartEl); }
+
+// ---------- ledger table ----------
+function drawLedger(res){
+  var names = state.firms.map(function(f){ return esc(f.name || 'Firm'); });
+  var head = '<thead><tr><th class="l">Week</th><th class="l">Starts</th><th class="l">Calendar</th>' +
+    names.map(function(nm){ return '<th>Buy · ' + nm + '</th>'; }).join('') +
+    '<th>Out</th><th>In</th><th>Running total</th><th>In profit</th><th>Funded trying</th></tr></thead>';
+  var body = res.rows.map(function(r){
+    var cal = calFor(r.t).map(function(c){ return '<span class="chip">' + esc(c) + '</span>'; }).join('');
+    return '<tr' + (r.t === 0 ? ' class="now"' : '') + '><td class="l"><strong>W' + r.t + '</strong></td><td class="l">' + dShort(weekStart(r.t)) + '</td><td class="l">' + (cal || '<span class="muted">–</span>') + '</td>' +
+      r.buys.map(function(b){ return '<td>' + (b ? b : '<span class="muted">–</span>') + '</td>'; }).join('') +
+      '<td>' + (r.out > 0.5 ? money(r.out) : '<span class="muted">–</span>') + '</td><td>' + (r.inn > 0.5 ? money(r.inn) : '<span class="muted">–</span>') + '</td>' +
+      '<td class="' + (r.cum < -0.5 ? 'neg' : r.cum > 0.5 ? 'pos' : '') + '">' + signed(r.cum) + '</td><td>' + acc(r.winning) + '</td><td>' + acc(r.trying) + '</td></tr>';
+  }).join('');
+  document.getElementById('ledger').innerHTML = head + '<tbody>' + body + '</tbody>';
+}
+
+// ---------- summary ----------
+function outcome(rRates){
+  var firms = state.firms.map(firmFrac);
+  var res = runAll(firms, rRates, WEEKS);
+  res.run = monthlyRunRate(firms, rRates);
+  return res;
+}
+function chatRule(held, slots){
+  if (held >= slots) return 'Full: buy only for slots that free up.';
+  if (held >= 3) return 'Chat rule: 3–5 evals at a time.';
+  if (held === 0) return 'Chat rule: about 25 evals for 5 winning funded.';
+  return 'Chat rule: about 5 evals per open slot, in batches.';
+}
+var lastText = '';
+function update(){
+  var rr = fracRates(state.rates), pn = presetName(state.rates);
+  document.getElementById('preset-live').setAttribute('aria-pressed', pn === 'live');
+  document.getElementById('preset-plan').setAttribute('aria-pressed', pn === 'plan');
+  var c = fundedToProfit(rr.win, rr.tries), pc = clamp01(rr.pass) * c;
+  document.getElementById('derived').innerHTML = (pn === 'custom' ? '<span class="tag">Custom rates</span> ' : '') +
+    'Funded to in profit <strong class="num">' + Math.round(c * 100) + '%</strong>. ' +
+    (pc > 0 ? 'About <strong class="num">' + (1 / pc).toFixed(1) + '</strong> evals per winning funded.' : 'No evals can pass at these rates.');
+
+  var res = outcome(rr);
+  // tiles
+  var buyNow = res.rows[0].buy, buyCost = 0;
+  res.per.forEach(function(p){ buyCost += p.rows[0].evalCost; });
+  document.getElementById('t-buy').textContent = buyNow + ' evals';
+  document.getElementById('t-buy-s').textContent = money(buyCost) + ' · ' + state.firms.map(function(f, i){ return (f.name || 'Firm') + ' ' + res.per[i].rows[0].buy; }).join(', ');
+  document.getElementById('t-need').textContent = money(res.need);
+  document.getElementById('t-need-s').textContent = (res.firstIn >= 0 ? 'first payout ' + wk(res.firstIn) : 'no payout inside 12 weeks') + (res.even >= 0 ? ' · even by W' + res.even : '');
+  var tn = document.getElementById('t-net'); tn.textContent = signed(res.net); tn.className = 'v num ' + (res.net >= 0 ? 'pos' : 'neg');
+  document.getElementById('t-net-s').textContent = 'in ' + money(res.totIn) + ' · out ' + money(res.totOut);
+  var tr = document.getElementById('t-run'); tr.textContent = signed(res.run) + '/mo'; tr.className = 'v num ' + (res.run >= 0 ? 'pos' : 'neg');
+
+  // the other preset, for contrast
+  var others = pn === 'live' ? ['plan'] : pn === 'plan' ? ['live'] : ['live', 'plan'];
+  var label = { live: 'Live so far (funded win 50%)', plan: 'Backtest plan (funded win 21%)' };
+  var altText = others.map(function(k){
+    var o = outcome(fracRates(PRESETS[k]));
+    return '<strong>' + label[k] + ':</strong> buy ' + o.rows[0].buy + ' now, need ' + money(o.need) + ', ' + signed(o.net) + ' after 12 weeks, ' + signed(o.run) + ' a month once running.';
+  });
+  document.getElementById('alt').innerHTML = altText.join(' ');
+  document.getElementById('sum-h').textContent = state.firms.length === 2 ? 'Both firms together' : state.firms.length === 1 ? 'Your firm' : 'All ' + state.firms.length + ' firms together';
+
+  // per firm outputs
+  state.firms.forEach(function(f, i){
+    var el = document.getElementById('f' + i + '-out'); if (!el) return;
+    var p = res.per[i], w = perWinning(firmFrac(f), rr);
+    var held = Math.round(num(f.fundedNow, 0) + num(f.inProfitNow, 0));
+    var inn = 0, outv = 0; p.rows.forEach(function(x){ inn += x.inn; outv += x.out; });
+    var run = monthlyRunRate([firmFrac(f)], rr);
+    el.innerHTML =
+      '<dt>Buy this week</dt><dd><span class="buynow num">' + p.rows[0].buy + ' evals</span> <span class="muted num">' + money(p.rows[0].evalCost) + '</span><br><span class="muted small">' + chatRule(held, Math.round(num(f.slots, 5))) + '</span></dd>' +
+      '<dt>Each winning funded</dt><dd class="num">' + (w ? acc(w.evals) + ' evals · costs ' + money(w.cost) + ' · pays ' + money(w.cash) + ' · <span class="' + (w.net >= 0 ? 'pos' : 'neg') + '">' + signed(w.net) + '</span>' : '–') + '</dd>' +
+      '<dt>12 weeks</dt><dd class="num">out ' + money(outv) + ' · in ' + money(inn) + ' · <span class="' + (inn - outv >= 0 ? 'pos' : 'neg') + '">' + signed(inn - outv) + '</span></dd>' +
+      '<dt>Once running</dt><dd class="num"><span class="' + (run >= 0 ? 'pos' : 'neg') + '">' + signed(run) + '</span> a month</dd>';
+  });
+
+  document.getElementById('chart-sub').textContent = 'W0 is the week of ' + dShort(START) + ' · ' + (pn === 'custom' ? 'custom rates' : pn === 'live' ? 'live rates' : 'backtest plan');
+  drawChart(res.rows);
+  drawLedger(res);
+
+  // text for the chat
+  var lines = [];
+  lines.push('Funded slots roadmap, week of ' + dShort(START));
+  lines.push('Rates: eval pass ' + state.rates.pass + '%, funded trade win ' + state.rates.win + '% x' + state.rates.tries + ' tries = ' + Math.round(c * 100) + '% funded to in profit' + (pn === 'live' ? ' (live so far)' : pn === 'plan' ? ' (backtest plan)' : '') + (num(state.rates.land, 100) !== 100 ? ', payouts landing ' + state.rates.land + '%' : ''));
+  state.firms.forEach(function(f, i){
+    var held = Math.round(num(f.fundedNow, 0) + num(f.inProfitNow, 0));
+    var pays = [money(f.pay1), money(f.pay2)];
+    if (num(f.pay3, 0) > 0 && num(f.q3, 0) > 0) pays.push(money(f.pay3) + ' (' + f.q3 + '% chance)');
+    lines.push((f.name || 'Firm') + ': holding ' + held + '/' + f.slots + ', buy ' + res.per[i].rows[0].buy + ' evals now (' + money(res.per[i].rows[0].evalCost) + (num(f.activation, 0) > 0 ? ' + ' + money(f.activation) + ' per activation' : '') + '). Per winning funded: ' + pays.join(' + ') + '.');
+  });
+  lines.push('Cash needed before payouts: ' + money(res.need) + (res.firstIn >= 0 ? '. First payout ' + wk(res.firstIn) : '') + '.');
+  lines.push('12 weeks: out ' + money(res.totOut) + ', in ' + money(res.totIn) + ', net ' + signed(res.net) + '. Once running: about ' + signed(res.run) + ' a month.');
+  others.forEach(function(k){ var o = outcome(fracRates(PRESETS[k])); lines.push(label[k] + ': 12-week net ' + signed(o.net) + ', about ' + signed(o.run) + ' a month.'); });
+  lastText = lines.join('\n');
+  document.getElementById('eyebrow').textContent = 'Prop roadmap · week of ' + dShort(START) + ' ' + START.getFullYear();
+}
+
+document.getElementById('copy').addEventListener('click', function(){
+  var toast = document.getElementById('toast'), fall = document.getElementById('copyfall');
+  function fallback(){
+    fall.hidden = false;
+    fall.innerHTML = '<label class="small muted" for="copytext">Copy this text</label><textarea class="copyfall" id="copytext" readonly></textarea>';
+    var ta = document.getElementById('copytext'); ta.value = lastText; ta.focus(); ta.select();
+    toast.textContent = 'Select and copy the text below.';
+  }
+  try {
+    navigator.clipboard.writeText(lastText).then(function(){ toast.textContent = 'Copied'; fall.hidden = true; setTimeout(function(){ toast.textContent = ''; }, 2500); }, fallback);
+  } catch (e) { fallback(); }
+});
+
+syncRates();
+buildFirms();
+update();
+})();
+</script>
+</body>
+</html>
