@@ -90,6 +90,9 @@ header.top{display:flex;flex-direction:column;gap:10px}
 .btn{font:600 14px/1 var(--font-body);padding:9px 13px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);cursor:pointer}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.ghost{background:transparent}
+.size{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:12px}
+.firm-top .field.cap{flex:0 0 110px}
+.capline{margin:0;font-size:13.5px;color:var(--muted)}
 .btnrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .toast{font-size:13px;color:var(--good)}
 
@@ -134,6 +137,8 @@ th.l,td.l{text-align:left}
 td.l{font-family:var(--font-body)}
 tr:last-child td{border-bottom:0}
 tr.now td{background:var(--accent-soft)}
+tr.past td{background:var(--sunk)}
+.chip.act{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
 .chip{display:inline-block;font:600 11.5px/1 var(--font-body);padding:4px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn);margin-right:4px}
 .status{display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 var(--font-body);padding:5px 9px;border-radius:999px}
 .status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
@@ -452,43 +457,96 @@ function wk(t){ return 'W' + t + ' (' + dShort(weekStart(t)) + ')'; }
 // ---------- firm cards ----------
 var firmsEl = document.getElementById('firms');
 var FIELDS = [
-  ['Accounts now', [['fundedNow','Funded, not in profit',''],['inProfitNow','In profit, awaiting payouts',''],['openEvals','Open evals',''],['slots','Slot cap','']]],
+  ['Accounts now', [['fundedNow','Funded, not in profit',''],['inProfitNow','In profit, awaiting payouts',''],['openEvals','Open evals',''],['slots','Slots for this size','']]],
   ['Costs', [['evalPrice','Eval price','$'],['activation','Activation per funded','$'],['monthly','Monthly fee per account','$']]],
   ['Cash to you per winning funded', [['pay1','Payout 1, week +2','$'],['pay2','Payout 2, week +4','$'],['pay3','Payout 3, week +6 (needs a flip)','$']]]
 ];
-function buildFirms(){
-  firmsEl.innerHTML = state.firms.map(function(f, i){
-    var groups = FIELDS.map(function(g){
-      var cls = g[1].length === 2 ? 'grid2' : 'grid4';
-      return '<div class="group"><span class="gl">' + g[0] + '</span><div class="' + cls + '">' + g[1].map(function(x){
-        var id = 'f' + i + '-' + x[0];
-        var pre = x[2] === '$' ? '<span>$</span>' : '';
-        var post = x[2] === '%' ? '<span class="after">%</span>' : '';
-        return '<div class="field"><label for="' + id + '">' + x[1] + '</label><div class="inp">' + pre +
-          '<input id="' + id + '" type="number" inputmode="decimal" min="0" step="' + (x[2] === '$' ? 10 : 1) + '" data-i="' + i + '" data-k="' + x[0] + '" value="' + esc(f[x[0]]) + '">' + post + '</div></div>';
-      }).join('') + '</div></div>';
-    }).join('');
-    var rm = state.firms.length > 1 ? '<button type="button" class="btn ghost" data-rm="' + i + '" aria-label="Remove ' + esc(f.name) + '">Remove</button>' : '';
-    return '<article class="firm" aria-label="' + esc(f.name) + '">' +
-      '<div class="firm-top"><div class="field"><label for="f' + i + '-name">Firm and size</label><div class="inp"><input id="f' + i + '-name" type="text" data-i="' + i + '" data-k="name" value="' + esc(f.name) + '"></div></div>' + rm + '</div>' +
-      groups +
-      '<dl class="out" id="f' + i + '-out"></dl>' +
-      (f.note ? '<p class="note">' + esc(f.note) + '</p>' : '') +
-      '</article>';
+function normalize(){
+  state.firms.forEach(function(f){
+    if (f.firm === undefined){ var m = String(f.name || '').match(/^(.*?)\s+(\d+(?:\.\d+)?k)$/i); f.firm = m ? m[1] : (f.name || 'Firm'); f.size = m ? m[2] : ''; }
+    if (f.size === undefined) f.size = '';
+    if (f.firmCap === undefined) f.firmCap = 5;
+    f.name = (f.firm + ' ' + f.size).trim();
+  });
+}
+var GROUPS = [];
+function groupsOf(){
+  var map = {}, out = [];
+  state.firms.forEach(function(f, i){ var key = String(f.firm).trim().toLowerCase(); if (!(key in map)){ map[key] = out.length; out.push([]); } out[map[key]].push(i); });
+  return out;
+}
+function sizeFields(f, i){
+  return FIELDS.map(function(g){
+    var cls = g[1].length === 2 ? 'grid2' : 'grid4';
+    return '<div class="group"><span class="gl">' + g[0] + '</span><div class="' + cls + '">' + g[1].map(function(x){
+      var id = 'f' + i + '-' + x[0];
+      var pre = x[2] === '$' ? '<span>$</span>' : '';
+      var post = x[2] === '%' ? '<span class="after">%</span>' : '';
+      return '<div class="field"><label for="' + id + '">' + x[1] + '</label><div class="inp">' + pre +
+        '<input id="' + id + '" type="number" inputmode="decimal" min="0" step="' + (x[2] === '$' ? 10 : 1) + '" data-i="' + i + '" data-k="' + x[0] + '" value="' + esc(f[x[0]]) + '">' + post + '</div></div>';
+    }).join('') + '</div></div>';
   }).join('');
 }
+function buildFirms(){
+  normalize(); GROUPS = groupsOf();
+  firmsEl.innerHTML = GROUPS.map(function(idx, g){
+    var f0 = state.firms[idx[0]];
+    var sizes = idx.map(function(i){
+      var f = state.firms[i];
+      var rm = idx.length > 1 ? '<button type="button" class="btn ghost" data-rm="' + i + '" aria-label="Remove ' + esc(f.name) + '">Remove size</button>' : '';
+      return '<div class="size"><div class="firm-top"><div class="field"><label for="f' + i + '-size">Account size</label><div class="inp"><input id="f' + i + '-size" type="text" data-i="' + i + '" data-k="size" value="' + esc(f.size) + '"></div></div>' + rm + '</div>' +
+        sizeFields(f, i) + '<dl class="out" id="f' + i + '-out"></dl>' + (f.note ? '<p class="note">' + esc(f.note) + '</p>' : '') + '</div>';
+    }).join('');
+    var rmf = GROUPS.length > 1 ? '<button type="button" class="btn ghost" data-rmfirm="' + g + '" aria-label="Remove ' + esc(f0.firm) + '">Remove firm</button>' : '';
+    return '<article class="firm" aria-label="' + esc(f0.firm) + '">' +
+      '<div class="firm-top"><div class="field"><label for="g' + g + '-firm">Firm</label><div class="inp"><input id="g' + g + '-firm" type="text" data-g="' + g + '" data-k="firm" value="' + esc(f0.firm) + '"></div></div>' +
+      '<div class="field cap"><label for="g' + g + '-cap">Max funded</label><div class="inp"><input id="g' + g + '-cap" type="number" inputmode="numeric" min="0" step="1" data-g="' + g + '" data-k="firmCap" value="' + esc(f0.firmCap) + '"></div></div>' + rmf + '</div>' +
+      '<p class="capline" id="cap-' + g + '"></p>' + sizes +
+      '<div class="btnrow"><button type="button" class="btn ghost" data-addsize="' + g + '">Add a size</button></div></article>';
+  }).join('');
+}
+function drawCaps(){
+  GROUPS.forEach(function(idx, g){
+    var el = document.getElementById('cap-' + g); if (!el) return;
+    var cap = num(state.firms[idx[0]].firmCap, 5);
+    var parts = idx.map(function(i){ return Math.round(num(state.firms[i].slots, 0)); });
+    var sum = parts.reduce(function(a, b){ return a + b; }, 0);
+    var held = idx.reduce(function(a, i){ return a + num(state.firms[i].fundedNow, 0) + num(state.firms[i].inProfitNow, 0); }, 0);
+    el.innerHTML = 'Slots by size: ' + idx.map(function(i, j){ return esc(state.firms[i].size || 'size') + ' ' + parts[j]; }).join(' + ') +
+      ' = <strong>' + sum + '</strong> of max ' + cap + ' · holding ' + acc(held) +
+      (sum > cap ? ' <span class="status bad">Over the firm max: lower a size\'s slots</span>' : '');
+  });
+}
 firmsEl.addEventListener('input', function(e){
-  var el = e.target; if (!el.dataset || el.dataset.i === undefined) return;
-  var f = state.firms[+el.dataset.i], k = el.dataset.k;
-  if (k === 'name') f.name = el.value; else f[k] = el.value === '' ? 0 : Number(el.value);
+  var el = e.target; if (!el.dataset) return; var k = el.dataset.k;
+  if (el.dataset.g !== undefined){
+    (GROUPS[+el.dataset.g] || []).forEach(function(i){
+      var f = state.firms[i];
+      if (k === 'firm'){ f.firm = el.value; f.name = (f.firm + ' ' + f.size).trim(); }
+      else f.firmCap = el.value === '' ? 0 : Math.max(0, Math.round(Number(el.value)));
+    });
+    save(); update(); return;
+  }
+  if (el.dataset.i === undefined) return;
+  var f = state.firms[+el.dataset.i];
+  if (k === 'size'){ f.size = el.value; f.name = (f.firm + ' ' + f.size).trim(); }
+  else f[k] = el.value === '' ? 0 : Number(el.value);
   if (k === 'slots') f.slots = Math.max(0, Math.round(num(f.slots, 0)));
   save(); update();
 });
+firmsEl.addEventListener('change', function(e){ if (e.target.dataset && e.target.dataset.k === 'firm'){ buildFirms(); update(); } });
 firmsEl.addEventListener('click', function(e){
-  var b = e.target.closest('[data-rm]'); if (!b) return;
-  state.firms.splice(+b.dataset.rm, 1); save(); buildFirms(); update();
+  var b = e.target.closest('[data-rm],[data-rmfirm],[data-addsize]'); if (!b) return;
+  if (b.dataset.rm !== undefined) state.firms.splice(+b.dataset.rm, 1);
+  else if (b.dataset.rmfirm !== undefined) GROUPS[+b.dataset.rmfirm].slice().sort(function(a, c){ return c - a; }).forEach(function(i){ state.firms.splice(i, 1); });
+  else {
+    var idx = GROUPS[+b.dataset.addsize], last = idx[idx.length - 1], n = clone(state.firms[last]);
+    n.size = 'New size'; n.name = (n.firm + ' New size').trim(); n.fundedNow = 0; n.inProfitNow = 0; n.openEvals = 0; n.slots = 0; n.note = '';
+    state.firms.splice(last + 1, 0, n);
+  }
+  save(); buildFirms(); update();
 });
-document.getElementById('add').addEventListener('click', function(){ state.firms.push(clone(NEW_FIRM)); save(); buildFirms(); update(); });
+document.getElementById('add').addEventListener('click', function(){ var n = clone(NEW_FIRM); n.firm = 'New firm'; n.size = '50K'; n.firmCap = 5; n.name = 'New firm 50K'; state.firms.push(n); save(); buildFirms(); update(); });
 document.getElementById('reset').addEventListener('click', function(){ state = clone(DEFAULTS); save(); syncRates(); buildFirms(); update(); });
 
 // ---------- rates ----------
@@ -529,6 +587,10 @@ function drawChart(rows){
   var band = iw / n; function x(i){ return m.l + band * (i + 0.5); }
   var bw = Math.max(5, Math.min(24, band * 0.46));
   var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+  var past = 0; rows.forEach(function(r){ if (r.actual) past++; });
+  if (past){ s += '<rect x="' + m.l + '" y="' + m.t + '" width="' + (band * past).toFixed(1) + '" height="' + ih + '" fill="var(--sunk)"/>' +
+    '<text x="' + (m.l + 6) + '" y="' + (m.t + 12) + '" style="fill:var(--ink);font-weight:600">Actual</text>' +
+    '<text x="' + (m.l + band * past + 6) + '" y="' + (m.t + 12) + '" style="fill:var(--ink);font-weight:600">Plan</text>'; }
   for (var v = y0; v <= y1 + step / 2; v += step){
     var yy = Math.round(y(v)) + 0.5;
     s += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--line)" stroke-width="1"' + (Math.abs(v) < 1e-6 ? '' : ' stroke-dasharray="2 4"') + '/>';
@@ -541,8 +603,8 @@ function drawChart(rows){
     if (r.inn > 0.5) s += '<path d="' + barPath(x0, x1, zy - 1, y(r.inn), true) + '" fill="var(--in)"/>';
     if (r.out > 0.5) s += '<path d="' + barPath(x0, x1, zy + 1, y(-r.out), false) + '" fill="var(--out)"/>';
     if (i % every === 0){
-      s += '<text x="' + cx + '" y="' + (H - m.b + 16) + '" text-anchor="middle" style="fill:var(--ink)">W' + i + '</text>';
-      s += '<text x="' + cx + '" y="' + (H - m.b + 30) + '" text-anchor="middle">' + dShort(weekStart(i)) + '</text>';
+      s += '<text x="' + cx + '" y="' + (H - m.b + 16) + '" text-anchor="middle" style="fill:var(--ink)">W' + r.t + '</text>';
+      s += '<text x="' + cx + '" y="' + (H - m.b + 30) + '" text-anchor="middle">' + dShort(weekStart(r.t)) + '</text>';
     }
   });
   var d = rows.map(function(r, i){ return (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(r.cum).toFixed(1); }).join('');
@@ -561,12 +623,13 @@ function showTip(i){
   if (!geom || !lastRows[i]) return;
   var r = lastRows[i], cx = geom.x(i), xh = chartEl.querySelector('#xhair');
   if (xh){ xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('visibility', 'visible'); }
-  var cal = calFor(i);
-  tipEl.innerHTML = '<div class="h">W' + i + ' · from ' + dShort(weekStart(i)) + (cal.length ? ' · ' + esc(cal.join(', ')) : '') + '</div>' +
+  var cal = calFor(r.t);
+  tipEl.innerHTML = '<div class="h">W' + r.t + ' · from ' + dShort(weekStart(r.t)) + (r.actual ? ' · actual' : '') + (cal.length ? ' · ' + esc(cal.join(', ')) : '') + '</div>' +
     '<div class="r"><span><i style="background:var(--in)"></i>Payouts in</span><span class="num">' + money(r.inn) + '</span></div>' +
-    '<div class="r"><span><i style="background:var(--out)"></i>Evals and activations</span><span class="num">' + money(r.out) + '</span></div>' +
+    '<div class="r"><span><i style="background:var(--out)"></i>' + (r.actual ? 'Fees paid' : 'Evals and activations') + '</span><span class="num">' + money(r.out) + '</span></div>' +
     '<div class="r"><span><i style="background:var(--net)"></i>Running total</span><span class="num">' + signed(r.cum) + '</span></div>' +
-    '<div class="r"><span>Evals to buy</span><span class="num">' + r.buy + '</span></div>';
+    (r.actual ? '' : '<div class="r"><span>Evals to buy</span><span class="num">' + r.buy + '</span></div>') +
+    (r.items && r.items.length ? '<div class="r"><span>' + r.items.map(function(e){ return esc(itemText(e)); }).join('<br>') + '</span></div>' : '');
   tipEl.hidden = false;
   var tw = tipEl.offsetWidth, left = cx + 14;
   if (left + tw > geom.W) left = cx - tw - 14;
@@ -592,17 +655,39 @@ chartEl.addEventListener('blur', function(){ focusIdx = -1; hideTip(); });
 if (window.ResizeObserver){ var lastW = 0; new ResizeObserver(function(){ var w = chartEl.clientWidth; if (Math.abs(w - lastW) > 2 && lastRows.length){ lastW = w; drawChart(lastRows); } }).observe(chartEl); }
 
 // ---------- ledger table ----------
-function drawLedger(res){
+// ---------- your actual history (fees out, payouts in) ----------
+var ACTUALS = [
+  ['2026-09-26','Topstep','fee',864.50], ['2026-09-29','Topstep','fee',425.00], ['2026-10-18','Lucid','fee',955.70], ['2026-10-22','Lucid','fee',928.80],
+  ['2026-10-29','Topstep','fee',708.10], ['2026-11-01','Aqua','fee',648.98], ['2026-11-01','Topstep','fee',425.00], ['2026-11-04','Tradify','fee',729.60],
+  ['2026-11-04','Aqua','fee',648.98], ['2026-11-04','Lucid','payout',891.23], ['2026-11-06','Topstep','fee',312.75], ['2026-11-08','Futureselite','fee',845.61],
+  ['2026-11-08','BG','fee',443.74], ['2026-11-09','Topstep','fee',425.00], ['2026-11-09','Lucid','payout',891.23]
+];
+function itemText(e){ return e.firm + (e.kind === 'payout' ? ' payout +' : ' fee −') + money(e.amt); }
+function withHistory(res){
+  var n = res.per.length, h = [], w0 = { out: 0, inn: 0, items: [] }, minT = 0, totOut = 0, totIn = 0;
+  var ev = ACTUALS.map(function(a){ var p = a[0].split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]); return { t: Math.floor(Math.round((d - START) / 864e5) / 7), firm: a[1], kind: a[2], amt: a[3] }; })
+    .filter(function(e){ return e.t <= 0; });
+  ev.forEach(function(e){ if (e.t < minT) minT = e.t; });
+  for (var t = minT; t < 0; t++){ var z = []; for (var k = 0; k < n; k++) z.push(0); h.push({ t: t, actual: true, items: [], out: 0, inn: 0, buy: 0, buys: z }); }
+  ev.forEach(function(e){ var row = e.t < 0 ? h[e.t - minT] : w0; if (e.kind === 'payout'){ row.inn += e.amt; totIn += e.amt; } else { row.out += e.amt; totOut += e.amt; } row.items.push(e); });
+  var cum = 0; h.forEach(function(r){ cum += r.inn - r.out; r.cum = cum; });
+  var base = cum + w0.inn - w0.out;
+  var proj = res.rows.map(function(r, i){ var o = {}; for (var key in r) o[key] = r[key]; if (i === 0){ o.out += w0.out; o.inn += w0.inn; o.items = w0.items; } o.cum = r.cum + base; return o; });
+  return { rows: h.concat(proj), past: h.length, base: base, totOut: totOut, totIn: totIn, first: minT };
+}
+function drawLedger(disp){
   var names = state.firms.map(function(f){ return esc(f.name || 'Firm'); });
-  var head = '<thead><tr><th class="l">Week</th><th class="l">Starts</th><th class="l">Calendar</th>' +
+  var head = '<thead><tr><th class="l">Week</th><th class="l">Starts</th><th class="l">Calendar and actual</th>' +
     names.map(function(nm){ return '<th>Buy · ' + nm + '</th>'; }).join('') +
     '<th>Out</th><th>In</th><th>Running total</th><th>In profit</th><th>Funded trying</th></tr></thead>';
-  var body = res.rows.map(function(r){
-    var cal = calFor(r.t).map(function(c){ return '<span class="chip">' + esc(c) + '</span>'; }).join('');
-    return '<tr' + (r.t === 0 ? ' class="now"' : '') + '><td class="l"><strong>W' + r.t + '</strong></td><td class="l">' + dShort(weekStart(r.t)) + '</td><td class="l">' + (cal || '<span class="muted">–</span>') + '</td>' +
-      r.buys.map(function(b){ return '<td>' + (b ? b : '<span class="muted">–</span>') + '</td>'; }).join('') +
-      '<td>' + (r.out > 0.5 ? money(r.out) : '<span class="muted">–</span>') + '</td><td>' + (r.inn > 0.5 ? money(r.inn) : '<span class="muted">–</span>') + '</td>' +
-      '<td class="' + (r.cum < -0.5 ? 'neg' : r.cum > 0.5 ? 'pos' : '') + '">' + signed(r.cum) + '</td><td>' + acc(r.winning) + '</td><td>' + acc(r.trying) + '</td></tr>';
+  var dash = '<span class="muted">–</span>';
+  var body = disp.rows.map(function(r){
+    var cal = calFor(r.t).map(function(c){ return '<span class="chip">' + esc(c) + '</span>'; }).join('') +
+      (r.items || []).map(function(e){ return '<span class="chip act">' + esc(itemText(e)) + '</span>'; }).join('');
+    return '<tr' + (r.actual ? ' class="past"' : r.t === 0 ? ' class="now"' : '') + '><td class="l"><strong>W' + r.t + '</strong>' + (r.actual ? ' <span class="muted small">actual</span>' : '') + '</td><td class="l">' + dShort(weekStart(r.t)) + '</td><td class="l">' + (cal || dash) + '</td>' +
+      r.buys.map(function(b){ return '<td>' + (b ? b : dash) + '</td>'; }).join('') +
+      '<td>' + (r.out > 0.5 ? money(r.out) : dash) + '</td><td>' + (r.inn > 0.5 ? money(r.inn) : dash) + '</td>' +
+      '<td class="' + (r.cum < -0.5 ? 'neg' : r.cum > 0.5 ? 'pos' : '') + '">' + signed(r.cum) + '</td><td>' + (r.actual ? dash : acc(r.winning)) + '</td><td>' + (r.actual ? dash : acc(r.trying)) + '</td></tr>';
   }).join('');
   document.getElementById('ledger').innerHTML = head + '<tbody>' + body + '</tbody>';
 }
@@ -630,6 +715,7 @@ function update(){
     'Funded to in profit <strong class="num">' + Math.round(c * 100) + '%</strong>. ' +
     (pc > 0 ? 'About <strong class="num">' + (1 / pc).toFixed(1) + '</strong> evals per winning funded.' : 'No evals can pass at these rates.');
 
+  drawCaps();
   var res = outcome(rr);
   // tiles
   var buyNow = res.rows[0].buy, buyCost = 0;
@@ -652,7 +738,7 @@ function update(){
     return '<strong>' + label[k] + ':</strong> buy ' + o.rows[0].buy + ' now, need ' + money(o.need) + ', ' + signed(o.net) + ' after 12 weeks, ' + signed(o.run) + ' a month once running.';
   });
   document.getElementById('alt').innerHTML = altText.join(' ');
-  document.getElementById('sum-h').textContent = state.firms.length === 2 ? 'Both firms together' : state.firms.length === 1 ? 'Your firm' : 'All ' + state.firms.length + ' firms together';
+  document.getElementById('sum-h').textContent = GROUPS.length === 2 ? 'Both firms together' : GROUPS.length === 1 ? 'Your firm' : 'All ' + GROUPS.length + ' firms together';
 
   // per firm outputs
   state.firms.forEach(function(f, i){
@@ -668,9 +754,10 @@ function update(){
       '<dt>Once running</dt><dd class="num"><span class="' + (run >= 0 ? 'pos' : 'neg') + '">' + signed(run) + '</span> a month</dd>';
   });
 
-  document.getElementById('chart-sub').textContent = 'W0 is the week of ' + dShort(START) + ' · ' + (pn === 'custom' ? 'custom rates' : pn === 'live' ? 'live rates' : 'backtest plan');
-  drawChart(res.rows);
-  drawLedger(res);
+  var disp = withHistory(res);
+  document.getElementById('chart-sub').textContent = (disp.past ? 'Shaded: your actual weeks since ' + dShort(weekStart(disp.first)) + ' · ' : '') + 'W0 is this week, ' + dShort(START) + ' · plan uses ' + (pn === 'custom' ? 'custom rates' : pn === 'live' ? 'live rates' : 'backtest plan');
+  drawChart(disp.rows);
+  drawLedger(disp);
 
   // text for the chat
   var lines = [];
@@ -682,6 +769,7 @@ function update(){
     if (num(f.pay3, 0) > 0) pays.push(money(f.pay3) + ' (only after a good flip, ' + state.rates.flip + '%)');
     lines.push((f.name || 'Firm') + ': holding ' + held + '/' + f.slots + ', buy ' + res.per[i].rows[0].buy + ' evals now (' + money(res.per[i].rows[0].evalCost) + (num(f.activation, 0) > 0 ? ' + ' + money(f.activation) + ' per activation' : '') + '). Per winning funded: ' + pays.join(' + ') + '.');
   });
+  lines.push('Actual so far: fees ' + money(disp.totOut) + ', payouts ' + money(disp.totIn) + ', net ' + signed(disp.totIn - disp.totOut) + '.');
   lines.push('Cash needed before payouts: ' + money(res.need) + (res.firstIn >= 0 ? '. First payout ' + wk(res.firstIn) : '') + '.');
   lines.push('Bad luck, 1 run in 10: need up to ' + money(bl.need90) + ', 12-week net ' + signed(bl.net10) + '; ' + Math.round(bl.behind * 100) + '% of runs still behind after 12 weeks.');
   lines.push('12 weeks: out ' + money(res.totOut) + ', in ' + money(res.totIn) + ', net ' + signed(res.net) + '. Once running: about ' + signed(res.run) + ' a month.');
