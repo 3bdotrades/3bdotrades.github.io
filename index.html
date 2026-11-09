@@ -295,7 +295,7 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
       <li><strong>Funded to in profit.</strong> 1 − (1 − trade win)<sup>tries</sup>. Two tries because a $1,000 risk fits twice in a 50K account's $2,000 drawdown.</li>
       <li><strong>Payouts.</strong> 50% of profit per request, capped at $2,000 on a 50K, 90% to you (<a href="https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts" target="_blank" rel="noopener">LucidFlex payouts</a>, <a href="https://help.topstep.com/en/articles/8284233" target="_blank" rel="noopener">Topstep payout policy</a>). The Lucid figures are your real $891 payouts; Topstep's are $2,000, $1,000 and $500 withdrawals at 90%.</li>
       <li><strong>Prices.</strong> Topstep 50K is $49 a month plus a $149 activation on the Standard path (<a href="https://intercom.help/topstep-llc/en/articles/9208217-topstep-pricing" target="_blank" rel="noopener">pricing</a>). Lucid 50K runs about $70 with a code and $130–175 without. Use your checkout price.</li>
-      <li><strong>Buying rule.</strong> Every second week the model buys enough evals to fill the open slots, counting slots that free within two weeks. Funded accounts not yet in profit hold their slot, so a full size buys nothing until a slot frees up. It caps a batch at 25, or at 5 once a firm holds 3 accounts.</li>
+      <li><strong>Buying rule.</strong> Every second week the model buys enough evals to fill the firm's free trading slots, counting slots that free within two weeks. Accounts above a firm's max sit idle and take the next free slots before any new eval, best-paying size first. Funded accounts not yet in profit hold their slot. New evals go to the size that earns the most per winning funded. A batch is capped at 25, or at 5 once a firm has 3 accounts trading.</li>
       <li><strong>After the last payout.</strong> The account counts as lost and its slot frees up, as in the chat's "expect to lose some funded after the third cycle". Topstep accounts without a good flip are lost after payout 2. Any account that keeps trading is extra upside.</li>
       <li><strong>Fees.</strong> Put platform, data or subscription fees in <em>Monthly fee per account</em>. It is charged every 4 weeks for every held account and open eval.</li>
       <li><strong>Bad luck.</strong> The tiles are averages. The bad-luck line replays the 12 weeks 1,000 times, passing and failing whole accounts at random, and shows the worst run in 10.</li>
@@ -312,66 +312,95 @@ function clamp01(v){ v = Number(v); return isFinite(v) ? Math.min(1, Math.max(0,
 function fundedToProfit(win, tries){ return 1 - Math.pow(1 - clamp01(win), Math.max(1, Math.round(num(tries, 1)))); }
 function rng(seed){ return function(){ seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-// One firm, week by week. Rates are fractions (0..1). Without rnd: expected values. With rnd: whole accounts pass or fail at random.
-function simulateFirm(f, r, weeks, rnd){
-  var pass = clamp01(r.pass), c = fundedToProfit(r.win, r.tries), land = clamp01(r.land), pc = pass * c;
-  var slots = Math.max(0, Math.floor(num(f.slots, 0)));
-  var q3 = clamp01(r.flip);
-  var pay1 = Math.max(0, num(f.pay1, 0)), pay2 = Math.max(0, num(f.pay2, 0)), pay3 = Math.max(0, num(f.pay3, 0));
-  var price = Math.max(0, num(f.evalPrice, 0)), actFee = Math.max(0, num(f.activation, 0)), monthly = Math.max(0, num(f.monthly, 0));
-  var L = weeks + 12, i;
+// The firms' accounts, week by week. Rates are fractions (0..1). Without rnd: expected values. With rnd: whole accounts pass or fail at random.
+// The sizes of one firm share its max-trading cap. Accounts above it sit idle and take the next free slots, best-paying size first.
+function groupKey(f){ return String(f.firm !== undefined ? f.firm : (f.name || '')).trim().toLowerCase(); }
+function simulateAll(firms, r, weeks, rnd){
+  var map = {}, groups = [], per = new Array(firms.length);
+  firms.forEach(function(f, i){ var k = groupKey(f); if (!(k in map)){ map[k] = groups.length; groups.push([]); } groups[map[k]].push(i); });
+  groups.forEach(function(idx){
+    var sims = simulateGroup(idx.map(function(i){ return firms[i]; }), r, weeks, rnd);
+    idx.forEach(function(i, j){ per[i] = sims[j]; });
+  });
+  return per;
+}
+function simulateGroup(units, r, weeks, rnd){
+  var pass = clamp01(r.pass), c = fundedToProfit(r.win, r.tries), land = clamp01(r.land), pc = pass * c, q3 = clamp01(r.flip);
+  var L = weeks + 12, capSum = 0;
   function zeros(){ var a = new Array(L); for (var k = 0; k < L; k++) a[k] = 0; return a; }
   function draw(n, p){ if (!rnd) return n * p; var k = 0, m = Math.round(n); for (var j = 0; j < m; j++) if (rnd() < p) k++; return k; }
-  var passesAt = zeros(), evalsDone = zeros(), triesDone = zeros(), payAt = zeros(), winFree = zeros();
-  var wait = 0, pending = 0, trying = 0, winning = 0, occupied = 0;
-  function addWinning(t, n){
+  function tiny(v){ return Math.abs(v) < 1e-9 ? 0 : v; }
+  var U = units.map(function(f){
+    var w = perWinning(f, r);
+    var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pay1: Math.max(0, num(f.pay1, 0)), pay2: Math.max(0, num(f.pay2, 0)), pay3: Math.max(0, num(f.pay3, 0)),
+      price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0,
+      passesAt: zeros(), evalsDone: zeros(), triesDone: zeros(), payAt: zeros(), winFree: zeros(),
+      waitFunded: 0, wait: 0, pending: 0, trying: 0, winning: 0, rows: [] };
+    capSum += u.slots;
+    return u;
+  });
+  var cap = units[0].firmCap !== undefined ? Math.max(0, Math.floor(num(units[0].firmCap, 0))) : capSum;
+  var order = U.map(function(u, j){ return j; }).sort(function(a, b){ return (U[b].value - U[a].value) || (a - b); });
+  function addWinning(u, t, n){
     if (!(n > 0)) return;
-    var n3 = pay3 > 0 ? draw(n, q3) : 0;
-    winning += n;
-    payAt[t + 2] += n * pay1 * land;
-    payAt[t + 4] += n * pay2 * land;
-    payAt[t + 6] += n3 * pay3 * land;
-    winFree[t + 4] += n - n3;
-    winFree[t + 6] += n3;
+    var n3 = u.pay3 > 0 ? draw(n, q3) : 0;
+    u.winning += n;
+    u.payAt[t + 2] += n * u.pay1 * land;
+    u.payAt[t + 4] += n * u.pay2 * land;
+    u.payAt[t + 6] += n3 * u.pay3 * land;
+    u.winFree[t + 4] += n - n3;
+    u.winFree[t + 6] += n3;
   }
-  var fundedNow = Math.max(0, num(f.fundedNow, 0)), inProfitNow = Math.max(0, num(f.inProfitNow, 0)), openEvals = Math.max(0, num(f.openEvals, 0));
-  if (rnd){ fundedNow = Math.round(fundedNow); inProfitNow = Math.round(inProfitNow); openEvals = Math.round(openEvals); }
-  occupied = fundedNow + inProfitNow;
-  trying = fundedNow; triesDone[1] += fundedNow;
-  addWinning(0, inProfitNow);
-  pending = openEvals; passesAt[1] += draw(openEvals, pass); evalsDone[1] += openEvals;
-  var rows = [];
+  function trading(){ var s = 0; U.forEach(function(u){ s += u.trying + u.winning; }); return s; }
+  units.forEach(function(f, j){
+    var u = U[j], fn = Math.max(0, num(f.fundedNow, 0)), ip = Math.max(0, num(f.inProfitNow, 0)), oe = Math.max(0, num(f.openEvals, 0));
+    if (rnd){ fn = Math.round(fn); ip = Math.round(ip); oe = Math.round(oe); }
+    addWinning(u, 0, ip);
+    u.waitFunded = fn;
+    u.pending = oe; u.passesAt[1] += draw(oe, pass); u.evalsDone[1] += oe;
+  });
   for (var t = 0; t < weeks; t++){
-    wait += passesAt[t];
-    pending = Math.max(0, pending - evalsDone[t]);
-    var done = triesDone[t], won = 0, lost = 0;
-    if (done > 0){ won = draw(done, c); lost = done - won; trying -= done; occupied -= lost; addWinning(t, won); }
-    winning -= winFree[t]; occupied -= winFree[t];
-    if (Math.abs(winning) < 1e-9) winning = 0;
-    if (Math.abs(occupied) < 1e-9) occupied = 0;
-    if (Math.abs(trying) < 1e-9) trying = 0;
-    var cashIn = payAt[t];
-    var free = Math.max(0, slots - occupied);
-    var act = Math.min(wait, free);
-    wait -= act; occupied += act; trying += act; triesDone[t + 1] += act;
-    var buy = 0;
-    if (t % 2 === 0 && pc > 0 && slots > 0){
-      var soonFree = winFree[t + 1] + winFree[t + 2];
-      var covered = Math.max(0, winning - soonFree) + trying + wait * c + pending * pc;
-      var need = slots - covered;
-      var maxBatch = occupied >= 3 - 1e-6 ? 5 : 25;
-      if (need >= 0.5) buy = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
+    U.forEach(function(u){
+      u.wait += u.passesAt[t];
+      u.pending = Math.max(0, u.pending - u.evalsDone[t]);
+      var done = u.triesDone[t]; u.won = 0; u.lost = 0;
+      if (done > 0){ u.won = draw(done, c); u.lost = done - u.won; u.trying -= done; addWinning(u, t, u.won); }
+      u.winning -= u.winFree[t];
+      u.winning = tiny(u.winning); u.trying = tiny(u.trying); u.wait = tiny(u.wait); u.waitFunded = tiny(u.waitFunded);
+      u.act = 0; u.buy = 0;
+    });
+    // idle accounts take free slots: already-funded ones first (no new activation fee), then passed evals
+    var free = Math.max(0, cap - trading());
+    order.forEach(function(j){
+      var u = U[j], room = Math.max(0, u.slots - u.trying - u.winning);
+      var a1 = Math.min(u.waitFunded, free, room); free -= a1; room -= a1; u.waitFunded -= a1;
+      var a2 = Math.min(u.wait, free, room); free -= a2; u.wait -= a2;
+      u.trying += a1 + a2; u.triesDone[t + 1] += a1 + a2; u.act = a2;
+    });
+    if (t % 2 === 0 && pc > 0 && cap > 0){
+      var covered = 0;
+      U.forEach(function(u){ covered += Math.max(0, u.winning - u.winFree[t + 1] - u.winFree[t + 2]) + u.trying + (u.waitFunded + u.wait) * c + u.pending * pc; });
+      var need = cap - covered;
+      if (need >= 0.5){
+        var maxBatch = trading() >= 0.6 * cap - 1e-6 ? cap : 5 * cap;
+        var total = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
+        var pick = order[0];
+        for (var o = 0; o < order.length; o++){ var v = U[order[o]]; if (v.trying + v.winning + v.waitFunded + v.wait + v.pending * pass < v.slots){ pick = order[o]; break; } }
+        U[pick].buy = total;
+      }
     }
-    pending += buy; passesAt[t + 1] += draw(buy, pass); evalsDone[t + 1] += buy;
-    var evalCost = buy * price, actCost = act * actFee, feeCost = (monthly > 0 && t % 4 === 0) ? monthly * (occupied + pending) : 0;
-    rows.push({ t: t, buy: buy, act: act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost, inn: cashIn,
-                won: won, lost: lost, winning: winning, trying: trying, wait: wait, occupied: occupied });
+    U.forEach(function(u){
+      u.pending += u.buy; u.passesAt[t + 1] += draw(u.buy, pass); u.evalsDone[t + 1] += u.buy;
+      var evalCost = u.buy * u.price, actCost = u.act * u.actFee, feeCost = (u.monthly > 0 && t % 4 === 0) ? u.monthly * (u.trying + u.winning + u.pending) : 0;
+      u.rows.push({ t: t, buy: u.buy, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost, inn: u.payAt[t],
+                    won: u.won, lost: u.lost, winning: u.winning, trying: u.trying, wait: u.wait + u.waitFunded, occupied: u.trying + u.winning });
+    });
   }
-  return { c: c, pc: pc, rows: rows };
+  return U.map(function(u){ return { c: c, pc: pc, rows: u.rows }; });
 }
 
 function runAll(firms, r, weeks, rnd){
-  var per = firms.map(function(f){ return simulateFirm(f, r, weeks, rnd); });
+  var per = simulateAll(firms, r, weeks, rnd);
   var rows = [], t, cum = 0, low = 0, lowAt = 0, firstIn = -1, even = -1;
   for (t = 0; t < weeks; t++){
     var row = { t: t, buy: 0, out: 0, inn: 0, winning: 0, trying: 0, wait: 0, buys: [] };
@@ -387,12 +416,12 @@ function runAll(firms, r, weeks, rnd){
   return { per: per, rows: rows, totOut: totOut, totIn: totIn, net: totIn - totOut, need: -low, lowAt: lowAt, firstIn: firstIn, even: even };
 }
 
-// Average month once the first wave is through (weeks 24-63 of a long run).
-function monthlyRunRate(firms, r){
-  var W = 64, from = 24, s = 0;
-  firms.forEach(function(f){ var rows = simulateFirm(f, r, W).rows; for (var t = from; t < W; t++) s += rows[t].inn - rows[t].out; });
-  return s / (W - from) * 52 / 12;
+// Average month once the first wave is through (weeks 24-63 of a long run), per account size.
+function monthlyUnits(firms, r){
+  var W = 64, from = 24;
+  return simulateAll(firms, r, W).map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
 }
+function monthlyRunRate(firms, r){ return monthlyUnits(firms, r).reduce(function(a, b){ return a + b; }, 0); }
 
 function perWinning(f, r){
   var pass = clamp01(r.pass), c = fundedToProfit(r.win, r.tries), land = clamp01(r.land), pc = pass * c;
@@ -457,7 +486,7 @@ function wk(t){ return 'W' + t + ' (' + dShort(weekStart(t)) + ')'; }
 // ---------- firm cards ----------
 var firmsEl = document.getElementById('firms');
 var FIELDS = [
-  ['Accounts now', [['fundedNow','Funded, not in profit',''],['inProfitNow','In profit, awaiting payouts',''],['openEvals','Open evals',''],['slots','Slots for this size','']]],
+  ['Accounts now', [['fundedNow','Funded, not in profit',''],['inProfitNow','In profit, awaiting payouts',''],['openEvals','Open evals',''],['slots','Max trading, this size','']]],
   ['Costs', [['evalPrice','Eval price','$'],['activation','Activation per funded','$'],['monthly','Monthly fee per account','$']]],
   ['Cash to you per winning funded', [['pay1','Payout 1, week +2','$'],['pay2','Payout 2, week +4','$'],['pay3','Payout 3, week +6 (needs a flip)','$']]]
 ];
@@ -500,21 +529,19 @@ function buildFirms(){
     var rmf = GROUPS.length > 1 ? '<button type="button" class="btn ghost" data-rmfirm="' + g + '" aria-label="Remove ' + esc(f0.firm) + '">Remove firm</button>' : '';
     return '<article class="firm" aria-label="' + esc(f0.firm) + '">' +
       '<div class="firm-top"><div class="field"><label for="g' + g + '-firm">Firm</label><div class="inp"><input id="g' + g + '-firm" type="text" data-g="' + g + '" data-k="firm" value="' + esc(f0.firm) + '"></div></div>' +
-      '<div class="field cap"><label for="g' + g + '-cap">Max funded</label><div class="inp"><input id="g' + g + '-cap" type="number" inputmode="numeric" min="0" step="1" data-g="' + g + '" data-k="firmCap" value="' + esc(f0.firmCap) + '"></div></div>' + rmf + '</div>' +
+      '<div class="field cap"><label for="g' + g + '-cap">Max trading at once</label><div class="inp"><input id="g' + g + '-cap" type="number" inputmode="numeric" min="0" step="1" data-g="' + g + '" data-k="firmCap" value="' + esc(f0.firmCap) + '"></div></div>' + rmf + '</div>' +
       '<p class="capline" id="cap-' + g + '"></p>' + sizes +
       '<div class="btnrow"><button type="button" class="btn ghost" data-addsize="' + g + '">Add a size</button></div></article>';
   }).join('');
 }
+function groupHeld(g){ return (GROUPS[g] || []).reduce(function(a, i){ return a + num(state.firms[i].fundedNow, 0) + num(state.firms[i].inProfitNow, 0); }, 0); }
+function groupCap(g){ var idx = GROUPS[g] || []; return idx.length ? num(state.firms[idx[0]].firmCap, 5) : 5; }
 function drawCaps(){
   GROUPS.forEach(function(idx, g){
     var el = document.getElementById('cap-' + g); if (!el) return;
-    var cap = num(state.firms[idx[0]].firmCap, 5);
-    var parts = idx.map(function(i){ return Math.round(num(state.firms[i].slots, 0)); });
-    var sum = parts.reduce(function(a, b){ return a + b; }, 0);
-    var held = idx.reduce(function(a, i){ return a + num(state.firms[i].fundedNow, 0) + num(state.firms[i].inProfitNow, 0); }, 0);
-    el.innerHTML = 'Slots by size: ' + idx.map(function(i, j){ return esc(state.firms[i].size || 'size') + ' ' + parts[j]; }).join(' + ') +
-      ' = <strong>' + sum + '</strong> of max ' + cap + ' · holding ' + acc(held) +
-      (sum > cap ? ' <span class="status bad">Over the firm max: lower a size\'s slots</span>' : '');
+    var cap = groupCap(g), held = groupHeld(g), idle = Math.max(0, held - cap);
+    el.innerHTML = 'Max <strong>' + cap + '</strong> trading at once · holding <strong>' + acc(held) + '</strong> (' + idx.map(function(i){ return esc(state.firms[i].size || 'size') + ' ' + acc(num(state.firms[i].fundedNow, 0) + num(state.firms[i].inProfitNow, 0)); }).join(' + ') + ')' +
+      (idle > 0 ? ' · <strong>' + acc(idle) + ' idle</strong>: they take the next free slots before any new eval' : '');
   });
 }
 firmsEl.addEventListener('input', function(e){
@@ -541,7 +568,7 @@ firmsEl.addEventListener('click', function(e){
   else if (b.dataset.rmfirm !== undefined) GROUPS[+b.dataset.rmfirm].slice().sort(function(a, c){ return c - a; }).forEach(function(i){ state.firms.splice(i, 1); });
   else {
     var idx = GROUPS[+b.dataset.addsize], last = idx[idx.length - 1], n = clone(state.firms[last]);
-    n.size = 'New size'; n.name = (n.firm + ' New size').trim(); n.fundedNow = 0; n.inProfitNow = 0; n.openEvals = 0; n.slots = 0; n.note = '';
+    n.size = 'New size'; n.name = (n.firm + ' New size').trim(); n.fundedNow = 0; n.inProfitNow = 0; n.openEvals = 0; n.slots = num(n.firmCap, 5); n.note = '';
     state.firms.splice(last + 1, 0, n);
   }
   save(); buildFirms(); update();
@@ -699,8 +726,10 @@ function outcome(rRates){
   res.run = monthlyRunRate(firms, rRates);
   return res;
 }
-function chatRule(held, slots){
-  if (held >= slots) return 'Full: buy only for slots that free up.';
+function chatRule(held, cap){
+  held = Math.round(held);
+  if (held > cap) return 'Over the max: ' + (held - cap) + ' idle account' + (held - cap === 1 ? '' : 's') + ' take the next free slots before any new eval.';
+  if (held >= cap) return 'Full: buy only for slots that free up.';
   if (held >= 3) return 'Chat rule: 3–5 evals at a time.';
   if (held === 0) return 'Chat rule: about 25 evals for 5 winning funded.';
   return 'Chat rule: about 5 evals per open slot, in batches.';
@@ -741,14 +770,16 @@ function update(){
   document.getElementById('sum-h').textContent = GROUPS.length === 2 ? 'Both firms together' : GROUPS.length === 1 ? 'Your firm' : 'All ' + GROUPS.length + ' firms together';
 
   // per firm outputs
+  var RUNS = monthlyUnits(state.firms.map(firmFrac), rr), gOf = [];
+  GROUPS.forEach(function(idx, g){ idx.forEach(function(i){ gOf[i] = g; }); });
   state.firms.forEach(function(f, i){
     var el = document.getElementById('f' + i + '-out'); if (!el) return;
     var p = res.per[i], w = perWinning(firmFrac(f), rr);
     var held = Math.round(num(f.fundedNow, 0) + num(f.inProfitNow, 0));
     var inn = 0, outv = 0; p.rows.forEach(function(x){ inn += x.inn; outv += x.out; });
-    var run = monthlyRunRate([firmFrac(f)], rr);
+    var run = RUNS[i];
     el.innerHTML =
-      '<dt>Buy this week</dt><dd><span class="buynow num">' + p.rows[0].buy + ' evals</span> <span class="muted num">' + money(p.rows[0].evalCost) + '</span><br><span class="muted small">' + chatRule(held, Math.round(num(f.slots, 5))) + '</span></dd>' +
+      '<dt>Buy this week</dt><dd><span class="buynow num">' + p.rows[0].buy + ' evals</span> <span class="muted num">' + money(p.rows[0].evalCost) + '</span><br><span class="muted small">' + chatRule(groupHeld(gOf[i]), groupCap(gOf[i])) + '</span></dd>' +
       '<dt>Each winning funded</dt><dd class="num">' + (w ? acc(w.evals) + ' evals · costs ' + money(w.cost) + ' · pays ' + money(w.cash) + ' · <span class="' + (w.net >= 0 ? 'pos' : 'neg') + '">' + signed(w.net) + '</span>' : '–') + '</dd>' +
       '<dt>12 weeks</dt><dd class="num">out ' + money(outv) + ' · in ' + money(inn) + ' · <span class="' + (inn - outv >= 0 ? 'pos' : 'neg') + '">' + signed(inn - outv) + '</span></dd>' +
       '<dt>Once running</dt><dd class="num"><span class="' + (run >= 0 ? 'pos' : 'neg') + '">' + signed(run) + '</span> a month</dd>';
