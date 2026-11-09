@@ -288,7 +288,7 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
     <ul class="notes">
       <li><strong>Timing.</strong> An eval resolves within a week, a funded account within a week of activation, and payouts land 2 and 4 weeks after it is in profit (6 for a third). Holiday and roll weeks run slower.</li>
       <li><strong>Funded to in profit.</strong> 1 − (1 − trade win)<sup>tries</sup>. Two tries because a $1,000 risk fits twice in a 50K account's $2,000 drawdown.</li>
-      <li><strong>Payouts.</strong> 50% of profit per request, capped at $2,000 on a 50K, 90% to you (<a href="https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts" target="_blank" rel="noopener">LucidFlex payouts</a>, <a href="https://help.topstep.com/en/articles/8284233" target="_blank" rel="noopener">Topstep payout policy</a>). The Lucid figures are the chat's own; Topstep's are $2,000, $1,000 and $500 withdrawals at 90%.</li>
+      <li><strong>Payouts.</strong> 50% of profit per request, capped at $2,000 on a 50K, 90% to you (<a href="https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts" target="_blank" rel="noopener">LucidFlex payouts</a>, <a href="https://help.topstep.com/en/articles/8284233" target="_blank" rel="noopener">Topstep payout policy</a>). The Lucid figures are your real $891 payouts; Topstep's are $2,000, $1,000 and $500 withdrawals at 90%.</li>
       <li><strong>Prices.</strong> Topstep 50K is $49 a month plus a $149 activation on the Standard path (<a href="https://intercom.help/topstep-llc/en/articles/9208217-topstep-pricing" target="_blank" rel="noopener">pricing</a>). Lucid 50K runs about $70 with a code and $130–175 without. Use your checkout price.</li>
       <li><strong>Buying rule.</strong> Every second week the model buys enough evals to fill the open slots, counting slots that free within two weeks. It caps a batch at 25, or at 5 once a firm holds 3 accounts.</li>
       <li><strong>After the last payout.</strong> The account counts as lost and its slot frees up, as in the chat's "expect to lose some funded after the third cycle". Topstep accounts without a good flip are lost after payout 2. Any account that keeps trading is extra upside.</li>
@@ -413,8 +413,8 @@ var NEW_FIRM = { name: 'New firm', slots: 5, fundedNow: 0, inProfitNow: 0, openE
 var DEFAULTS = {
   rates: PRESETS.live,
   firms: [
-    { name: 'Lucid 50K', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 70, activation: 0, pay1: 1900, pay2: 900, pay3: 0, monthly: 0,
-      note: 'From the chat: 5 Lucid in profit pay about $1,900 each in the first 2 weeks and $900 each in the next 2, about $2,800 an account.' },
+    { name: 'Lucid 50K', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 70, activation: 0, pay1: 891, pay2: 891, pay3: 0, monthly: 0,
+      note: 'Your real Lucid payouts so far: $891.23 each (4 and 9 Nov). The chat expected about $1,900 then $900, about $2,800 an account.' },
     { name: 'Topstep 50K', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 49, activation: 149, pay1: 1800, pay2: 900, pay3: 450, monthly: 0,
       note: 'The buffer shrinks with each payout: +$4k, then +$2k, then +$1k. Payout 3 only after a good flip (the Flip win rate); otherwise back to funded trading.' }
   ]
