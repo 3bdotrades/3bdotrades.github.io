@@ -842,8 +842,6 @@ document.getElementById('copy').addEventListener('click', function(){
 syncRates();
 buildFirms();
 update();
-})();
-
 // ---------- G1 sync: read the owner's fleet dashboard and fill the accounts ----------
 var G1_URL = 'https://randompotato247.github.io/fleet-dashboard/';
 var FIRM_ALIAS = { bg: 'blueguardian', tradify: 'tradeify' };
@@ -925,6 +923,8 @@ function syncG1(){
 }
 function nextDays(p){ var a = []; for (var d = 1; d <= 4; d++) a.push(p.days[d] ? p.days[d].buy : 0); return ' · next days ' + a.join(' · '); }
 drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000);
+})();
+
 </script>
 </body>
 </html>
