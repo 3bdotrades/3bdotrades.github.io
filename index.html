@@ -93,6 +93,8 @@ header.top{display:flex;flex-direction:column;gap:10px}
 .size{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:12px}
 .firm-top .field.cap{flex:0 0 110px}
 .capline{margin:0;font-size:13.5px;color:var(--muted)}
+.g1line{margin:6px 0 0;font-size:13.5px;color:var(--muted)}
+.g1line .btn{padding:2px 10px;margin-left:6px}
 .btnrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .toast{font-size:13px;color:var(--good)}
 
@@ -177,6 +179,7 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
 <div class="wrap">
   <header class="top">
     <h1>Funded Slots Roadmap</h1>
+    <p class="g1line" id="g1"></p>
   </header>
 
   <section class="rates" aria-labelledby="rates-h">
@@ -190,8 +193,10 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
     <div class="field"><label for="r-pass">Eval pass rate</label><div class="inp"><input id="r-pass" type="number" inputmode="decimal" min="0" max="100" step="1"><span class="after">%</span></div></div>
     <div class="field"><label for="r-win">Funded trade win</label><div class="inp"><input id="r-win" type="number" inputmode="decimal" min="0" max="100" step="1"><span class="after">%</span></div></div>
     <div class="field"><label for="r-tries">Tries per funded</label><div class="inp"><input id="r-tries" type="number" inputmode="numeric" min="1" max="4" step="1"></div></div>
-    <div class="field"><label for="r-land">Payouts that land</label><div class="inp"><input id="r-land" type="number" inputmode="decimal" min="0" max="100" step="5"><span class="after">%</span></div></div>
-    <div class="field"><label for="r-flip">Flip win (payout 3)</label><div class="inp"><input id="r-flip" type="number" inputmode="decimal" min="0" max="100" step="1"><span class="after">%</span></div></div>
+    <div class="field"><label for="r-paydays">Days per payout</label><div class="inp"><input id="r-paydays" type="number" inputmode="numeric" min="1" max="20" step="1"></div></div>
+    <div class="field"><label for="r-lossdays">Losing flip days allowed</label><div class="inp"><input id="r-lossdays" type="number" inputmode="numeric" min="1" max="60" step="1"></div></div>
+    <div class="field"><label for="r-evaldays">Eval days</label><div class="inp"><input id="r-evaldays" type="number" inputmode="numeric" min="1" max="30" step="1"></div></div>
+    <div class="field"><label for="r-flip">Flip win</label><div class="inp"><input id="r-flip" type="number" inputmode="decimal" min="0" max="100" step="1"><span class="after">%</span></div></div>
     <p class="derived" id="derived"></p>
   </section>
 
@@ -201,7 +206,7 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
       <div class="btnrow"><button type="button" class="btn" id="copy">Copy summary for the chat</button><span class="toast" id="toast" role="status"></span></div>
     </div>
     <div class="tiles">
-      <div class="tile"><span class="k">Buy this week</span><span class="v num" id="t-buy">–</span><span class="s" id="t-buy-s"></span></div>
+      <div class="tile"><span class="k">Buy today</span><span class="v num" id="t-buy">–</span><span class="s" id="t-buy-s"></span></div>
       <div class="tile"><span class="k">Cash needed before payouts</span><span class="v num" id="t-need">–</span><span class="s" id="t-need-s"></span></div>
       <div class="tile"><span class="k">Net after 12 weeks</span><span class="v num" id="t-net">–</span><span class="s" id="t-net-s"></span></div>
       <div class="tile"><span class="k">Once running</span><span class="v num" id="t-run">–</span><span class="s">average month after the first wave</span></div>
@@ -263,9 +268,18 @@ function num(v, d){ v = Number(v); return isFinite(v) ? v : d; }
 function clamp01(v){ v = Number(v); return isFinite(v) ? Math.min(1, Math.max(0, v)) : 0; }
 function fundedToProfit(win, tries){ return 1 - Math.pow(1 - clamp01(win), Math.max(1, Math.round(num(tries, 1)))); }
 function rng(seed){ return function(){ seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-
-// The firms' accounts, week by week. Rates are fractions (0..1). Without rnd: expected values. With rnd: whole accounts pass or fail at random.
-// The sizes of one firm share its max-trading cap. Accounts above it sit idle and take the next free slots, best-paying size first.
+// Chance a flip cycle reaches its payout: D winning flip days before L losing ones.
+function cycleOdds(q, D, L){
+  q = clamp01(q); D = Math.max(1, Math.round(num(D, 5))); L = Math.max(1, Math.round(num(L, 12)));
+  var s = 0, term = Math.pow(q, D);
+  for (var k = 0; k < L; k++){ s += term; term *= (1 - q) * (D + k) / (k + 1); }
+  return Math.min(1, s);
+}
+function params(r){
+  return { pass: clamp01(r.pass), win: clamp01(r.win), tries: Math.max(1, Math.round(num(r.tries, 2))), q: clamp01(r.flip),
+    D: Math.max(1, Math.round(num(r.payDays, 5))), L: Math.max(1, Math.round(num(r.lossDays, 20))), E: Math.max(1, Math.round(num(r.evalDays, 3))),
+    wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))) };
+}
 function groupKey(f){ return String(f.firm !== undefined ? f.firm : (f.name || '')).trim().toLowerCase(); }
 function simulateAll(firms, r, weeks, rnd){
   var map = {}, groups = [], per = new Array(firms.length);
@@ -276,79 +290,124 @@ function simulateAll(firms, r, weeks, rnd){
   });
   return per;
 }
+// One firm, trading day by trading day. Sizes share the firm's max-trading cap; accounts above it wait idle.
+// Evals resolve after E days; a funded account takes one try a day; an account in profit flips one day at a time
+// and gets a payout after D winning flip days, or is lost after L losing ones.
 function simulateGroup(units, r, weeks, rnd){
-  var pass = clamp01(r.pass), c = fundedToProfit(r.win, r.tries), land = clamp01(r.land), pc = pass * c, q3 = clamp01(r.flip);
-  var L = weeks + 12, capSum = 0;
-  function zeros(){ var a = new Array(L); for (var k = 0; k < L; k++) a[k] = 0; return a; }
+  var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c, D = P.D, L = P.L, S = 3 * D * L, H = P.E + 1;
+  var nDays = Math.max(1, weeks * 5 - P.wd0), LD = nDays + P.E + P.tries + 8, capSum = 0;
+  function zeros(){ var a = new Array(LD); for (var k = 0; k < LD; k++) a[k] = 0; return a; }
   function draw(n, p){ if (!rnd) return n * p; var k = 0, m = Math.round(n); for (var j = 0; j < m; j++) if (rnd() < p) k++; return k; }
-  function tiny(v){ return Math.abs(v) < 1e-9 ? 0 : v; }
+  function idx(k, rem, l){ return ((k - 1) * D + (rem - 1)) * L + l; }
   var U = units.map(function(f){
-    var w = perWinning(f, r);
-    var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pay1: Math.max(0, num(f.pay1, 0)), pay2: Math.max(0, num(f.pay2, 0)), pay3: Math.max(0, num(f.pay3, 0)),
+    var w = perWinning(f, r), pays = [Math.max(0, num(f.pay1, 0)), Math.max(0, num(f.pay2, 0)), Math.max(0, num(f.pay3, 0))];
+    var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pays: pays, last: pays[2] > 0 ? 3 : pays[1] > 0 ? 2 : 1,
       price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0,
-      passesAt: zeros(), evalsDone: zeros(), triesDone: zeros(), payAt: zeros(), winFree: zeros(),
-      waitFunded: 0, wait: 0, pending: 0, trying: 0, winning: 0, rows: [] };
+      evalRes: zeros(), profitAt: zeros(), failAt: zeros(), flips: new Float64Array(S), fc: 0, waitFunded: 0, wait: 0, pending: 0, trying: 0, cash0: 0, days: [] };
+    // chance an account in each flip state leaves (paid out for the last time, or lost) within H days
+    var cur = new Float64Array(S);
+    for (var h = 0; h < H; h++){
+      var nx = new Float64Array(S);
+      for (var k = 1; k <= 3; k++) for (var rem = 1; rem <= D; rem++) for (var l = 0; l < L; l++){
+        var pw = rem <= 1 ? (k >= u.last ? 1 : cur[idx(k + 1, D, 0)]) : cur[idx(k, rem - 1, l)];
+        var pl = l + 1 >= L ? 1 : cur[idx(k, rem, l + 1)];
+        nx[idx(k, rem, l)] = P.q * pw + (1 - P.q) * pl;
+      }
+      cur = nx;
+    }
+    u.exitP = cur;
     capSum += u.slots;
     return u;
   });
   var cap = units[0].firmCap !== undefined ? Math.max(0, Math.floor(num(units[0].firmCap, 0))) : capSum;
   var order = U.map(function(u, j){ return j; }).sort(function(a, b){ return (U[b].value - U[a].value) || (a - b); });
-  function addWinning(u, t, n){
-    if (!(n > 0)) return;
-    var n3 = u.pay3 > 0 ? draw(n, q3) : 0;
-    u.winning += n;
-    u.payAt[t + 2] += n * u.pay1 * land;
-    u.payAt[t + 4] += n * u.pay2 * land;
-    u.payAt[t + 6] += n3 * u.pay3 * land;
-    u.winFree[t + 4] += n - n3;
-    u.winFree[t + 6] += n3;
+  function sumF(u){ var s = 0, a = u.flips; for (var i = 0; i < S; i++) s += a[i]; return s; }
+  function soonExits(u){ var s = 0, a = u.flips, e = u.exitP; for (var i = 0; i < S; i++) if (a[i] > 0) s += a[i] * e[i]; return s; }
+  function trading(){ var s = 0; U.forEach(function(u){ s += u.trying + u.fc; }); return s; }
+  function flipStep(u){
+    var cur = u.flips, nx = new Float64Array(S), cash = 0;
+    for (var k = 1; k <= 3; k++) for (var rem = 1; rem <= D; rem++) for (var l = 0; l < L; l++){
+      var n = cur[idx(k, rem, l)]; if (!(n > 1e-12)) continue;
+      var wins = draw(n, P.q), losses = n - wins;
+      if (wins > 0){ if (rem <= 1){ cash += wins * u.pays[k - 1]; if (k < u.last) nx[idx(k + 1, D, 0)] += wins; } else nx[idx(k, rem - 1, l)] += wins; }
+      if (losses > 0 && l + 1 < L) nx[idx(k, rem, l + 1)] += losses;
+    }
+    u.flips = nx;
+    return cash;
   }
-  function trading(){ var s = 0; U.forEach(function(u){ s += u.trying + u.winning; }); return s; }
   units.forEach(function(f, j){
-    var u = U[j], fn = Math.max(0, num(f.fundedNow, 0)), ip = Math.max(0, num(f.inProfitNow, 0)), oe = Math.max(0, num(f.openEvals, 0));
-    if (rnd){ fn = Math.round(fn); ip = Math.round(ip); oe = Math.round(oe); }
-    addWinning(u, 0, ip);
-    u.waitFunded = fn;
-    u.pending = oe; u.passesAt[1] += draw(oe, pass); u.evalsDone[1] += oe;
-  });
-  for (var t = 0; t < weeks; t++){
-    U.forEach(function(u){
-      u.wait += u.passesAt[t];
-      u.pending = Math.max(0, u.pending - u.evalsDone[t]);
-      var done = u.triesDone[t]; u.won = 0; u.lost = 0;
-      if (done > 0){ u.won = draw(done, c); u.lost = done - u.won; u.trying -= done; addWinning(u, t, u.won); }
-      u.winning -= u.winFree[t];
-      u.winning = tiny(u.winning); u.trying = tiny(u.trying); u.wait = tiny(u.wait); u.waitFunded = tiny(u.waitFunded);
-      u.act = 0; u.buy = 0;
+    var u = U[j];
+    var fn = Math.max(0, num(f.fundedNow, 0)) + Math.max(0, num(f.idle, 0)), ps = Math.max(0, num(f.passedNow, 0)), ip = Math.max(0, num(f.inProfitNow, 0)), oe = Math.max(0, num(f.openEvals, 0));
+    if (rnd){ fn = Math.round(fn); ps = Math.round(ps); ip = Math.round(ip); oe = Math.round(oe); }
+    u.waitFunded = fn; u.wait = ps;
+    var list = Array.isArray(f.g1Flips) && ip > 0 && f.g1Flips.length === Math.round(ip) ? f.g1Flips : null;
+    if (list) list.forEach(function(x){
+      var rem = Math.min(D, Math.round(num(x.rem, D))), left = Math.max(1, Math.min(L, Math.round(num(x.left, L))));
+      if (rem <= 0){ u.cash0 += u.pays[0]; if (u.last > 1) u.flips[idx(2, D, 0)] += 1; }
+      else u.flips[idx(1, rem, L - left)] += 1;
     });
-    // idle accounts take free slots: already-funded ones first (no new activation fee), then passed evals
+    else u.flips[idx(1, D, 0)] += ip;
+    u.fc = sumF(u);
+    u.pending = oe;
+    if (oe > 0){ if (rnd){ for (var i = 0; i < oe; i++) u.evalRes[1 + (i % P.E)] += 1; } else { for (var e = 0; e < P.E; e++) u.evalRes[1 + e] += oe / P.E; } }
+  });
+  for (var d = 0; d < nDays; d++){
+    U.forEach(function(u){
+      u.cashIn = d === 0 ? u.cash0 : 0; u.buy = 0; u.act = 0;
+      var n = u.evalRes[d];
+      if (n > 0){ u.wait += draw(n, P.pass); u.pending = Math.max(0, u.pending - n); }
+      u.cashIn += flipStep(u);
+      var m = u.profitAt[d], fl = u.failAt[d];
+      if (m > 0){ u.trying -= m; u.flips[idx(1, D, 0)] += m; }
+      if (fl > 0) u.trying -= fl;
+      if (Math.abs(u.trying) < 1e-9) u.trying = 0;
+      if (Math.abs(u.wait) < 1e-9) u.wait = 0;
+      if (Math.abs(u.waitFunded) < 1e-9) u.waitFunded = 0;
+      u.fc = sumF(u);
+    });
     var free = Math.max(0, cap - trading());
     order.forEach(function(j){
-      var u = U[j], room = Math.max(0, u.slots - u.trying - u.winning);
-      var a1 = Math.min(u.waitFunded, free, room); free -= a1; room -= a1; u.waitFunded -= a1;
-      var a2 = Math.min(u.wait, free, room); free -= a2; u.wait -= a2;
-      u.trying += a1 + a2; u.triesDone[t + 1] += a1 + a2; u.act = a2;
+      var u = U[j], room = Math.max(0, u.slots - u.trying - u.fc);
+      var a1 = Math.min(u.waitFunded, free, room); if (rnd) a1 = Math.floor(a1); free -= a1; room -= a1; u.waitFunded -= a1;
+      var a2 = Math.min(u.wait, free, room); if (rnd) a2 = Math.floor(a2); free -= a2; u.wait -= a2;
+      var a = a1 + a2; u.act = a2;
+      if (a > 0){
+        u.trying += a;
+        var rem = a;
+        for (var tr = 1; tr <= P.tries; tr++){ var w = draw(rem, P.win); u.profitAt[d + tr] += w; rem -= w; }
+        u.failAt[d + P.tries] += rem;
+      }
     });
-    if (t % 2 === 0 && pc > 0 && cap > 0){
+    if (pc > 0 && cap > 0){
       var covered = 0;
-      U.forEach(function(u){ covered += Math.max(0, u.winning - u.winFree[t + 1] - u.winFree[t + 2]) + u.trying + (u.waitFunded + u.wait) * c + u.pending * pc; });
+      U.forEach(function(u){ covered += Math.max(0, u.fc - soonExits(u)) + u.trying + (u.waitFunded + u.wait) * c + u.pending * pc; });
       var need = cap - covered;
       if (need >= 0.5){
         var maxBatch = trading() >= 0.6 * cap - 1e-6 ? cap : 5 * cap;
         var total = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
         var pick = order[0];
-        for (var o = 0; o < order.length; o++){ var v = U[order[o]]; if (v.trying + v.winning + v.waitFunded + v.wait + v.pending * pass < v.slots){ pick = order[o]; break; } }
+        for (var o = 0; o < order.length; o++){ var v = U[order[o]]; if (v.trying + v.fc + v.waitFunded + v.wait + v.pending * P.pass < v.slots){ pick = order[o]; break; } }
         U[pick].buy = total;
       }
     }
     U.forEach(function(u){
-      u.pending += u.buy; u.passesAt[t + 1] += draw(u.buy, pass); u.evalsDone[t + 1] += u.buy;
-      var evalCost = u.buy * u.price, actCost = u.act * u.actFee, feeCost = (u.monthly > 0 && t % 4 === 0) ? u.monthly * (u.trying + u.winning + u.pending) : 0;
-      u.rows.push({ t: t, buy: u.buy, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost, inn: u.payAt[t],
-                    won: u.won, lost: u.lost, winning: u.winning, trying: u.trying, wait: u.wait + u.waitFunded, occupied: u.trying + u.winning });
+      if (u.buy > 0){ u.pending += u.buy; u.evalRes[d + P.E] += u.buy; }
+      var evalCost = u.buy * u.price, actCost = u.act * u.actFee;
+      var feeCost = (u.monthly > 0 && d % 20 === 0) ? u.monthly * (u.trying + u.fc + u.pending) : 0;
+      u.days.push({ d: d, w: Math.floor((P.wd0 + d) / 5), buy: u.buy, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost,
+                    inn: u.cashIn, winning: u.fc, trying: u.trying, wait: u.wait + u.waitFunded, occupied: u.trying + u.fc });
     });
   }
-  return U.map(function(u){ return { c: c, pc: pc, rows: u.rows }; });
+  return U.map(function(u){
+    var rows = [];
+    for (var t = 0; t < weeks; t++) rows.push({ t: t, buy: 0, act: 0, evalCost: 0, actCost: 0, feeCost: 0, out: 0, inn: 0, winning: 0, trying: 0, wait: 0, occupied: 0 });
+    u.days.forEach(function(x){
+      var w = rows[x.w]; if (!w) return;
+      w.buy += x.buy; w.act += x.act; w.evalCost += x.evalCost; w.actCost += x.actCost; w.feeCost += x.feeCost; w.out += x.out; w.inn += x.inn;
+      w.winning = x.winning; w.trying = x.trying; w.wait = x.wait; w.occupied = x.occupied;
+    });
+    return { c: c, pc: pc, rows: rows, days: u.days };
+  });
 }
 
 function runAll(firms, r, weeks, rnd){
@@ -359,7 +418,7 @@ function runAll(firms, r, weeks, rnd){
     per.forEach(function(p){ var x = p.rows[t]; row.buy += x.buy; row.out += x.out; row.inn += x.inn; row.winning += x.winning; row.trying += x.trying; row.wait += x.wait; row.buys.push(x.buy); });
     cum += row.inn - row.out; row.cum = cum;
     if (cum < low){ low = cum; lowAt = t; }
-    if (firstIn < 0 && row.inn > 0.5) firstIn = t;
+    if (firstIn < 0 && row.inn > 100) firstIn = t;
     rows.push(row);
   }
   if (low < 0){ for (t = lowAt + 1; t < weeks; t++){ if (rows[t].cum >= 0){ even = t; break; } } }
@@ -376,16 +435,17 @@ function monthlyUnits(firms, r){
 function monthlyRunRate(firms, r){ return monthlyUnits(firms, r).reduce(function(a, b){ return a + b; }, 0); }
 
 function perWinning(f, r){
-  var pass = clamp01(r.pass), c = fundedToProfit(r.win, r.tries), land = clamp01(r.land), pc = pass * c;
+  var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c;
   if (!(pc > 0)) return null;
-  var evals = 1 / pc;
+  var s = cycleOdds(P.q, P.D, P.L), evals = 1 / pc;
   var cost = evals * Math.max(0, num(f.evalPrice, 0)) + Math.max(0, num(f.activation, 0)) / c;
-  var cash = (Math.max(0, num(f.pay1, 0)) + Math.max(0, num(f.pay2, 0)) + clamp01(r.flip) * Math.max(0, num(f.pay3, 0))) * land;
-  return { evals: evals, cost: cost, cash: cash, net: cash - cost };
+  var cash = Math.max(0, num(f.pay1, 0)) * s + Math.max(0, num(f.pay2, 0)) * s * s + Math.max(0, num(f.pay3, 0)) * s * s * s;
+  return { evals: evals, cost: cost, cash: cash, net: cash - cost, odds: s };
 }
+
 // Bad luck: replay the weeks many times with whole accounts and report the worst 1 run in 10.
 function badLuck(firms, r, weeks, runs){
-  runs = runs || 1000; var rnd = rng(20261109), needs = [], nets = [], behind = 0;
+  runs = runs || 300; var rnd = rng(20261109), needs = [], nets = [], behind = 0;
   for (var k = 0; k < runs; k++){ var res = runAll(firms, r, weeks, rnd); needs.push(res.need); nets.push(res.net); if (res.net < 0) behind++; }
   needs.sort(function(a, b){ return a - b; }); nets.sort(function(a, b){ return a - b; });
   return { need90: needs[Math.floor(runs * 0.9)], net10: nets[Math.floor(runs * 0.1)], behind: behind / runs };
@@ -394,7 +454,7 @@ function badLuck(firms, r, weeks, runs){
 
 var WEEKS = 12;
 var STORE = 'funded-slots-roadmap-v1';
-var PRESETS = { live: { pass: 28, win: 50, tries: 2, land: 100, flip: 18 }, plan: { pass: 28, win: 21, tries: 2, land: 100, flip: 48 } };
+var PRESETS = { live: { pass: 28, win: 50, tries: 2, flip: 18, payDays: 5, lossDays: 20, evalDays: 3 }, plan: { pass: 28, win: 21, tries: 2, flip: 48, payDays: 5, lossDays: 20, evalDays: 3 } };
 var NEW_FIRM = { name: 'New firm', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 100, activation: 0, pay1: 1000, pay2: 500, pay3: 0, monthly: 0, note: '' };
 var DEFAULTS = {
   rates: PRESETS.live,
@@ -408,15 +468,16 @@ var DEFAULTS = {
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 var state = clone(DEFAULTS);
 try { var saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved && saved.rates && Array.isArray(saved.firms) && saved.firms.length) state = saved; } catch (e) {}
-if (state.rates.flip === undefined) state.rates.flip = PRESETS[+state.rates.win === 21 ? 'plan' : 'live'].flip;
+(function(){ var base = PRESETS[+state.rates.win === 21 ? 'plan' : 'live']; ['flip', 'payDays', 'lossDays', 'evalDays'].forEach(function(k){ if (state.rates[k] === undefined) state.rates[k] = base[k]; }); delete state.rates.land; })();
 function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
-function fracRates(r){ return { pass: num(r.pass, 0) / 100, win: num(r.win, 0) / 100, tries: num(r.tries, 2), land: num(r.land, 100) / 100, flip: num(r.flip, 18) / 100 }; }
+function fracRates(r){ return { pass: num(r.pass, 0) / 100, win: num(r.win, 0) / 100, tries: num(r.tries, 2), flip: num(r.flip, 18) / 100, payDays: num(r.payDays, 5), lossDays: num(r.lossDays, 20), evalDays: num(r.evalDays, 3), wd0: WD0 }; }
 function firmFrac(f){ return clone(f); }
 
 // ---------- dates ----------
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function mondayOf(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
 var START = mondayOf(new Date());
+var WD0 = (function(d){ return d === 0 || d === 6 ? 5 : d - 1; })(new Date().getDay());
 function weekStart(t){ var d = new Date(START.getTime()); d.setDate(d.getDate() + 7 * t); return d; }
 function dShort(d){ return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
 var CAL = [];
@@ -437,15 +498,16 @@ function wk(t){ return 'W' + t + ' (' + dShort(weekStart(t)) + ')'; }
 // ---------- firm cards ----------
 var firmsEl = document.getElementById('firms');
 var FIELDS = [
-  ['Accounts now', [['fundedNow','Funded, not in profit',''],['inProfitNow','In profit, awaiting payouts',''],['openEvals','Open evals',''],['slots','Max trading, this size','']]],
+  ['Accounts now', [['openEvals','Open evals',''],['fundedNow','Funded, not in profit',''],['inProfitNow','In profit (flipping)',''],['idle','Idle, not on G1',''],['slots','Max trading, this size','']]],
   ['Costs', [['evalPrice','Eval price','$'],['activation','Activation per funded','$'],['monthly','Monthly fee per account','$']]],
-  ['Cash to you per winning funded', [['pay1','Payout 1, week +2','$'],['pay2','Payout 2, week +4','$'],['pay3','Payout 3, week +6 (needs a flip)','$']]]
+  ['Cash to you per winning funded', [['pay1','Payout 1','$'],['pay2','Payout 2','$'],['pay3','Payout 3','$']]]
 ];
 function normalize(){
   state.firms.forEach(function(f){
     if (f.firm === undefined){ var m = String(f.name || '').match(/^(.*?)\s+(\d+(?:\.\d+)?k)$/i); f.firm = m ? m[1] : (f.name || 'Firm'); f.size = m ? m[2] : ''; }
     if (f.size === undefined) f.size = '';
     if (f.firmCap === undefined) f.firmCap = 5;
+    if (f.idle === undefined) f.idle = 0;
     f.name = (f.firm + ' ' + f.size).trim();
   });
 }
@@ -485,13 +547,14 @@ function buildFirms(){
       '<div class="btnrow"><button type="button" class="btn ghost" data-addsize="' + g + '">Add a size</button></div></article>';
   }).join('');
 }
-function groupHeld(g){ return (GROUPS[g] || []).reduce(function(a, i){ return a + num(state.firms[i].fundedNow, 0) + num(state.firms[i].inProfitNow, 0); }, 0); }
+function heldOf(f){ return num(f.fundedNow, 0) + num(f.inProfitNow, 0) + num(f.idle, 0) + num(f.passedNow, 0); }
+function groupHeld(g){ return (GROUPS[g] || []).reduce(function(a, i){ return a + heldOf(state.firms[i]); }, 0); }
 function groupCap(g){ var idx = GROUPS[g] || []; return idx.length ? num(state.firms[idx[0]].firmCap, 5) : 5; }
 function drawCaps(){
   GROUPS.forEach(function(idx, g){
     var el = document.getElementById('cap-' + g); if (!el) return;
     var cap = groupCap(g), held = groupHeld(g), idle = Math.max(0, held - cap);
-    el.innerHTML = 'Max <strong>' + cap + '</strong> trading at once · holding <strong>' + acc(held) + '</strong> (' + idx.map(function(i){ return esc(state.firms[i].size || 'size') + ' ' + acc(num(state.firms[i].fundedNow, 0) + num(state.firms[i].inProfitNow, 0)); }).join(' + ') + ')' +
+    el.innerHTML = 'Max <strong>' + cap + '</strong> trading at once · holding <strong>' + acc(held) + '</strong> (' + idx.map(function(i){ return esc(state.firms[i].size || 'size') + ' ' + acc(heldOf(state.firms[i])); }).join(' + ') + ')' +
       (idle > 0 ? ' · <strong>' + acc(idle) + ' idle</strong>: they take the next free slots before any new eval' : '');
   });
 }
@@ -528,10 +591,10 @@ document.getElementById('add').addEventListener('click', function(){ var n = clo
 document.getElementById('reset').addEventListener('click', function(){ state = clone(DEFAULTS); save(); syncRates(); buildFirms(); update(); });
 
 // ---------- rates ----------
-var RATE_IDS = { pass: 'r-pass', win: 'r-win', tries: 'r-tries', land: 'r-land', flip: 'r-flip' };
+var RATE_IDS = { pass: 'r-pass', win: 'r-win', tries: 'r-tries', flip: 'r-flip', payDays: 'r-paydays', lossDays: 'r-lossdays', evalDays: 'r-evaldays' };
 function syncRates(){ Object.keys(RATE_IDS).forEach(function(k){ document.getElementById(RATE_IDS[k]).value = state.rates[k]; }); }
 function presetName(r){
-  for (var k in PRESETS){ var p = PRESETS[k]; if (+r.pass === p.pass && +r.win === p.win && +r.tries === p.tries && +r.land === p.land && +r.flip === p.flip) return k; }
+  for (var k in PRESETS){ var p = PRESETS[k]; if (+r.pass === p.pass && +r.win === p.win && +r.tries === p.tries && +r.flip === p.flip && +r.payDays === p.payDays && +r.lossDays === p.lossDays && +r.evalDays === p.evalDays) return k; }
   return 'custom';
 }
 Object.keys(RATE_IDS).forEach(function(k){
@@ -685,7 +748,15 @@ function chatRule(held, cap){
   if (held === 0) return 'Chat rule: about 25 evals for 5 winning funded.';
   return 'Chat rule: about 5 evals per open slot, in batches.';
 }
-var lastText = '';
+var lastText = '', lastBL = null, blTimer = 0;
+function scheduleBadLuck(rr){
+  clearTimeout(blTimer);
+  blTimer = setTimeout(function(){
+    var bl = badLuck(state.firms.map(firmFrac), rr, WEEKS); lastBL = bl;
+    document.getElementById('badluck').innerHTML = '<strong>Bad luck, 1 run in 10:</strong> you could need up to <strong class="num">' + money(bl.need90) + '</strong> before payouts cover costs, and the 12-week net could be as low as <strong class="num">' + signed(bl.net10) + '</strong>. ' + Math.round(bl.behind * 100) + '% of runs are still behind after 12 weeks.';
+  }, 200);
+}
+
 function update(){
   var rr = fracRates(state.rates), pn = presetName(state.rates);
   document.getElementById('preset-live').setAttribute('aria-pressed', pn === 'live');
@@ -693,22 +764,23 @@ function update(){
   var c = fundedToProfit(rr.win, rr.tries), pc = clamp01(rr.pass) * c;
   document.getElementById('derived').innerHTML = (pn === 'custom' ? '<span class="tag">Custom rates</span> ' : '') +
     'Funded to in profit <strong class="num">' + Math.round(c * 100) + '%</strong>. ' +
-    (pc > 0 ? 'About <strong class="num">' + (1 / pc).toFixed(1) + '</strong> evals per winning funded.' : 'No evals can pass at these rates.');
+    (pc > 0 ? 'About <strong class="num">' + (1 / pc).toFixed(1) + '</strong> evals per winning funded.' : 'No evals can pass at these rates.') +
+    (rr.flip > 0 ? ' A payout takes about <strong class="num">' + Math.round(rr.payDays / rr.flip) + '</strong> flip days; <strong class="num">' + Math.round(cycleOdds(rr.flip, rr.payDays, rr.lossDays) * 100) + '%</strong> of flip cycles get there.' : ' No flip day wins at 0%.');
 
   drawCaps();
   var res = outcome(rr);
   // tiles
-  var buyNow = res.rows[0].buy, buyCost = 0;
-  res.per.forEach(function(p){ buyCost += p.rows[0].evalCost; });
+  var buyNow = 0, buyCost = 0;
+  res.per.forEach(function(p){ if (p.days[0]){ buyNow += p.days[0].buy; buyCost += p.days[0].evalCost; } });
   document.getElementById('t-buy').textContent = buyNow + ' evals';
-  document.getElementById('t-buy-s').textContent = money(buyCost) + ' · ' + state.firms.map(function(f, i){ return (f.name || 'Firm') + ' ' + res.per[i].rows[0].buy; }).join(', ');
+  document.getElementById('t-buy-s').textContent = money(buyCost) + ' · ' + state.firms.map(function(f, i){ return (f.name || 'Firm') + ' ' + (res.per[i].days[0] ? res.per[i].days[0].buy : 0); }).join(', ') + (function(){ var a = []; for (var d = 1; d <= 4; d++){ var s = 0; res.per.forEach(function(p){ if (p.days[d]) s += p.days[d].buy; }); a.push(s); } return ' · next days ' + a.join(' · '); })();
   document.getElementById('t-need').textContent = money(res.need);
   document.getElementById('t-need-s').textContent = (res.firstIn >= 0 ? 'first payout ' + wk(res.firstIn) : 'no payout inside 12 weeks') + (res.even >= 0 ? ' · even by W' + res.even : '');
   var tn = document.getElementById('t-net'); tn.textContent = signed(res.net); tn.className = 'v num ' + (res.net >= 0 ? 'pos' : 'neg');
   document.getElementById('t-net-s').textContent = 'in ' + money(res.totIn) + ' · out ' + money(res.totOut);
   var tr = document.getElementById('t-run'); tr.textContent = signed(res.run) + '/mo'; tr.className = 'v num ' + (res.run >= 0 ? 'pos' : 'neg');
-  var bl = badLuck(state.firms.map(firmFrac), rr, WEEKS);
-  document.getElementById('badluck').innerHTML = '<strong>Bad luck, 1 run in 10:</strong> you could need up to <strong class="num">' + money(bl.need90) + '</strong> before payouts cover costs, and the 12-week net could be as low as <strong class="num">' + signed(bl.net10) + '</strong>. ' + Math.round(bl.behind * 100) + '% of runs are still behind after 12 weeks.';
+  scheduleBadLuck(rr);
+  var bl = lastBL;
 
   // the other preset, for contrast
   var others = pn === 'live' ? ['plan'] : pn === 'plan' ? ['live'] : ['live', 'plan'];
@@ -725,7 +797,7 @@ function update(){
     var inn = 0, outv = 0; p.rows.forEach(function(x){ inn += x.inn; outv += x.out; });
     var run = RUNS[i];
     el.innerHTML =
-      '<dt>Buy this week</dt><dd><span class="buynow num">' + p.rows[0].buy + ' evals</span> <span class="muted num">' + money(p.rows[0].evalCost) + '</span><br><span class="muted small">' + chatRule(groupHeld(gOf[i]), groupCap(gOf[i])) + '</span></dd>' +
+      '<dt>Buy today</dt><dd><span class="buynow num">' + (p.days[0] ? p.days[0].buy : 0) + ' evals</span> <span class="muted num">' + money(p.days[0] ? p.days[0].evalCost : 0) + '</span><br><span class="muted small">' + chatRule(groupHeld(gOf[i]), groupCap(gOf[i])) + nextDays(p) + '</span></dd>' +
       '<dt>Each winning funded</dt><dd class="num">' + (w ? acc(w.evals) + ' evals · costs ' + money(w.cost) + ' · pays ' + money(w.cash) + ' · <span class="' + (w.net >= 0 ? 'pos' : 'neg') + '">' + signed(w.net) + '</span>' : '–') + '</dd>' +
       '<dt>12 weeks</dt><dd class="num">out ' + money(outv) + ' · in ' + money(inn) + ' · <span class="' + (inn - outv >= 0 ? 'pos' : 'neg') + '">' + signed(inn - outv) + '</span></dd>' +
       '<dt>Once running</dt><dd class="num"><span class="' + (run >= 0 ? 'pos' : 'neg') + '">' + signed(run) + '</span> a month</dd>';
@@ -739,16 +811,16 @@ function update(){
   // text for the chat
   var lines = [];
   lines.push('Funded slots roadmap, week of ' + dShort(START));
-  lines.push('Rates: eval pass ' + state.rates.pass + '%, funded trade win ' + state.rates.win + '% x' + state.rates.tries + ' tries = ' + Math.round(c * 100) + '% funded to in profit' + (pn === 'live' ? ' (live so far)' : pn === 'plan' ? ' (backtest plan)' : '') + (num(state.rates.land, 100) !== 100 ? ', payouts landing ' + state.rates.land + '%' : '') + ', flips ' + state.rates.flip + '%');
+  lines.push('Rates: eval pass ' + state.rates.pass + '%, funded trade win ' + state.rates.win + '% x' + state.rates.tries + ' tries = ' + Math.round(c * 100) + '% funded to in profit' + (pn === 'live' ? ' (live so far)' : pn === 'plan' ? ' (backtest plan)' : '') + ', flips ' + state.rates.flip + '%, ' + state.rates.payDays + ' winning flip days a payout, ' + state.rates.lossDays + ' losing days allowed');
   state.firms.forEach(function(f, i){
     var held = Math.round(num(f.fundedNow, 0) + num(f.inProfitNow, 0));
     var pays = [money(f.pay1), money(f.pay2)];
-    if (num(f.pay3, 0) > 0) pays.push(money(f.pay3) + ' (only after a good flip, ' + state.rates.flip + '%)');
-    lines.push((f.name || 'Firm') + ': holding ' + held + '/' + f.slots + ', buy ' + res.per[i].rows[0].buy + ' evals now (' + money(res.per[i].rows[0].evalCost) + (num(f.activation, 0) > 0 ? ' + ' + money(f.activation) + ' per activation' : '') + '). Per winning funded: ' + pays.join(' + ') + '.');
+    if (num(f.pay3, 0) > 0) pays.push(money(f.pay3));
+    lines.push((f.name || 'Firm') + ': holding ' + held + '/' + f.slots + ', buy ' + (res.per[i].days[0] ? res.per[i].days[0].buy : 0) + ' evals today (' + money(res.per[i].days[0] ? res.per[i].days[0].evalCost : 0) + (num(f.activation, 0) > 0 ? ' + ' + money(f.activation) + ' per activation' : '') + '). Per winning funded: ' + pays.join(' + ') + '.');
   });
   lines.push('Actual so far: fees ' + money(disp.totOut) + ', payouts ' + money(disp.totIn) + ', net ' + signed(disp.totIn - disp.totOut) + '.');
   lines.push('Cash needed before payouts: ' + money(res.need) + (res.firstIn >= 0 ? '. First payout ' + wk(res.firstIn) : '') + '.');
-  lines.push('Bad luck, 1 run in 10: need up to ' + money(bl.need90) + ', 12-week net ' + signed(bl.net10) + '; ' + Math.round(bl.behind * 100) + '% of runs still behind after 12 weeks.');
+  if (bl) lines.push('Bad luck, 1 run in 10: need up to ' + money(bl.need90) + ', 12-week net ' + signed(bl.net10) + '; ' + Math.round(bl.behind * 100) + '% of runs still behind after 12 weeks.');
   lines.push('12 weeks: out ' + money(res.totOut) + ', in ' + money(res.totIn) + ', net ' + signed(res.net) + '. Once running: about ' + signed(res.run) + ' a month.');
   others.forEach(function(k){ var o = outcome(fracRates(PRESETS[k])); lines.push(label[k] + ': 12-week net ' + signed(o.net) + ', about ' + signed(o.run) + ' a month.'); });
   lastText = lines.join('\n');
@@ -771,6 +843,88 @@ syncRates();
 buildFirms();
 update();
 })();
+
+// ---------- G1 sync: read the owner's fleet dashboard and fill the accounts ----------
+var G1_URL = 'https://randompotato247.github.io/fleet-dashboard/';
+var FIRM_ALIAS = { bg: 'blueguardian', tradify: 'tradeify' };
+function normFirm(s){ s = String(s || '').toLowerCase().replace(/\b(xfa|funded|flex)\b/g, '').replace(/[^a-z]/g, ''); return FIRM_ALIAS[s] || s; }
+function sizeNum(s){ var m = /(\d+)/.exec(String(s || '')); return m ? +m[1] : 50; }
+function moneyNum(s){ var m = /(-?)\$([\d,]+)/.exec(String(s || '')); return m ? (m[1] ? -1 : 1) * Number(m[2].replace(/,/g, '')) : null; }
+function g1Size(id, total, isEval){
+  var m = /^LF[EF]0?(25|50|100|150)/i.exec(id) || /DFYSLX?(25|50|100|150)/i.exec(id);
+  if (m) return +m[1];
+  if (isEval){ var t = /of \$([\d,]+)/.exec(total); if (t){ var v = +t[1].replace(/,/g, ''); return v <= 1600 ? 25 : v <= 3500 ? 50 : v <= 6500 ? 100 : 150; } }
+  return 50;
+}
+function parseG1(html){
+  var doc = new DOMParser().parseFromString(html, 'text/html');
+  var sec = doc.getElementById('eng-g1'); if (!sec) return null;
+  var units = {};
+  function unit(firmText, size){
+    var fk = normFirm(firmText), key = fk + '|' + size;
+    if (!units[key]) units[key] = { fkey: fk, firm: firmText.replace(/\s+(XFA|funded|Flex)$/i, ''), size: size, evals: 0, passed: 0, fundeds: 0, flips: [] };
+    return units[key];
+  }
+  function cells(tr){ return Array.prototype.map.call(tr.children, function(c){ return c.textContent.replace(/\s+/g, ' ').trim(); }); }
+  function rows(id){ var pane = sec.querySelector('#' + id); return pane ? Array.prototype.slice.call(pane.querySelectorAll('tr')).map(cells).filter(function(c){ return c.length >= 5 && c[0] !== 'Account' && !/LIQUIDATED/i.test(c[3]); }) : []; }
+  rows('p-g1-eval').forEach(function(c){ var u = unit(c[1], g1Size(c[0], c[3], true)); if (/PASSED/i.test(c[3])) u.passed++; else u.evals++; });
+  rows('p-g1-funded').forEach(function(c){ unit(c[1], g1Size(c[0], c[3], false)).fundeds++; });
+  rows('p-g1-flip').forEach(function(c){
+    var m = /(\d+)\s*\/\s*(\d+)\s*days/i.exec(c[3]), room = moneyNum(c[4]);
+    unit(c[1], g1Size(c[0], c[3], false)).flips.push({ rem: m ? +m[2] - +m[1] : null, left: room !== null ? Math.max(1, Math.round(room / 160)) : null });
+  });
+  var sig = null, sum = sec.querySelector('table.sum');
+  if (sum){
+    var heads = Array.prototype.map.call(sum.querySelectorAll('thead th'), function(th){ return th.textContent.trim().toLowerCase(); }), ei = heads.indexOf('evals');
+    Array.prototype.forEach.call(sum.querySelectorAll('tbody tr'), function(tr){
+      var c = cells(tr); if (ei > 0 && /^avg signals/i.test(c[0] || '')){ var m = /([\d.]+)[^\d]*max\s*(\d+)/i.exec(c[ei] || ''); if (m) sig = { avg: +m[1], max: +m[2] }; }
+    });
+  }
+  var ft = (doc.querySelector('.foot') || {}).textContent || '';
+  var up = /Updated \(page built\) ([0-9:]+ ?ET)/.exec(ft), day = /Trading day ([A-Za-z]{3} \d{1,2} [A-Za-z]{3})/.exec(ft);
+  var total = { evals: 0, passed: 0, fundeds: 0, flips: 0 };
+  Object.keys(units).forEach(function(k){ var x = units[k]; total.evals += x.evals; total.passed += x.passed; total.fundeds += x.fundeds; total.flips += x.flips.length; });
+  return { units: units, sig: sig, total: total, updated: up ? up[1] : '', day: day ? day[1] : '' };
+}
+function applyG1(g){
+  normalize();
+  var seen = [];
+  Object.keys(g.units).forEach(function(key){
+    var x = g.units[key], f = null, sameFirm = -1;
+    state.firms.forEach(function(y, i){ if (normFirm(y.firm) === x.fkey){ sameFirm = i; if (!f && sizeNum(y.size) === x.size) f = y; } });
+    if (!f){
+      f = sameFirm >= 0 ? clone(state.firms[sameFirm]) : clone(NEW_FIRM);
+      if (sameFirm < 0){ f.firm = x.firm; f.firmCap = 5; }
+      f.evalPrice = 0; f.activation = 0; f.pay1 = 0; f.pay2 = 0; f.pay3 = 0; f.monthly = 0;
+      f.size = x.size + 'K'; f.slots = num(f.firmCap, 5); f.idle = 0; f.note = ''; f.name = (f.firm + ' ' + f.size).trim();
+      if (sameFirm >= 0) state.firms.splice(sameFirm + 1, 0, f); else state.firms.push(f);
+    }
+    f.openEvals = x.evals; f.passedNow = x.passed; f.fundedNow = x.fundeds; f.inProfitNow = x.flips.length;
+    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, left: z.left === null ? undefined : z.left }; });
+    f.g1 = true; seen.push(f);
+  });
+  state.firms.forEach(function(f){ if (f.g1 && seen.indexOf(f) < 0){ f.openEvals = 0; f.passedNow = 0; f.fundedNow = 0; f.inProfitNow = 0; f.g1Flips = []; } });
+  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total };
+  save(); buildFirms(); update(); drawG1(false);
+}
+var g1El = document.getElementById('g1');
+function drawG1(failed){
+  var g = state.g1, s = failed ? 'G1 not reachable right now, using the last numbers. ' : '';
+  if (g && g.total){
+    s += 'G1 ' + esc(g.day || '') + ' ' + esc(g.at || '') + ': ' + g.total.evals + ' evals' + (g.total.passed ? ' (+' + g.total.passed + ' passed)' : '') + ', ' + g.total.fundeds + ' funded, ' + g.total.flips + ' flipping.';
+    if (g.sig) s += ' Eval signals max ' + g.sig.max + ' a day' + (g.total.evals < g.sig.max ? ': ' + (g.sig.max - g.total.evals) + ' evals short.' : ', enough evals.');
+  } else if (!failed) s += 'Reading G1…';
+  g1El.innerHTML = s + ' <button type="button" class="btn ghost" id="g1sync">Sync</button>';
+  document.getElementById('g1sync').onclick = syncG1;
+}
+function syncG1(){
+  fetch(G1_URL + '?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(function(html){ var g = parseG1(html); if (!g) throw new Error('no G1 section'); applyG1(g); })
+    .catch(function(){ drawG1(true); });
+}
+function nextDays(p){ var a = []; for (var d = 1; d <= 4; d++) a.push(p.days[d] ? p.days[d].buy : 0); return ' · next days ' + a.join(' · '); }
+drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000);
 </script>
 </body>
 </html>
