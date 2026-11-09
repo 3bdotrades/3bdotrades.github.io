@@ -218,7 +218,7 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
   <section class="summary" aria-labelledby="firms-h">
     <div class="section-head">
       <h2 id="firms-h">Per firm</h2>
-      <div class="btnrow"><button type="button" class="btn" id="add">Add a firm</button><button type="button" class="btn ghost" id="reset">Reset to example numbers</button></div>
+      <div class="btnrow"><button type="button" class="btn" id="add">Add a firm</button><button type="button" class="btn ghost" id="reset">Reset</button></div>
     </div>
     <div class="firms" id="firms"></div>
   </section>
@@ -589,7 +589,7 @@ firmsEl.addEventListener('click', function(e){
   save(); buildFirms(); update();
 });
 document.getElementById('add').addEventListener('click', function(){ var n = clone(NEW_FIRM); n.firm = 'New firm'; n.size = '50K'; n.firmCap = 5; n.name = 'New firm 50K'; state.firms.push(n); save(); buildFirms(); update(); });
-document.getElementById('reset').addEventListener('click', function(){ state = clone(DEFAULTS); save(); syncRates(); buildFirms(); update(); });
+document.getElementById('reset').addEventListener('click', function(){ state = clone(DEFAULTS); applyOwner(); save(); syncRates(); buildFirms(); update(); syncG1(); });
 
 // ---------- rates ----------
 var RATE_IDS = { pass: 'r-pass', win: 'r-win', tries: 'r-tries', flip: 'r-flip', payDays: 'r-paydays', lossDays: 'r-lossdays', evalDays: 'r-evaldays' };
@@ -798,7 +798,7 @@ function update(){
     var inn = 0, outv = 0; p.rows.forEach(function(x){ inn += x.inn; outv += x.out; });
     var run = RUNS[i];
     el.innerHTML =
-      '<dt>Buy today</dt><dd><span class="buynow num">' + (p.days[0] ? p.days[0].buy : 0) + ' evals</span> <span class="muted num">' + money(p.days[0] ? p.days[0].evalCost : 0) + '</span><br><span class="muted small">' + (w && w.net > 0 ? chatRule(groupHeld(gOf[i]), groupCap(gOf[i])) : num(f.pay1, 0) + num(f.pay2, 0) + num(f.pay3, 0) > 0 ? 'No buys: a winning funded loses money at these rates.' : 'Add this size\'s eval price and payouts to plan buys.') + nextDays(p) + '</span></dd>' +
+      '<dt>Buy today</dt><dd><span class="buynow num">' + (p.days[0] ? p.days[0].buy : 0) + ' evals</span> <span class="muted num">' + money(p.days[0] ? p.days[0].evalCost : 0) + '</span><br><span class="muted small">' + (w && w.net > 0 ? chatRule(groupHeld(gOf[i]), groupCap(gOf[i])) : num(f.pay1, 0) + num(f.pay2, 0) + num(f.pay3, 0) > 0 ? 'No buys: a winning funded loses money at these rates.' : 'No payouts at this firm, so no buys planned.') + nextDays(p) + '</span></dd>' +
       '<dt>Each winning funded</dt><dd class="num">' + (w ? acc(w.evals) + ' evals · costs ' + money(w.cost) + ' · pays ' + money(w.cash) + ' · <span class="' + (w.net >= 0 ? 'pos' : 'neg') + '">' + signed(w.net) + '</span>' : '–') + '</dd>' +
       '<dt>12 weeks</dt><dd class="num">out ' + money(outv) + ' · in ' + money(inn) + ' · <span class="' + (inn - outv >= 0 ? 'pos' : 'neg') + '">' + signed(inn - outv) + '</span></dd>' +
       '<dt>Once running</dt><dd class="num"><span class="' + (run >= 0 ? 'pos' : 'neg') + '">' + signed(run) + '</span> a month</dd>';
@@ -923,6 +923,38 @@ function syncG1(){
     .catch(function(){ drawG1(true); });
 }
 function nextDays(p){ var a = []; for (var d = 1; d <= 4; d++) a.push(p.days[d] ? p.days[d].buy : 0); return ' · next days ' + a.join(' · '); }
+// ---------- owner's numbers (set from the chat; bump OWNER_V to push changes into every browser once) ----------
+var OWNER_V = 1;
+var OWNER = [
+  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, idle: 2 },
+  { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, idle: 2 },
+  { firm: 'Topstep', size: '50K', evalPrice: 49, activation: 149, pay1: 0, pay2: 0, pay3: 0 },
+  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
+  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
+  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
+  { firm: 'Tradeify', size: '25K', evalPrice: 72.38, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
+  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 0, pay2: 0, pay3: 0 }
+];
+function applyOwner(){
+  if (state.ownerV === OWNER_V) return;
+  normalize();
+  OWNER.forEach(function(o){
+    var f = null, sameFirm = -1;
+    state.firms.forEach(function(y, i){ if (normFirm(y.firm) === normFirm(o.firm)){ sameFirm = i; if (!f && sizeNum(y.size) === sizeNum(o.size)) f = y; } });
+    if (!f){
+      f = sameFirm >= 0 ? clone(state.firms[sameFirm]) : clone(NEW_FIRM);
+      if (sameFirm < 0){ f.firm = o.firm; f.firmCap = 5; }
+      f.size = o.size; f.slots = num(f.firmCap, 5); f.openEvals = 0; f.fundedNow = 0; f.inProfitNow = 0; f.passedNow = 0; f.idle = 0; f.g1Flips = []; f.monthly = 0; f.note = '';
+      if (sameFirm >= 0) state.firms.splice(sameFirm + 1, 0, f); else state.firms.push(f);
+    }
+    ['evalPrice', 'activation', 'pay1', 'pay2', 'pay3', 'idle'].forEach(function(k){ if (o[k] !== undefined) f[k] = o[k]; });
+    f.note = ''; f.name = (f.firm + ' ' + f.size).trim();
+    state.firms.forEach(function(y){ if (normFirm(y.firm) === normFirm(o.firm)) y.firmCap = 5; });
+  });
+  state.ownerV = OWNER_V;
+  save();
+}
+applyOwner(); buildFirms(); update();
 drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000);
 })();
 
