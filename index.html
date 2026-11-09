@@ -176,9 +176,7 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="eyebrow" id="eyebrow">Prop roadmap</div>
     <h1>Funded Slots Roadmap</h1>
-    <p class="lede">Five funded slots per firm. Buy evals to fill them, turn funded accounts into winners, then collect two payouts from each. The starting numbers are examples from the chat and public prices. Set your own accounts and prices and everything below updates.</p>
   </header>
 
   <section class="rates" aria-labelledby="rates-h">
@@ -209,7 +207,6 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
       <div class="tile"><span class="k">Once running</span><span class="v num" id="t-run">–</span><span class="s">average month after the first wave</span></div>
     </div>
     <p class="alt" id="badluck"></p>
-    <p class="alt" id="alt"></p>
     <div id="copyfall" hidden></div>
   </section>
 
@@ -237,38 +234,6 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
     </div>
   </section>
 
-  <div class="cols">
-    <section class="panel" aria-labelledby="play-h">
-      <h2 id="play-h">How to run it</h2>
-      <ol class="steps">
-        <li><span class="when">W0</span><p>Buy each firm's batch from the cards above. At 0 of 5 that is about 25 evals a firm. Once you hold 3 or more accounts, buy 3 to 5 at a time.</p></li>
-        <li><span class="when">W1–W2</span><p>Evals resolve: two winning days pass one. Move passes into free slots. Extra passes wait for a slot, so overbuying only means a pass sits for a week.</p></li>
-        <li><span class="when">W2–W3</span><p>Funded trade at 4:1, then 5:1 after one loss. Two losses and the account is gone; fill its slot from a waiting pass the same day.</p></li>
-        <li><span class="when">W4</span><p>Payout 1 after the flip days: about $1,900 per Lucid account; Topstep takes $2,000 out (+$4k becomes +$2k).</p></li>
-        <li><span class="when">W6</span><p>Payout 2: about $900 per Lucid account; Topstep takes $1,000 out (+$2k becomes +$1k). Five Lucid in profit pays about $9.5k, then $4.5k.</p></li>
-        <li><span class="when">W8</span><p>Topstep payout 3 only after a good flip. After a bad one the account goes back to funded trading. Expect to lose some funded after the third cycle.</p></li>
-        <li><span class="when">Every 2 weeks</span><p>Recount each firm: accounts held, waiting passes, accounts in profit. Re-buy from the table and check the yardsticks.</p></li>
-      </ol>
-    </section>
-    <section class="panel" aria-labelledby="yard-h">
-      <h2 id="yard-h">Yardsticks</h2>
-      <p class="muted small">Live results against the plan, from the chat. Check your own every two weeks.</p>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th class="l">Measure</th><th>Plan</th><th>Live</th><th class="l">Read</th></tr></thead>
-          <tbody>
-            <tr><td class="l">Eval pass rate</td><td>28–32%</td><td>28% <span class="muted">(17/60)</span></td><td class="l"><span class="status good">On plan</span></td></tr>
-            <tr><td class="l">Eval trades per pass</td><td>10–12</td><td>12.5</td><td class="l"><span class="status good">Normal</span></td></tr>
-            <tr><td class="l">Funded trade win</td><td>20–22%</td><td>50% <span class="muted">(9/18)</span></td><td class="l"><span class="status warn">Partly luck</span></td></tr>
-            <tr><td class="l">Flips, 15/16 box<br><span class="muted small">Topstep XFA, Lucid 50K</span></td><td>48%</td><td>18% <span class="muted">(5/28)</span></td><td class="l"><span class="status bad">Off plan</span></td></tr>
-            <tr><td class="l">Flips, 10.75/15 box<br><span class="muted small">Lucid 25K</span></td><td>58%</td><td>53% <span class="muted">(9/17)</span></td><td class="l"><span class="status good">Normal</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="small muted">The 25-evals-for-5 rule holds while funded trades win near the live 50%. At the plan's 21% the same 25 evals make about 2.6 winners, so budget on the plan. Flips on the 15/16 box are the weak spot: the live preset uses the real 18% for the Topstep third payout and the plan uses 48%. Change <em>Flip win</em> to test your own number.</p>
-    </section>
-  </div>
-
   <section class="panel" aria-labelledby="act-h">
     <h2 id="act-h">Actual so far</h2>
     <p class="muted small">Real fees paid and payouts received, 26 Sep – 9 Nov 2026. 13 challenge fees, 2 payouts.</p>
@@ -288,19 +253,6 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
     </details>
   </section>
 
-  <section class="panel" aria-labelledby="notes-h">
-    <h2 id="notes-h">What the numbers assume</h2>
-    <ul class="notes">
-      <li><strong>Timing.</strong> An eval resolves within a week, a funded account within a week of activation, and payouts land 2 and 4 weeks after it is in profit (6 for a third). Holiday and roll weeks run slower.</li>
-      <li><strong>Funded to in profit.</strong> 1 − (1 − trade win)<sup>tries</sup>. Two tries because a $1,000 risk fits twice in a 50K account's $2,000 drawdown.</li>
-      <li><strong>Payouts.</strong> 50% of profit per request, capped at $2,000 on a 50K, 90% to you (<a href="https://support.lucidtrading.com/en/articles/12945796-lucidflex-payouts" target="_blank" rel="noopener">LucidFlex payouts</a>, <a href="https://help.topstep.com/en/articles/8284233" target="_blank" rel="noopener">Topstep payout policy</a>). The Lucid figures are your real $891 payouts; Topstep's are $2,000, $1,000 and $500 withdrawals at 90%.</li>
-      <li><strong>Prices.</strong> Topstep 50K is $49 a month plus a $149 activation on the Standard path (<a href="https://intercom.help/topstep-llc/en/articles/9208217-topstep-pricing" target="_blank" rel="noopener">pricing</a>). Lucid 50K runs about $70 with a code and $130–175 without. Use your checkout price.</li>
-      <li><strong>Buying rule.</strong> Every second week the model buys enough evals to fill the firm's free trading slots, counting slots that free within two weeks. Accounts above a firm's max sit idle and take the next free slots before any new eval, best-paying size first. Funded accounts not yet in profit hold their slot. New evals go to the size that earns the most per winning funded. A batch is capped at 25, or at 5 once a firm has 3 accounts trading.</li>
-      <li><strong>After the last payout.</strong> The account counts as lost and its slot frees up, as in the chat's "expect to lose some funded after the third cycle". Topstep accounts without a good flip are lost after payout 2. Any account that keeps trading is extra upside.</li>
-      <li><strong>Fees.</strong> Put platform, data or subscription fees in <em>Monthly fee per account</em>. It is charged every 4 weeks for every held account and open eval.</li>
-      <li><strong>Bad luck.</strong> The tiles are averages. The bad-luck line replays the 12 weeks 1,000 times, passing and failing whole accounts at random, and shows the worst run in 10.</li>
-    </ul>
-  </section>
 </div>
 
 <script>
@@ -467,8 +419,7 @@ function mondayOf(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate(
 var START = mondayOf(new Date());
 function weekStart(t){ var d = new Date(START.getTime()); d.setDate(d.getDate() + 7 * t); return d; }
 function dShort(d){ return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
-var CAL = [['2026-11-26','Thanksgiving'],['2026-12-10','NQ roll'],['2026-12-25','Christmas'],['2027-01-01','New Year'],['2027-01-18','MLK Day'],
-  ['2027-02-15','Presidents Day'],['2027-03-11','NQ roll'],['2027-03-26','Good Friday'],['2027-05-31','Memorial Day'],['2027-06-10','NQ roll'],['2027-06-18','Juneteenth'],['2027-07-05','July 4th']];
+var CAL = [];
 function calFor(t){
   var a = weekStart(t).getTime(), b = weekStart(t + 1).getTime(), out = [];
   CAL.forEach(function(c){ var p = c[0].split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]).getTime(); if (d >= a && d < b) out.push(c[1]); });
@@ -524,7 +475,7 @@ function buildFirms(){
       var f = state.firms[i];
       var rm = idx.length > 1 ? '<button type="button" class="btn ghost" data-rm="' + i + '" aria-label="Remove ' + esc(f.name) + '">Remove size</button>' : '';
       return '<div class="size"><div class="firm-top"><div class="field"><label for="f' + i + '-size">Account size</label><div class="inp"><input id="f' + i + '-size" type="text" data-i="' + i + '" data-k="size" value="' + esc(f.size) + '"></div></div>' + rm + '</div>' +
-        sizeFields(f, i) + '<dl class="out" id="f' + i + '-out"></dl>' + (f.note ? '<p class="note">' + esc(f.note) + '</p>' : '') + '</div>';
+        sizeFields(f, i) + '<dl class="out" id="f' + i + '-out"></dl>' + '' + '</div>';
     }).join('');
     var rmf = GROUPS.length > 1 ? '<button type="button" class="btn ghost" data-rmfirm="' + g + '" aria-label="Remove ' + esc(f0.firm) + '">Remove firm</button>' : '';
     return '<article class="firm" aria-label="' + esc(f0.firm) + '">' +
@@ -704,7 +655,7 @@ function withHistory(res){
 }
 function drawLedger(disp){
   var names = state.firms.map(function(f){ return esc(f.name || 'Firm'); });
-  var head = '<thead><tr><th class="l">Week</th><th class="l">Starts</th><th class="l">Calendar and actual</th>' +
+  var head = '<thead><tr><th class="l">Week</th><th class="l">Starts</th><th class="l">Actual</th>' +
     names.map(function(nm){ return '<th>Buy · ' + nm + '</th>'; }).join('') +
     '<th>Out</th><th>In</th><th>Running total</th><th>In profit</th><th>Funded trying</th></tr></thead>';
   var dash = '<span class="muted">–</span>';
@@ -761,12 +712,7 @@ function update(){
 
   // the other preset, for contrast
   var others = pn === 'live' ? ['plan'] : pn === 'plan' ? ['live'] : ['live', 'plan'];
-  var label = { live: 'Live so far (funded win 50%)', plan: 'Backtest plan (funded win 21%)' };
-  var altText = others.map(function(k){
-    var o = outcome(fracRates(PRESETS[k]));
-    return '<strong>' + label[k] + ':</strong> buy ' + o.rows[0].buy + ' now, need ' + money(o.need) + ', ' + signed(o.net) + ' after 12 weeks, ' + signed(o.run) + ' a month once running.';
-  });
-  document.getElementById('alt').innerHTML = altText.join(' ');
+  var label = { live: 'Live rates', plan: 'Plan rates' };
   document.getElementById('sum-h').textContent = GROUPS.length === 2 ? 'Both firms together' : GROUPS.length === 1 ? 'Your firm' : 'All ' + GROUPS.length + ' firms together';
 
   // per firm outputs
@@ -806,7 +752,6 @@ function update(){
   lines.push('12 weeks: out ' + money(res.totOut) + ', in ' + money(res.totIn) + ', net ' + signed(res.net) + '. Once running: about ' + signed(res.run) + ' a month.');
   others.forEach(function(k){ var o = outcome(fracRates(PRESETS[k])); lines.push(label[k] + ': 12-week net ' + signed(o.net) + ', about ' + signed(o.run) + ' a month.'); });
   lastText = lines.join('\n');
-  document.getElementById('eyebrow').textContent = 'Prop roadmap · week of ' + dShort(START) + ' ' + START.getFullYear();
 }
 
 document.getElementById('copy').addEventListener('click', function(){
