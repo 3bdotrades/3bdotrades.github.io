@@ -292,8 +292,10 @@ function params(r){
     D: D, D1: Math.min(30, Math.max(1, Math.round(num(r.payDays1, D)))), L: Math.min(60, Math.max(1, Math.round(num(r.lossDays, 20)))),
     E: Math.min(30, Math.max(1, Math.round(num(r.evalDays, 3)))), wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), plan: !!r.plan };
 }
-// A losing flip day costs about this much room; it turns room and payouts into losing days.
-var DAY_LOSS = 160;
+// A losing flip day costs about this much room (more where the fleet's stop is bigger); it turns room and payouts into losing days.
+var DAY_LOSS = 160, DAY_LOSS_AT = { 'aqua|50': 215, 'topstep|50': 167 };
+var FIRM_ALIAS = { bg: 'blueguardian' }, FIRM_KEYS = ['lucid', 'topstep', 'aqua', 'blueguardian', 'futureselite', 'tradeify'];
+function dayLoss(firm, size){ return DAY_LOSS_AT[normFirm(firm) + '|' + sizeNum(size)] || DAY_LOSS; }
 // Flip numbers for one size: its own flip win and losing days when set, else the rates bar.
 // Under the Plan preset a size uses its plan flip win (flipPlan) when it has one.
 // A payout takes its cash out of the room, so each later cycle allows fewer losing days.
@@ -301,8 +303,8 @@ function flipSpec(f, P){
   var fq = P.plan && num(f.flipPlan, 0) > 0 ? num(f.flipPlan, 0) : num(f.flip, 0);
   var q = fq > 0 ? clamp01(fq / 100) : P.q;
   var L1 = num(f.lossDays, 0) > 0 ? Math.min(60, Math.max(1, Math.round(num(f.lossDays, 0)))) : P.L;
-  var p1 = Math.max(0, num(f.pay1, 0)), p2 = Math.max(0, num(f.pay2, 0));
-  return { q: q, Lk: [L1, Math.max(1, Math.round(L1 - p1 / DAY_LOSS)), Math.max(1, Math.round(L1 - (p1 + p2) / DAY_LOSS))] };
+  var p1 = Math.max(0, num(f.pay1, 0)), p2 = Math.max(0, num(f.pay2, 0)), dl = dayLoss(f.firm, f.size);
+  return { q: q, dl: dl, Lk: [L1, Math.max(1, Math.round(L1 - p1 / dl)), Math.max(1, Math.round(L1 - (p1 + p2) / dl))] };
 }
 function groupKey(f){ return String(f.firm !== undefined ? f.firm : (f.name || '')).trim().toLowerCase(); }
 function simulateAll(firms, r, weeks, rnd){
@@ -329,7 +331,7 @@ function simulateGroup(units, r, weeks, rnd){
   function entry(u, k){ return idx(k, k === 1 ? P.D1 : P.D, L - u.Lk[k - 1]); }
   var U = units.map(function(f, j){
     var w = perWinning(f, r), pays = [Math.max(0, num(f.pay1, 0)), Math.max(0, num(f.pay2, 0)), Math.max(0, num(f.pay3, 0))];
-    var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pays: pays, last: pays[2] > 0 ? 3 : pays[1] > 0 ? 2 : 1, q: specs[j].q, Lk: specs[j].Lk,
+    var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pays: pays, last: pays[2] > 0 ? 3 : pays[1] > 0 ? 2 : 1, q: specs[j].q, Lk: specs[j].Lk, dl: specs[j].dl,
       price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0,
       evalRes: zeros(), profitAt: zeros(), failAt: zeros(), flips: new Float64Array(S), fc: 0, waitFunded: 0, wait: 0, pending: 0, trying: 0, cash0: 0, days: [] };
     // chance an account in each flip state leaves (paid out for the last time, or lost) within H flip days:
@@ -378,7 +380,7 @@ function simulateGroup(units, r, weeks, rnd){
       if (rem <= 0){
         // every winning day is in: the payout is due now, and the next cycle starts with the room that is left
         u.cash0 += u.pays[k0 - 1];
-        if (u.last > k0) u.flips[idx(k0 + 1, P.D, L - Math.max(1, Math.min(L, Math.round(left - u.pays[k0 - 1] / DAY_LOSS))))] += 1;
+        if (u.last > k0) u.flips[idx(k0 + 1, P.D, L - Math.max(1, Math.min(L, Math.round(left - u.pays[k0 - 1] / u.dl))))] += 1;
       }
       else u.flips[idx(k0, rem, L - left)] += 1;
     });
@@ -970,7 +972,6 @@ buildFirms();
 update();
 // ---------- dashboard sync: read this fleet's section of the fleet dashboard and fill the accounts ----------
 var G1_URL = 'https://randompotato247.github.io/fleet-dashboard/';
-var FIRM_ALIAS = { bg: 'blueguardian' }, FIRM_KEYS = ['lucid', 'topstep', 'aqua', 'blueguardian', 'futureselite', 'tradeify'];
 function lev(a, b){
   var p = [], i, j; for (j = 0; j <= b.length; j++) p[j] = j;
   for (i = 1; i <= a.length; i++){ var q = [i]; for (j = 1; j <= b.length; j++) q[j] = Math.min(p[j] + 1, q[j - 1] + 1, p[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1)); p = q; }
@@ -1012,8 +1013,8 @@ function parseG1(html){
   rows('p-' + K + '-funded').forEach(function(c){ unit(c[1], g1Size(c[0], c[3], false)).fundeds++; });
   // G1 shows "n/4 days" before the first payout and "n/5 days" after one
   rows('p-' + K + '-flip').forEach(function(c){
-    var m = /(\d+)\s*\/\s*(\d+)\s*days/i.exec(c[3]), room = moneyNum(c[4]);
-    unit(c[1], g1Size(c[0], c[3], false)).flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, left: room !== null ? Math.max(1, Math.round(room / DAY_LOSS)) : null });
+    var m = /(\d+)\s*\/\s*(\d+)\s*days/i.exec(c[3]), room = moneyNum(c[4]), u = unit(c[1], g1Size(c[0], c[3], false));
+    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, left: room !== null ? Math.max(1, Math.round(room / dayLoss(u.fkey, u.size))) : null });
   });
   var sig = null, sum = sec.querySelector('table.sum');
   if (sum){
@@ -1079,22 +1080,23 @@ function nextDays(p){ var a = []; for (var d = 1; d <= 4; d++) a.push(p.days[d] 
 // ---------- numbers per fleet (set from the chat; bump that fleet's v to push changes into every browser once) ----------
 var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'pay3', 'idle', 'flip', 'flipPlan', 'lossDays'];
 // payouts: Lucid's own; Topstep from the chat advice; every other firm pays like Lucid at the same size
-var OWNER_SETS = { g1: { v: 4, rows: [
+// losing days: the dashboards' room at the start of a flip / the loss on a losing day there (Topstep 24, Aqua 19)
+var OWNER_SETS = { g1: { v: 5, rows: [
   { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, idle: 2, flip: 53, flipPlan: 58, lossDays: 12 },
   { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, idle: 2, lossDays: 24 },
-  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 25 },
-  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 24 },
+  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 19 },
   { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'Tradeify', size: '25K', evalPrice: 72.38, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, flip: 53, flipPlan: 58, lossDays: 12 },
   { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 }
 ] },
 // V2 fleet: G1's numbers; no idle accounts
-v2: { v: 2, rows: [
+v2: { v: 3, rows: [
   { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, flip: 53, flipPlan: 58, lossDays: 12 },
   { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
-  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 25 },
-  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 24 },
+  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 19 },
   { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 }
