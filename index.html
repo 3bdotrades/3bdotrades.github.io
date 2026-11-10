@@ -103,11 +103,26 @@ header.top{display:flex;flex-direction:column;gap:10px}
 
 /* firms */
 .section-head{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:baseline}
-.firms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,470px),1fr));gap:16px}
-.firm{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.firms{min-width:0}
+.firmwrap{background:var(--surface);container-type:inline-size}
+.ft{border-collapse:separate;border-spacing:0}
+.ft th,.ft td{padding:6px 9px}
+.ft th:first-child,.ft td.fn{position:sticky;left:0;z-index:1;text-align:left;border-right:1px solid var(--line)}
+.ft td.fn{background:var(--surface);padding:2px 4px}
+.ft td.buy strong{font-size:15px}
+.ft tr:nth-last-child(2)>td{border-bottom:0}
+.ft tr.ed:last-child>td{border-top:1px solid var(--line)}
+.ft tr.ed>td{padding:0;text-align:left;white-space:normal;font-family:var(--font-body)}
+.fbtn{display:flex;align-items:center;gap:7px;width:100%;font:600 13.5px/1.2 var(--font-body);color:var(--ink);background:none;border:0;border-radius:6px;padding:6px;cursor:pointer;text-align:left;white-space:nowrap}
+.fbtn::before{content:"";flex:none;border-left:5px solid var(--accent);border-top:4px solid transparent;border-bottom:4px solid transparent}
+.fbtn[aria-expanded="true"]::before{transform:rotate(90deg)}
+.fbtn:hover{background:var(--accent-soft)}
+.fbtn:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.fbtn .sz{color:var(--muted);font-weight:400}
+.edbox{position:sticky;left:0;width:min(100%,calc(100vw - 34px));width:100cqw;max-width:100%;padding:14px 16px 16px;border-left:3px solid var(--accent);display:flex;flex-direction:column;gap:14px}
+.sizes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:14px 28px}
 .firm-top{display:flex;gap:10px;align-items:flex-end}
-.firm-top .field{flex:1}
-.firm-top .inp input{font-size:17px;padding:8px 10px}
+.firm-top .field{flex:1;max-width:260px}
 .group{display:flex;flex-direction:column;gap:8px}
 .group .gl{font-family:var(--font-data);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
@@ -236,6 +251,7 @@ textarea.copyfall{width:100%;min-height:150px;font:13px var(--font-data);color:v
     <p class="muted small" id="act-dash" hidden></p>
     <div id="act-own">
     <p class="muted small">Real fees paid and payouts received, 26 Sep – 9 Nov 2026. 13 challenge fees, 2 payouts.</p>
+    <p class="small" id="act-new" hidden></p>
     <div class="tablewrap">
       <table>
         <thead><tr><th class="l">Firm</th><th>Fees paid</th><th>Received</th><th>Net</th></tr></thead>
@@ -274,14 +290,16 @@ function params(r){
   var D = Math.min(30, Math.max(1, Math.round(num(r.payDays, 5))));
   return { pass: clamp01(r.pass), win: clamp01(r.win), tries: Math.min(10, Math.max(1, Math.round(num(r.tries, 2)))), q: clamp01(r.flip),
     D: D, D1: Math.min(30, Math.max(1, Math.round(num(r.payDays1, D)))), L: Math.min(60, Math.max(1, Math.round(num(r.lossDays, 20)))),
-    E: Math.min(30, Math.max(1, Math.round(num(r.evalDays, 3)))), wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))) };
+    E: Math.min(30, Math.max(1, Math.round(num(r.evalDays, 3)))), wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), plan: !!r.plan };
 }
 // A losing flip day costs about this much room; it turns room and payouts into losing days.
 var DAY_LOSS = 160;
 // Flip numbers for one size: its own flip win and losing days when set, else the rates bar.
+// Under the Plan preset a size uses its plan flip win (flipPlan) when it has one.
 // A payout takes its cash out of the room, so each later cycle allows fewer losing days.
 function flipSpec(f, P){
-  var q = num(f.flip, 0) > 0 ? clamp01(num(f.flip, 0) / 100) : P.q;
+  var fq = P.plan && num(f.flipPlan, 0) > 0 ? num(f.flipPlan, 0) : num(f.flip, 0);
+  var q = fq > 0 ? clamp01(fq / 100) : P.q;
   var L1 = num(f.lossDays, 0) > 0 ? Math.min(60, Math.max(1, Math.round(num(f.lossDays, 0)))) : P.L;
   var p1 = Math.max(0, num(f.pay1, 0)), p2 = Math.max(0, num(f.pay2, 0));
   return { q: q, Lk: [L1, Math.max(1, Math.round(L1 - p1 / DAY_LOSS)), Math.max(1, Math.round(L1 - (p1 + p2) / DAY_LOSS))] };
@@ -300,7 +318,7 @@ function simulateAll(firms, r, weeks, rnd){
 // Evals resolve after E days; a funded account takes one try a day; an account in profit flips one day at a time
 // and gets a payout after enough winning flip days (D1 for the first, D for later ones), or is lost when its losing days run out.
 function simulateGroup(units, r, weeks, rnd){
-  var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c, D = Math.max(P.D, P.D1), L = 1, H = P.E + 1;
+  var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c, D = Math.max(P.D, P.D1), L = 1, H = P.E;
   var specs = units.map(function(f){ var sp = flipSpec(f, P); if (sp.Lk[0] > L) L = sp.Lk[0]; return sp; });
   var S = 3 * D * L;
   var nDays = Math.max(1, weeks * 5 - P.wd0), LD = nDays + P.E + P.tries + 8, capSum = 0;
@@ -314,7 +332,8 @@ function simulateGroup(units, r, weeks, rnd){
     var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pays: pays, last: pays[2] > 0 ? 3 : pays[1] > 0 ? 2 : 1, q: specs[j].q, Lk: specs[j].Lk,
       price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0,
       evalRes: zeros(), profitAt: zeros(), failAt: zeros(), flips: new Float64Array(S), fc: 0, waitFunded: 0, wait: 0, pending: 0, trying: 0, cash0: 0, days: [] };
-    // chance an account in each flip state leaves (paid out for the last time, or lost) within H days
+    // chance an account in each flip state leaves (paid out for the last time, or lost) within H flip days:
+    // an eval bought today needs its slot E trading days from now, after E more flip days
     var cur = new Float64Array(S);
     for (var h = 0; h < H; h++){
       var nx = new Float64Array(S);
@@ -415,7 +434,8 @@ function simulateGroup(units, r, weeks, rnd){
     U.forEach(function(u){
       if (u.buy > 0){ u.pending += u.buy; u.evalRes[d + P.E] += u.buy; }
       var evalCost = u.buy * u.price, actCost = u.act * u.actFee;
-      var feeCost = (u.monthly > 0 && d % 20 === 0) ? u.monthly * (u.trying + u.fc + u.pending) : 0;
+      // a monthly fee builds up a day at a time on every account held, trading or waiting
+      var feeCost = u.monthly > 0 ? u.monthly * 12 / 260 * (u.trying + u.fc + u.pending + u.wait + u.waitFunded) : 0;
       u.days.push({ d: d, w: Math.floor((P.wd0 + d) / 5), buy: u.buy, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost,
                     inn: u.cashIn, winning: u.fc, trying: u.trying, wait: u.wait + u.waitFunded, occupied: u.trying + u.fc });
     });
@@ -488,9 +508,9 @@ var DEFAULTS = {
   rates: PRESETS.live,
   firms: [
     { name: 'Lucid 50K', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 70, activation: 0, pay1: 891, pay2: 891, pay3: 0, monthly: 0,
-      note: 'Your real Lucid payouts so far: $891.23 each (4 and 9 Nov). The chat expected about $1,900 then $900, about $2,800 an account.' },
+      note: '' },
     { name: 'Topstep 50K', slots: 5, fundedNow: 0, inProfitNow: 0, openEvals: 0, evalPrice: 49, activation: 149, pay1: 1800, pay2: 900, pay3: 450, monthly: 0,
-      note: 'The buffer shrinks with each payout: +$4k, then +$2k, then +$1k. Payout 3 only after a good flip (the Flip win rate); otherwise back to funded trading.' }
+      note: '' }
   ]
 };
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
@@ -498,7 +518,7 @@ var state = clone(DEFAULTS);
 try { var saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (saved && saved.rates && Array.isArray(saved.firms) && saved.firms.length) state = saved; } catch (e) {}
 (function(){ var base = PRESETS[+state.rates.win === 21 ? 'plan' : 'live']; ['flip', 'payDays1', 'payDays', 'lossDays', 'evalDays'].forEach(function(k){ if (state.rates[k] === undefined) state.rates[k] = base[k]; }); delete state.rates.land; })();
 function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
-function fracRates(r){ return { pass: num(r.pass, 0) / 100, win: num(r.win, 0) / 100, tries: num(r.tries, 2), flip: num(r.flip, 18) / 100, payDays1: num(r.payDays1, 4), payDays: num(r.payDays, 5), lossDays: num(r.lossDays, 20), evalDays: num(r.evalDays, 3), wd0: WD0 }; }
+function fracRates(r){ return { pass: num(r.pass, 0) / 100, win: num(r.win, 0) / 100, tries: num(r.tries, 2), flip: num(r.flip, 18) / 100, payDays1: num(r.payDays1, 4), payDays: num(r.payDays, 5), lossDays: num(r.lossDays, 20), evalDays: num(r.evalDays, 3), wd0: WD0, plan: presetName(r) === 'plan' }; }
 function firmFrac(f){ return clone(f); }
 
 // ---------- dates ----------
@@ -563,10 +583,19 @@ function sizeFields(f, i){
     }).join('') + '</div></div>';
   }).join('');
 }
+// one table row per account size; each firm's inputs sit in a row below it, opened from the firm name
+var OPEN = {}, COLS = ['buy', 'next', 'ev', 'fu', 'ip', 'id', 'pr', 'pay', 'w12', 'run'];
+function gKey(g){ var idx = GROUPS[g]; return idx ? String(state.firms[idx[0]].firm).trim().toLowerCase() : ''; }
+function nameHtml(f){ return esc(f.firm || 'Firm') + ' <span class="sz">' + esc(f.size) + '</span>'; }
+function price(v){ v = Math.round(num(v, 0) * 100) / 100; return '$' + v.toLocaleString('en-US', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 }); }
 function buildFirms(){
   normalize(); GROUPS = groupsOf();
-  firmsEl.innerHTML = GROUPS.map(function(idx, g){
-    var f0 = state.firms[idx[0]];
+  firmsEl.innerHTML = '<div class="tablewrap firmwrap"><table class="ft" aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>' + esc(BUY_K) + '</th><th>Next 4 days</th><th>Evals</th><th>Funded</th><th>In profit</th><th>Idle</th><th>Eval price</th><th>Payouts</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' + GROUPS.map(function(idx, g){
+    var f0 = state.firms[idx[0]], open = !!OPEN[gKey(g)];
+    var rows = idx.map(function(i){
+      return '<tr><td class="fn"><button type="button" class="fbtn" id="n' + i + '" data-edit="' + g + '" aria-expanded="' + open + '" aria-controls="ed-' + g + '">' + nameHtml(state.firms[i]) + '</button></td>' +
+        COLS.map(function(c){ return '<td id="c' + i + '-' + c + '"' + (c === 'buy' ? ' class="buy"' : '') + '></td>'; }).join('') + '</tr>';
+    }).join('');
     var sizes = idx.map(function(i){
       var f = state.firms[i];
       var rm = idx.length > 1 ? '<button type="button" class="btn ghost" data-rm="' + i + '" aria-label="Remove ' + esc(f.name) + '">Remove size</button>' : '';
@@ -574,13 +603,14 @@ function buildFirms(){
         sizeFields(f, i) + '<dl class="out" id="f' + i + '-out"></dl>' + '' + '</div>';
     }).join('');
     var rmf = GROUPS.length > 1 ? '<button type="button" class="btn ghost" data-rmfirm="' + g + '" aria-label="Remove ' + esc(f0.firm) + '">Remove firm</button>' : '';
-    return '<article class="firm" aria-label="' + esc(f0.firm) + '">' +
+    return rows + '<tr class="ed" id="ed-' + g + '"' + (open ? '' : ' hidden') + '><td colspan="' + (COLS.length + 1) + '"><div class="edbox">' +
       '<div class="firm-top"><div class="field"><label for="g' + g + '-firm">Firm</label><div class="inp"><input id="g' + g + '-firm" type="text" data-g="' + g + '" data-k="firm" value="' + esc(f0.firm) + '"></div></div>' +
       '<div class="field cap"><label for="g' + g + '-cap">Max trading at once</label><div class="inp"><input id="g' + g + '-cap" type="number" inputmode="numeric" min="0" step="1" data-g="' + g + '" data-k="firmCap" value="' + esc(f0.firmCap) + '"></div></div>' + rmf + '</div>' +
-      '<p class="capline" id="cap-' + g + '"></p>' + sizes +
-      '<div class="btnrow"><button type="button" class="btn ghost" data-addsize="' + g + '">Add a size</button></div></article>';
-  }).join('');
+      '<p class="capline" id="cap-' + g + '"></p><div class="sizes">' + sizes +
+      '</div><div class="btnrow"><button type="button" class="btn ghost" data-addsize="' + g + '">Add a size</button></div></div></td></tr>';
+  }).join('') + '</tbody></table></div>';
 }
+function cell(i, c, html){ var el = document.getElementById('c' + i + '-' + c); if (el) el.innerHTML = html; }
 function heldOf(f){ return num(f.fundedNow, 0) + num(f.inProfitNow, 0) + num(f.idle, 0) + num(f.passedNow, 0); }
 function groupHeld(g){ return (GROUPS[g] || []).reduce(function(a, i){ return a + heldOf(state.firms[i]); }, 0); }
 function groupCap(g){ var idx = GROUPS[g] || []; return idx.length ? num(state.firms[idx[0]].firmCap, 5) : 5; }
@@ -595,11 +625,13 @@ function drawCaps(){
 firmsEl.addEventListener('input', function(e){
   var el = e.target; if (!el.dataset) return; var k = el.dataset.k;
   if (el.dataset.g !== undefined){
+    var was = gKey(+el.dataset.g);
     (GROUPS[+el.dataset.g] || []).forEach(function(i){
       var f = state.firms[i];
       if (k === 'firm'){ f.firm = el.value; f.name = (f.firm + ' ' + f.size).trim(); }
       else f.firmCap = el.value === '' ? 0 : Math.max(0, Math.round(Number(el.value)));
     });
+    if (k === 'firm' && OPEN[was]){ delete OPEN[was]; OPEN[gKey(+el.dataset.g)] = 1; }
     save(); update(); return;
   }
   if (el.dataset.i === undefined) return;
@@ -607,16 +639,25 @@ firmsEl.addEventListener('input', function(e){
   if (k === 'size'){ f.size = el.value; f.name = (f.firm + ' ' + f.size).trim(); }
   else f[k] = el.value === '' ? 0 : Number(el.value);
   if (k === 'slots') f.slots = Math.max(0, Math.round(num(f.slots, 0)));
+  if (k === 'flip') delete f.flipPlan;
   save(); update();
 });
 firmsEl.addEventListener('change', function(e){ if (e.target.dataset && e.target.dataset.k === 'firm'){ buildFirms(); update(); } });
 firmsEl.addEventListener('click', function(e){
+  var t = e.target.closest('[data-edit]');
+  if (t){
+    var g = +t.dataset.edit, key = gKey(g), on = !OPEN[key], ed = document.getElementById('ed-' + g);
+    if (on) OPEN[key] = 1; else delete OPEN[key];
+    if (ed) ed.hidden = !on;
+    (GROUPS[g] || []).forEach(function(i){ var nb = document.getElementById('n' + i); if (nb) nb.setAttribute('aria-expanded', on ? 'true' : 'false'); });
+    return;
+  }
   var b = e.target.closest('[data-rm],[data-rmfirm],[data-addsize]'); if (!b) return;
   if (b.dataset.rm !== undefined) state.firms.splice(+b.dataset.rm, 1);
   else if (b.dataset.rmfirm !== undefined) GROUPS[+b.dataset.rmfirm].slice().sort(function(a, c){ return c - a; }).forEach(function(i){ state.firms.splice(i, 1); });
   else {
     var idx = GROUPS[+b.dataset.addsize], last = idx[idx.length - 1], n = clone(state.firms[last]);
-    n.size = 'New size'; n.name = (n.firm + ' New size').trim(); n.fundedNow = 0; n.inProfitNow = 0; n.openEvals = 0; n.passedNow = 0; n.idle = 0; n.g1Flips = []; delete n.g1; n.flip = 0; n.lossDays = 0; n.slots = num(n.firmCap, 5); n.note = '';
+    n.size = 'New size'; n.name = (n.firm + ' New size').trim(); n.fundedNow = 0; n.inProfitNow = 0; n.openEvals = 0; n.passedNow = 0; n.idle = 0; n.g1Flips = []; delete n.g1; n.flip = 0; delete n.flipPlan; n.lossDays = 0; n.slots = num(n.firmCap, 5); n.note = '';
     state.firms.splice(last + 1, 0, n);
   }
   save(); buildFirms(); update();
@@ -624,9 +665,9 @@ firmsEl.addEventListener('click', function(e){
 document.getElementById('add').addEventListener('click', function(){
   var used = {}; state.firms.forEach(function(f){ used[String(f.firm).trim().toLowerCase()] = 1; });
   var nm = 'New firm', k = 2; while (used[nm.toLowerCase()]) nm = 'New firm ' + (k++);
-  var n = clone(NEW_FIRM); n.firm = nm; n.size = '50K'; n.firmCap = 5; n.name = nm + ' 50K'; state.firms.push(n); save(); buildFirms(); update();
+  var n = clone(NEW_FIRM); n.firm = nm; n.size = '50K'; n.firmCap = 5; n.name = nm + ' 50K'; state.firms.push(n); OPEN[nm.toLowerCase()] = 1; save(); buildFirms(); update();
 });
-document.getElementById('reset').addEventListener('click', function(){ state = clone(DEFAULTS); applyOwner(); save(); syncRates(); buildFirms(); update(); drawG1(false); syncG1(); });
+document.getElementById('reset').addEventListener('click', function(){ var cl = state.cashLog, cs = state.cashSeen; state = clone(DEFAULTS); if (cl){ state.cashLog = cl; state.cashSeen = cs; } applyOwner(); save(); syncRates(); buildFirms(); update(); drawG1(false); syncG1(); });
 
 // ---------- rates ----------
 var RATE_IDS = { pass: 'r-pass', win: 'r-win', tries: 'r-tries', flip: 'r-flip', payDays1: 'r-paydays1', payDays: 'r-paydays', lossDays: 'r-lossdays', evalDays: 'r-evaldays' };
@@ -741,10 +782,25 @@ var ACTUALS = FLEET.key !== 'g1' ? [] : [
   ['2026-11-04','Aqua','fee',648.98], ['2026-11-04','Lucid','payout',891.23], ['2026-11-06','Topstep','fee',312.75], ['2026-11-08','Futureselite','fee',845.61],
   ['2026-11-08','BG','fee',443.74], ['2026-11-09','Topstep','fee',425.00], ['2026-11-09','Lucid','payout',891.23]
 ];
+// G1's dashboard totals that the typed history above already covers; cash beyond them is new
+var CASH0 = FLEET.key === 'g1' ? { inn: 1761, out: 8420 } : null;
+function ymd(d){ return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+// the dashboard gives totals only, so a rise is logged on the day this browser first sees it
+function logCash(c){
+  if (!CASH0 || !c) return;
+  var seen = state.cashSeen || CASH0, dIn = c.inn - seen.inn, dOut = c.out - seen.out;
+  if (dIn > 0 || dOut > 0) (state.cashLog = state.cashLog || []).push({ d: ymd(new Date()), inn: Math.max(0, dIn), out: Math.max(0, dOut) });
+  state.cashSeen = { inn: Math.max(seen.inn, c.inn), out: Math.max(seen.out, c.out) };
+}
+function cashNew(){
+  var a = { inn: 0, out: 0, rows: [] };
+  if (CASH0) (state.cashLog || []).forEach(function(c){ if (c.inn > 0){ a.inn += c.inn; a.rows.push([c.d, 'Dashboard', 'payout', c.inn]); } if (c.out > 0){ a.out += c.out; a.rows.push([c.d, 'Dashboard', 'fee', c.out]); } });
+  return a;
+}
 function itemText(e){ return e.firm + (e.kind === 'payout' ? ' payout +' : ' fee −') + money(e.amt); }
 function withHistory(res){
   var n = res.per.length, h = [], w0 = { out: 0, inn: 0, items: [] }, minT = 0, totOut = 0, totIn = 0;
-  var ev = ACTUALS.map(function(a){ var p = a[0].split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]); return { t: Math.floor(Math.round((d - START) / 864e5) / 7), firm: a[1], kind: a[2], amt: a[3] }; })
+  var ev = ACTUALS.concat(cashNew().rows).map(function(a){ var p = a[0].split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]); return { t: Math.floor(Math.round((d - START) / 864e5) / 7), firm: a[1], kind: a[2], amt: a[3] }; })
     .filter(function(e){ return e.t <= 0; });
   ev.forEach(function(e){ if (e.t < minT) minT = e.t; });
   for (var t = minT; t < 0; t++){ var z = []; for (var k = 0; k < n; k++) z.push(0); h.push({ t: t, actual: true, items: [], out: 0, inn: 0, buy: 0, buys: z }); }
@@ -821,7 +877,7 @@ function update(){
   res.per.forEach(function(p){ if (p.days[0]){ buyNow += p.days[0].buy; buyCost += p.days[0].evalCost; } });
   document.getElementById('t-buy-k').textContent = BUY_K;
   document.getElementById('t-buy').textContent = buyNow + ' evals';
-  document.getElementById('t-buy-s').textContent = money(buyCost) + ' · ' + state.firms.map(function(f, i){ return (f.name || 'Firm') + ' ' + (res.per[i].days[0] ? res.per[i].days[0].buy : 0); }).join(', ') + (function(){ var a = []; for (var d = 1; d <= 4; d++){ var s = 0; res.per.forEach(function(p){ if (p.days[d]) s += p.days[d].buy; }); a.push(s); } return ' · next days ' + a.join(' · '); })();
+  document.getElementById('t-buy-s').textContent = money(buyCost) + (function(){ var a = []; for (var d = 1; d <= 4; d++){ var s = 0; res.per.forEach(function(p){ if (p.days[d]) s += p.days[d].buy; }); a.push(s); } return ' · next days ' + a.join(' · '); })();
   document.getElementById('t-need').textContent = money(res.need);
   document.getElementById('t-need-s').textContent = (res.firstIn >= 0 ? 'first payout ' + wk(res.firstIn) : 'no payout inside 12 weeks') + (res.even >= 0 ? ' · even by W' + res.even : '');
   var tn = document.getElementById('t-net'); tn.textContent = signed(res.net); tn.className = 'v num ' + (res.net >= 0 ? 'pos' : 'neg');
@@ -838,10 +894,21 @@ function update(){
   var RUNS = monthlyUnits(state.firms.map(firmFrac), rr), gOf = [];
   GROUPS.forEach(function(idx, g){ idx.forEach(function(i){ gOf[i] = g; }); });
   state.firms.forEach(function(f, i){
-    var el = document.getElementById('f' + i + '-out'); if (!el) return;
     var p = res.per[i], w = perWinning(firmFrac(f), rr);
     var inn = 0, outv = 0; p.rows.forEach(function(x){ inn += x.inn; outv += x.out; });
-    var run = RUNS[i];
+    var run = RUNS[i], d0 = p.days[0], pays = [f.pay1, f.pay2, f.pay3].filter(function(v){ return num(v, 0) > 0; });
+    var nb = document.getElementById('n' + i); if (nb) nb.innerHTML = nameHtml(f);
+    cell(i, 'buy', d0 && d0.buy > 0 ? '<strong>' + d0.buy + '</strong> <span class="muted">' + money(d0.evalCost) + '</span>' : '<span class="muted">0</span>');
+    cell(i, 'next', [1, 2, 3, 4].map(function(d){ return p.days[d] ? p.days[d].buy : 0; }).join(' · '));
+    cell(i, 'ev', acc(num(f.openEvals, 0)) + (num(f.passedNow, 0) > 0 ? ' <span class="muted">+' + acc(num(f.passedNow, 0)) + ' passed</span>' : ''));
+    cell(i, 'fu', acc(num(f.fundedNow, 0)));
+    cell(i, 'ip', acc(num(f.inProfitNow, 0)));
+    cell(i, 'id', acc(num(f.idle, 0)));
+    cell(i, 'pr', price(f.evalPrice));
+    cell(i, 'pay', pays.length ? pays.map(price).join(' · ') : '–');
+    cell(i, 'w12', '<span class="' + (inn - outv >= 0 ? 'pos' : 'neg') + '">' + signed(inn - outv) + '</span>');
+    cell(i, 'run', '<span class="' + (run >= 0 ? 'pos' : 'neg') + '">' + signed(run) + '</span><span class="muted">/mo</span>');
+    var el = document.getElementById('f' + i + '-out'); if (!el) return;
     el.innerHTML =
       '<dt>' + BUY_K + '</dt><dd><span class="buynow num">' + (p.days[0] ? p.days[0].buy : 0) + ' evals</span> <span class="muted num">' + money(p.days[0] ? p.days[0].evalCost : 0) + '</span><br><span class="muted small">' + (w && w.net > 0 ? chatRule(groupHeld(gOf[i]), groupCap(gOf[i])) : num(f.pay1, 0) + num(f.pay2, 0) + num(f.pay3, 0) > 0 ? 'No buys: a winning funded loses money at these rates.' : 'No payouts at this firm, so no buys planned.') + nextDays(p) + '</span></dd>' +
       '<dt>Each winning funded</dt><dd class="num">' + (w ? acc(w.evals) + ' evals · costs ' + money(w.cost) + ' · pays ' + money(w.cash) + ' · <span class="' + (w.net >= 0 ? 'pos' : 'neg') + '">' + signed(w.net) + '</span>' : '–') + '</dd>' +
@@ -860,6 +927,10 @@ function update(){
     document.getElementById('act').hidden = !disp.dash;
     actDash.hidden = !disp.dash;
     if (disp.dash) actDash.innerHTML = 'From the ' + esc(FLEET.label) + ' dashboard: received <strong class="num">' + money(disp.totIn) + '</strong> · spent <strong class="num">' + money(disp.totOut) + '</strong> · net <strong class="num ' + (disp.totIn - disp.totOut >= 0 ? 'pos' : 'neg') + '">' + signed(disp.totIn - disp.totOut) + '</strong>.';
+  } else {
+    var nw = cashNew(), actNew = document.getElementById('act-new');
+    actNew.hidden = !(nw.inn || nw.out);
+    if (!actNew.hidden) actNew.innerHTML = 'Since then, on the ' + esc(FLEET.label) + ' dashboard: spent <strong class="num">' + money(nw.out) + '</strong> · received <strong class="num">' + money(nw.inn) + '</strong> · net so far <strong class="num ' + (disp.totIn - disp.totOut >= 0 ? 'pos' : 'neg') + '">' + signed(disp.totIn - disp.totOut) + '</strong>.';
   }
 
   // text for the chat
@@ -899,8 +970,19 @@ buildFirms();
 update();
 // ---------- dashboard sync: read this fleet's section of the fleet dashboard and fill the accounts ----------
 var G1_URL = 'https://randompotato247.github.io/fleet-dashboard/';
-var FIRM_ALIAS = { bg: 'blueguardian', tradify: 'tradeify' };
-function normFirm(s){ s = String(s || '').toLowerCase().replace(/\b(xfa|funded|flex)\b/g, '').replace(/[^a-z]/g, ''); return FIRM_ALIAS[s] || s; }
+var FIRM_ALIAS = { bg: 'blueguardian' }, FIRM_KEYS = ['lucid', 'topstep', 'aqua', 'blueguardian', 'futureselite', 'tradeify'];
+function lev(a, b){
+  var p = [], i, j; for (j = 0; j <= b.length; j++) p[j] = j;
+  for (i = 1; i <= a.length; i++){ var q = [i]; for (j = 1; j <= b.length; j++) q[j] = Math.min(p[j] + 1, q[j - 1] + 1, p[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1)); p = q; }
+  return p[b.length];
+}
+// a firm name as a key; a near-miss spelling of one of the fleet's firms ("Blue Gurdian", "Tradify") gets that firm's key
+function normFirm(s){
+  s = String(s || '').toLowerCase().replace(/\b(xfa|funded|flex)\b/g, '').replace(/[^a-z]/g, ''); s = FIRM_ALIAS[s] || s;
+  if (FIRM_KEYS.indexOf(s) >= 0) return s;
+  for (var i = 0; i < FIRM_KEYS.length; i++){ var k = FIRM_KEYS[i]; if (lev(s, k) <= (k.length >= 10 ? 2 : k.length >= 5 ? 1 : 0)) return k; }
+  return s;
+}
 function sizeNum(s){ var m = /(\d+)/.exec(String(s || '')); return m ? +m[1] : 50; }
 function moneyNum(s){ var m = /(-?)\$([\d,]+)/.exec(String(s || '')); return m ? (m[1] ? -1 : 1) * Number(m[2].replace(/,/g, '')) : null; }
 function g1Size(id, total, isEval){
@@ -962,7 +1044,7 @@ function applyG1(g){
     if (!f){
       f = sameFirm >= 0 ? clone(state.firms[sameFirm]) : clone(NEW_FIRM);
       if (sameFirm < 0){ f.firm = x.firm; f.firmCap = 5; }
-      f.evalPrice = 0; f.activation = 0; f.pay1 = 0; f.pay2 = 0; f.pay3 = 0; f.monthly = 0; f.flip = 0; f.lossDays = 0;
+      f.evalPrice = 0; f.activation = 0; f.pay1 = 0; f.pay2 = 0; f.pay3 = 0; f.monthly = 0; f.flip = 0; delete f.flipPlan; f.lossDays = 0;
       f.size = x.size + 'K'; f.slots = num(f.firmCap, 5); f.idle = 0; f.note = ''; f.name = (f.firm + ' ' + f.size).trim();
       OWNER.forEach(function(q){ if (normFirm(q.firm) === x.fkey && sizeNum(q.size) === x.size) OWNER_KEYS.forEach(function(k){ if (k !== 'idle' && q[k] !== undefined) f[k] = q[k]; }); });
       if (sameFirm >= 0) state.firms.splice(sameFirm + 1, 0, f); else state.firms.push(f);
@@ -972,6 +1054,7 @@ function applyG1(g){
     f.g1 = true; seen.push(f);
   });
   state.firms.forEach(function(f){ if (f.g1 && seen.indexOf(f) < 0){ f.openEvals = 0; f.passedNow = 0; f.fundedNow = 0; f.inProfitNow = 0; f.g1Flips = []; } });
+  logCash(g.cash);
   state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash };
   save(); buildFirms(); update(); drawG1(false);
 }
@@ -994,39 +1077,51 @@ function syncG1(){
 }
 function nextDays(p){ var a = []; for (var d = 1; d <= 4; d++) a.push(p.days[d] ? p.days[d].buy : 0); return ' · next days ' + a.join(' · '); }
 // ---------- numbers per fleet (set from the chat; bump that fleet's v to push changes into every browser once) ----------
-var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'pay3', 'idle', 'flip', 'lossDays'];
-var OWNER_SETS = { g1: { v: 3, rows: [
-  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, idle: 2, flip: 53, lossDays: 12 },
+var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'pay3', 'idle', 'flip', 'flipPlan', 'lossDays'];
+// payouts: Lucid's own; Topstep from the chat advice; every other firm pays like Lucid at the same size
+var OWNER_SETS = { g1: { v: 4, rows: [
+  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, idle: 2, flip: 53, flipPlan: 58, lossDays: 12 },
   { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, idle: 2, lossDays: 24 },
-  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'Tradeify', size: '25K', evalPrice: 72.38, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 0, pay2: 0, pay3: 0 }
+  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 25 },
+  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'Tradeify', size: '25K', evalPrice: 72.38, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, flip: 53, flipPlan: 58, lossDays: 12 },
+  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 }
 ] },
-// V2 fleet: the same eval prices and Lucid payouts until its own numbers are given; no idle accounts
-v2: { v: 1, rows: [
-  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, flip: 53, lossDays: 12 },
+// V2 fleet: G1's numbers; no idle accounts
+v2: { v: 2, rows: [
+  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, flip: 53, flipPlan: 58, lossDays: 12 },
   { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
-  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 0, pay2: 0, pay3: 0 },
-  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 0, pay2: 0, pay3: 0 }
+  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 25 },
+  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 }
 ] } };
 var OWNER = OWNER_SETS[FLEET.key].rows, OWNER_V = OWNER_SETS[FLEET.key].v;
+// one row per firm and size: a second row for the same one (typed under another spelling) folds into the row the dashboard feeds
+function tidy(){
+  var keep = {}, out = [];
+  state.firms.forEach(function(f){
+    var k = normFirm(f.firm) + '|' + sizeNum(f.size), o = keep[k];
+    if (!o){ keep[k] = f; out.push(f); return; }
+    if (f.g1 && !o.g1){ if (!(num(f.idle, 0) > 0)) f.idle = num(o.idle, 0); out[out.indexOf(o)] = f; keep[k] = f; }
+    else if (!(num(o.idle, 0) > 0)) o.idle = num(f.idle, 0);
+  });
+  state.firms = out;
+}
 function applyOwner(){
   if (state.ownerV === OWNER_V) return;
   var prev = num(state.ownerV, 0);
-  normalize();
+  normalize(); tidy();
   OWNER.forEach(function(o){
     var f = null, sameFirm = -1;
     state.firms.forEach(function(y, i){ if (normFirm(y.firm) === normFirm(o.firm)){ sameFirm = i; if (!f && sizeNum(y.size) === sizeNum(o.size)) f = y; } });
     if (!f){
       f = sameFirm >= 0 ? clone(state.firms[sameFirm]) : clone(NEW_FIRM);
       if (sameFirm < 0){ f.firm = o.firm; f.firmCap = 5; }
-      f.size = o.size; f.slots = num(f.firmCap, 5); f.openEvals = 0; f.fundedNow = 0; f.inProfitNow = 0; f.passedNow = 0; f.idle = 0; f.g1Flips = []; f.monthly = 0; f.flip = 0; f.lossDays = 0; f.note = '';
+      f.size = o.size; f.slots = num(f.firmCap, 5); f.openEvals = 0; f.fundedNow = 0; f.inProfitNow = 0; f.passedNow = 0; f.idle = 0; f.g1Flips = []; f.monthly = 0; f.flip = 0; delete f.flipPlan; f.lossDays = 0; f.note = '';
       if (sameFirm >= 0) state.firms.splice(sameFirm + 1, 0, f); else state.firms.push(f);
     }
     // idle counts are typed on the page: once set, a later version leaves them alone
