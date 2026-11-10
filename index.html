@@ -63,6 +63,11 @@ thead th{font-size:12px;color:var(--mute);font-weight:600;border-bottom:1px soli
 tbody td:first-child{background:var(--card)}
 tbody tr+tr td{border-top:1px solid var(--line)}
 tbody tr:hover td{background:var(--row)}
+td.who{padding:0}
+.pick{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer}
+.pick input{flex:none;width:15px;height:15px;margin:0;accent-color:var(--accent);cursor:pointer}
+tr.off .pick{color:var(--mute)}
+.note.after{margin:8px 2px 0}
 
 /* cash by week */
 .legend{display:inline-flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
@@ -106,17 +111,18 @@ tbody tr:hover td{background:var(--row)}
       </div>
     </div>
     <div>
-      <h2><span id="rates-h">Rates</span><span class="seg" role="group" aria-label="Rates to use"><button type="button" id="preset-live" aria-pressed="true" title="Your live rates so far">Live</button><button type="button" id="preset-plan" aria-pressed="false" title="The backtest plan's rates">Plan</button></span></h2>
+      <h2><span id="rates-h">Rates</span><span class="seg" role="group" aria-label="Rates to use"><button type="button" id="preset-live" aria-pressed="true" title="Counted from this fleet's real results">Live</button><button type="button" id="preset-plan" aria-pressed="false" title="The backtest plan's rates">Plan</button></span></h2>
       <div class="wrap cells rates">
-        <div class="cell"><label for="r-pass">Eval pass</label><span class="pct"><input id="r-pass" type="number" inputmode="decimal" min="0" max="100" step="1">%</span></div>
-        <div class="cell"><label for="r-win">Funded win</label><span class="pct"><input id="r-win" type="number" inputmode="decimal" min="0" max="100" step="1">%</span></div>
-        <div class="cell"><label for="r-flip">Flip win</label><span class="pct"><input id="r-flip" type="number" inputmode="decimal" min="0" max="100" step="1">%</span></div>
+        <div class="cell" id="c-pass"><label for="r-pass">Eval pass</label><span class="pct"><input id="r-pass" type="number" inputmode="decimal" min="0" max="100" step="1">%</span></div>
+        <div class="cell" id="c-win"><label for="r-win">Funded win</label><span class="pct"><input id="r-win" type="number" inputmode="decimal" min="0" max="100" step="1">%</span></div>
+        <div class="cell" id="c-flip"><label for="r-flip">Flip win</label><span class="pct"><input id="r-flip" type="number" inputmode="decimal" min="0" max="100" step="1">%</span></div>
       </div>
     </div>
   </div>
 
   <h2 id="firms-h">Per firm</h2>
   <div class="wrap" id="firms"></div>
+  <p class="note after" id="skip" aria-live="polite" hidden></p>
 
   <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span></span></h2>
   <div class="wrap chartcard"><div class="chartbox" id="chart" tabindex="0" role="img" aria-label="Weekly cash in and out with the running total. Use the left and right arrow keys to read each week."></div></div>
@@ -157,32 +163,51 @@ function flipSpec(f, P){
   return { q: q, dl: dl, Lk: [L1, Math.max(1, Math.round(L1 - p1 / dl)), Math.max(1, Math.round(L1 - (p1 + p2) / dl))] };
 }
 function groupKey(f){ return String(f.firm !== undefined ? f.firm : (f.name || '')).trim().toLowerCase(); }
-function simulateAll(firms, r, weeks, rnd){
+// The firms run the same trading days side by side, because they share the fleet's eval seats: an eval takes one trade a day
+// and the fleet gets only so many eval signals a day, so the evals open across all firms stay within `seats` (no limit when not given).
+// Each free seat goes to the firm furthest from full; at a tie, to the one that pays more.
+function simulateAll(firms, r, weeks, seats){
   var map = {}, groups = [], per = new Array(firms.length);
   firms.forEach(function(f, i){ var k = groupKey(f); if (!(k in map)){ map[k] = groups.length; groups.push([]); } groups[map[k]].push(i); });
-  groups.forEach(function(idx){
-    var sims = simulateGroup(idx.map(function(i){ return firms[i]; }), r, weeks, rnd);
-    idx.forEach(function(i, j){ per[i] = sims[j]; });
-  });
+  var sims = groups.map(function(idx){ return simulateGroup(idx.map(function(i){ return firms[i]; }), r, weeks); });
+  var limited = typeof seats === 'number' && isFinite(seats);
+  for (var d = 0, nDays = sims.length ? sims[0].nDays : 0; d < nDays; d++){
+    var wants = sims.map(function(g){ return g.open(d); }), grant = wants.map(function(w){ return w && !limited ? w.n : 0; });
+    if (limited){
+      var held = 0; sims.forEach(function(g){ held += g.held(); });
+      for (var left = Math.max(0, Math.floor(seats - held + 1e-9)); left > 0; left--){
+        var best = -1, gap = 0;
+        wants.forEach(function(w, i){
+          if (!w || grant[i] >= w.n) return;
+          var g = w.need - grant[i] * w.pc;
+          if (best < 0 || g > gap + 1e-9 || (g > gap - 1e-9 && w.value > wants[best].value)){ best = i; gap = g; }
+        });
+        if (best < 0) break;
+        grant[best]++;
+      }
+    }
+    sims.forEach(function(g, i){ g.close(d, grant[i]); });
+  }
+  groups.forEach(function(idx, gi){ var out = sims[gi].done(); idx.forEach(function(i, j){ per[i] = out[j]; }); });
   return per;
 }
 // One firm, trading day by trading day. Sizes share the firm's max-trading cap; accounts above it wait idle.
 // Evals resolve after E days; a funded account takes one try a day; an account in profit flips one day at a time
 // and gets a payout after enough winning flip days (D1 for the first, D for later ones), or is lost when its losing days run out.
-function simulateGroup(units, r, weeks, rnd){
+// open(d) runs a day up to the evals the firm wants, close(d, n) buys n of them and books the day. A size marked skip gets no new evals.
+function simulateGroup(units, r, weeks){
   var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c, D = Math.max(P.D, P.D1), L = 1, H = P.E;
   var specs = units.map(function(f){ var sp = flipSpec(f, P); if (sp.Lk[0] > L) L = sp.Lk[0]; return sp; });
   var S = 3 * D * L;
   var nDays = Math.max(1, weeks * 5 - P.wd0), LD = nDays + P.E + P.tries + 8, capSum = 0;
   function zeros(){ var a = new Array(LD); for (var k = 0; k < LD; k++) a[k] = 0; return a; }
-  function draw(n, p){ if (!rnd) return n * p; var k = 0, m = Math.round(n); for (var j = 0; j < m; j++) if (rnd() < p) k++; return k; }
   function idx(k, rem, l){ return ((k - 1) * D + (rem - 1)) * L + l; }
   // where a flip cycle starts: the winning days it needs and the losing days it allows
   function entry(u, k){ return idx(k, k === 1 ? P.D1 : P.D, L - u.Lk[k - 1]); }
   var U = units.map(function(f, j){
     var w = perWinning(f, r), pays = [Math.max(0, num(f.pay1, 0)), Math.max(0, num(f.pay2, 0)), Math.max(0, num(f.pay3, 0))];
     var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pays: pays, last: pays[2] > 0 ? 3 : pays[1] > 0 ? 2 : 1, q: specs[j].q, Lk: specs[j].Lk, dl: specs[j].dl,
-      price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0,
+      price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0, skip: !!f.skip,
       evalRes: zeros(), profitAt: zeros(), failAt: zeros(), flips: new Float64Array(S), fc: 0, waitFunded: 0, wait: 0, pending: 0, trying: 0, cash0: 0, days: [] };
     // chance an account in each flip state leaves (paid out for the last time, or lost) within H flip days:
     // an eval bought today needs its slot E trading days from now, after E more flip days
@@ -209,7 +234,7 @@ function simulateGroup(units, r, weeks, rnd){
     var cur = u.flips, nx = new Float64Array(S), cash = 0;
     for (var k = 1; k <= 3; k++) for (var rem = 1; rem <= D; rem++) for (var l = 0; l < L; l++){
       var n = cur[idx(k, rem, l)]; if (!(n > 1e-12)) continue;
-      var wins = draw(n, u.q), losses = n - wins;
+      var wins = n * u.q, losses = n - wins;
       if (wins > 0){ if (rem <= 1){ cash += wins * u.pays[k - 1]; if (k < u.last) nx[entry(u, k + 1)] += wins; } else nx[idx(k, rem - 1, l)] += wins; }
       if (losses > 0 && l + 1 < L) nx[idx(k, rem, l + 1)] += losses;
     }
@@ -219,7 +244,6 @@ function simulateGroup(units, r, weeks, rnd){
   units.forEach(function(f, j){
     var u = U[j];
     var fn = Math.max(0, num(f.fundedNow, 0)) + Math.max(0, num(f.idle, 0)), ps = Math.max(0, num(f.passedNow, 0)), ip = Math.max(0, num(f.inProfitNow, 0)), oe = Math.max(0, num(f.openEvals, 0));
-    if (rnd){ fn = Math.round(fn); ps = Math.round(ps); ip = Math.round(ip); oe = Math.round(oe); }
     u.waitFunded = fn; u.wait = ps;
     // accounts the dashboard reported keep their own place (cycle, winning days still needed, losing days left); any others start a first cycle
     var known = Array.isArray(f.g1Flips) && ip > 0 ? f.g1Flips.slice(0, Math.floor(ip)) : [];
@@ -237,13 +261,14 @@ function simulateGroup(units, r, weeks, rnd){
     if (ip > known.length) u.flips[entry(u, 1)] += ip - known.length;
     u.fc = sumF(u);
     u.pending = oe;
-    if (oe > 0){ if (rnd){ for (var i = 0; i < oe; i++) u.evalRes[1 + (i % P.E)] += 1; } else { for (var e = 0; e < P.E; e++) u.evalRes[1 + e] += oe / P.E; } }
+    if (oe > 0) for (var e = 0; e < P.E; e++) u.evalRes[1 + e] += oe / P.E;
   });
-  for (var d = 0; d < nDays; d++){
+  var pick = -1;
+  function open(d){
     U.forEach(function(u){
       u.cashIn = d === 0 ? u.cash0 : 0; u.buy = 0; u.act = 0;
       var n = u.evalRes[d];
-      if (n > 0){ u.wait += draw(n, P.pass); u.pending = Math.max(0, u.pending - n); }
+      if (n > 0){ u.wait += n * P.pass; u.pending = Math.max(0, u.pending - n); }
       u.cashIn += flipStep(u);
       var m = u.profitAt[d], fl = u.failAt[d];
       if (m > 0){ u.trying -= m; u.flips[entry(u, 1)] += m; }
@@ -256,16 +281,17 @@ function simulateGroup(units, r, weeks, rnd){
     var free = Math.max(0, cap - trading());
     order.forEach(function(j){
       var u = U[j], room = Math.max(0, u.slots - u.trying - u.fc);
-      var a1 = Math.min(u.waitFunded, free, room); if (rnd) a1 = Math.floor(a1); free -= a1; room -= a1; u.waitFunded -= a1;
-      var a2 = Math.min(u.wait, free, room); if (rnd) a2 = Math.floor(a2); free -= a2; u.wait -= a2;
+      var a1 = Math.min(u.waitFunded, free, room); free -= a1; room -= a1; u.waitFunded -= a1;
+      var a2 = Math.min(u.wait, free, room); free -= a2; u.wait -= a2;
       var a = a1 + a2; u.act = a2;
       if (a > 0){
         u.trying += a;
         var rem = a;
-        for (var tr = 1; tr <= P.tries; tr++){ var w = draw(rem, P.win); u.profitAt[d + tr] += w; rem -= w; }
+        for (var tr = 1; tr <= P.tries; tr++){ var w = rem * P.win; u.profitAt[d + tr] += w; rem -= w; }
         u.failAt[d + P.tries] += rem;
       }
     });
+    pick = -1;
     if (pc > 0 && cap > 0){
       var covered = 0, idleWait = 0;
       U.forEach(function(u){
@@ -277,12 +303,15 @@ function simulateGroup(units, r, weeks, rnd){
       if (need >= 0.5){
         var maxBatch = trading() >= 0.6 * cap - 1e-6 ? cap : 5 * cap;
         var total = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
-        var pick = -1;
-        for (var o = 0; o < order.length; o++){ var v = U[order[o]]; if (v.value > 0 && v.trying + v.fc + v.waitFunded + v.wait + v.pending * P.pass < v.slots){ pick = order[o]; break; } }
-        if (pick < 0) for (var o2 = 0; o2 < order.length; o2++){ if (U[order[o2]].value > 0){ pick = order[o2]; break; } }
-        if (pick >= 0) U[pick].buy = total;
+        for (var o = 0; o < order.length; o++){ var v = U[order[o]]; if (!v.skip && v.value > 0 && v.trying + v.fc + v.waitFunded + v.wait + v.pending * P.pass < v.slots){ pick = order[o]; break; } }
+        if (pick < 0) for (var o2 = 0; o2 < order.length; o2++){ if (!U[order[o2]].skip && U[order[o2]].value > 0){ pick = order[o2]; break; } }
+        if (pick >= 0) return { n: total, need: need, pc: pc, value: U[pick].value };
       }
     }
+    return null;
+  }
+  function close(d, n){
+    if (pick >= 0 && n > 0) U[pick].buy = n;
     U.forEach(function(u){
       if (u.buy > 0){ u.pending += u.buy; u.evalRes[d + P.E] += u.buy; }
       var evalCost = u.buy * u.price, actCost = u.act * u.actFee;
@@ -292,20 +321,24 @@ function simulateGroup(units, r, weeks, rnd){
                     inn: u.cashIn, winning: u.fc, trying: u.trying, wait: u.wait + u.waitFunded, occupied: u.trying + u.fc });
     });
   }
-  return U.map(function(u){
-    var rows = [];
-    for (var t = 0; t < weeks; t++) rows.push({ t: t, buy: 0, act: 0, evalCost: 0, actCost: 0, feeCost: 0, out: 0, inn: 0, winning: 0, trying: 0, wait: 0, occupied: 0 });
-    u.days.forEach(function(x){
-      var w = rows[x.w]; if (!w) return;
-      w.buy += x.buy; w.act += x.act; w.evalCost += x.evalCost; w.actCost += x.actCost; w.feeCost += x.feeCost; w.out += x.out; w.inn += x.inn;
-      w.winning = x.winning; w.trying = x.trying; w.wait = x.wait; w.occupied = x.occupied;
+  function held(){ var s = 0; U.forEach(function(u){ s += u.pending; }); return s; }
+  function done(){
+    return U.map(function(u){
+      var rows = [];
+      for (var t = 0; t < weeks; t++) rows.push({ t: t, buy: 0, act: 0, evalCost: 0, actCost: 0, feeCost: 0, out: 0, inn: 0, winning: 0, trying: 0, wait: 0, occupied: 0 });
+      u.days.forEach(function(x){
+        var w = rows[x.w]; if (!w) return;
+        w.buy += x.buy; w.act += x.act; w.evalCost += x.evalCost; w.actCost += x.actCost; w.feeCost += x.feeCost; w.out += x.out; w.inn += x.inn;
+        w.winning = x.winning; w.trying = x.trying; w.wait = x.wait; w.occupied = x.occupied;
+      });
+      return { c: c, pc: pc, rows: rows, days: u.days };
     });
-    return { c: c, pc: pc, rows: rows, days: u.days };
-  });
+  }
+  return { nDays: nDays, open: open, close: close, held: held, done: done };
 }
 
-function runAll(firms, r, weeks, rnd){
-  var per = simulateAll(firms, r, weeks, rnd);
+function runAll(firms, r, weeks, seats){
+  var per = simulateAll(firms, r, weeks, seats);
   var rows = [], t, cum = 0, low = 0, lowAt = 0, firstIn = -1, even = -1;
   for (t = 0; t < weeks; t++){
     var row = { t: t, buy: 0, out: 0, inn: 0, winning: 0, trying: 0, wait: 0, buys: [] };
@@ -322,9 +355,9 @@ function runAll(firms, r, weeks, rnd){
 }
 
 // Average month once the first wave is through (weeks 24-63 of a long run), per account size.
-function monthlyUnits(firms, r){
+function monthlyUnits(firms, r, seats){
   var W = 64, from = 24;
-  return simulateAll(firms, r, W).map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
+  return simulateAll(firms, r, W, seats).map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
 }
 
 function perWinning(f, r){
@@ -346,9 +379,14 @@ var FLEET = FLEETS[/[?&]fleet=v2(&|$)/i.test((window.location && window.location
 var STORE = FLEET.store;
 document.getElementById('fleet-' + FLEET.key).setAttribute('aria-current', 'page');
 if (FLEET.key !== 'g1') document.title = 'Funded Slots Roadmap · ' + FLEET.label;
-// the three rates on the page, and the rest of a run, which is fixed
-var PRESETS = { live: { pass: 28, win: 50, flip: 18 }, plan: { pass: 28, win: 21, flip: 48 } };
+// the three rates on the page: Plan is the backtest, Live is counted from real results; the rest of a run is fixed
+var RATE_KEYS = ['pass', 'win', 'flip'], PLAN = { pass: 28, win: 21, flip: 48 };
 var FIXED = { tries: 2, payDays1: 4, payDays: 5, lossDays: 20, evalDays: 3 };
+// Live starts from the counts in the chat's live table: 17 of 60 evals passed, 9 of 18 funded trades won, 5 of 28 flip days won.
+// A GitHub job (tools/track.js, every 30 minutes) reads the fleet dashboard and adds what has happened since, for each fleet.
+var LIVE0 = { pass: [17, 60], win: [9, 18], flip: [5, 28] };
+var TRACK_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/' + FLEET.key + '.json';
+var TRACK_KEYS = ['evalPass', 'evalFail', 'fundedWin', 'fundedLoss', 'flipWin', 'flipLoss'];
 
 // ---------- numbers per fleet (set from the chat; nothing here is typed on the page) ----------
 // payouts: Lucid's own; Topstep from the chat advice; every other firm pays like Lucid at the same size
@@ -382,6 +420,8 @@ var COUNT_KEYS = ['openEvals', 'passedNow', 'fundedNow', 'inProfitNow'];
 var NEW_FIRM = { firm: 'Firm', size: '', firmCap: 5, slots: 5, openEvals: 0, passedNow: 0, fundedNow: 0, inProfitNow: 0, idle: 0, evalPrice: 0, activation: 0, monthly: 0, pay1: 0, pay2: 0, pay3: 0, flip: 0, lossDays: 0 };
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 function sameUnit(f, firm, size){ return normFirm(f.firm) === normFirm(firm) && sizeNum(f.size) === sizeNum(size); }
+function unitKey(f){ return normFirm(f.firm) + '|' + sizeNum(f.size); }
+function skipped(f){ return !!state.skip && state.skip.indexOf(unitKey(f)) >= 0; }
 function inSet(f){ return OWNER.some(function(o){ return sameUnit(f, o.firm, o.size); }); }
 function addRow(rows, firm, size){
   var f = clone(NEW_FIRM), at = -1; f.firm = firm; f.size = size;
@@ -403,22 +443,33 @@ function firmRows(saved){
   });
   return rows;
 }
-var state = { rates: clone(PRESETS.live), firms: [] };
+// follow: the rates are the Live ones and move with the counts; track: the tracker's counts; skip: the firms the plan buys no evals at
+var state = { rates: {}, follow: true, firms: [] };
+function trackOf(t){ var o = {}; TRACK_KEYS.forEach(function(k){ o[k] = Math.min(1e6, Math.max(0, Math.round(num(t && t[k], 0)))); }); return o; }
+function liveCounts(){
+  var t = trackOf(state.track);
+  return { pass: [LIVE0.pass[0] + t.evalPass, LIVE0.pass[1] + t.evalPass + t.evalFail], win: [LIVE0.win[0] + t.fundedWin, LIVE0.win[1] + t.fundedWin + t.fundedLoss],
+           flip: [LIVE0.flip[0] + t.flipWin, LIVE0.flip[1] + t.flipWin + t.flipLoss] };
+}
+function ratesOf(c){ var o = {}; RATE_KEYS.forEach(function(k){ o[k] = Math.round(100 * c[k][0] / c[k][1]); }); return o; }
+function liveRates(){ return ratesOf(liveCounts()); }
 (function(){
   var s = null; try { s = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
   if (!s || typeof s !== 'object') s = {};
-  var r = s.rates && typeof s.rates === 'object' ? s.rates : {}, base = PRESETS[+r.win === 21 ? 'plan' : 'live'];
-  ['pass', 'win', 'flip'].forEach(function(k){ state.rates[k] = r[k] === undefined ? base[k] : num(r[k], base[k]); });
+  if (s.track && typeof s.track === 'object') state.track = trackOf(s.track);
+  // a browser that saved before Live was counted was on Live if it held the first live rates
+  var r = s.rates && typeof s.rates === 'object' ? s.rates : {}, first = ratesOf(LIVE0), base = +r.win === PLAN.win ? PLAN : first;
+  state.follow = typeof s.follow === 'boolean' ? s.follow : RATE_KEYS.every(function(k){ return r[k] === undefined || +r[k] === first[k]; });
+  if (state.follow) state.rates = liveRates();
+  else RATE_KEYS.forEach(function(k){ state.rates[k] = r[k] === undefined ? base[k] : num(r[k], base[k]); });
+  if (Array.isArray(s.skip)){ var sk = s.skip.filter(function(k){ return typeof k === 'string' && k.length < 60; }).slice(0, 40); if (sk.length) state.skip = sk; }
   if (s.g1 && s.g1.total && typeof s.g1.total === 'object') state.g1 = s.g1;
   if (Array.isArray(s.cashLog)) state.cashLog = s.cashLog;
   if (s.cashSeen && isFinite(s.cashSeen.inn) && isFinite(s.cashSeen.out)) state.cashSeen = s.cashSeen;
   state.firms = firmRows(s.firms);
 })();
 function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
-function presetName(r){
-  for (var k in PRESETS){ var p = PRESETS[k]; if (+r.pass === p.pass && +r.win === p.win && +r.flip === p.flip) return k; }
-  return 'custom';
-}
+function presetName(r){ return state.follow ? 'live' : RATE_KEYS.every(function(k){ return +r[k] === PLAN[k]; }) ? 'plan' : 'custom'; }
 function fracRates(r){ return { pass: num(r.pass, 0) / 100, win: num(r.win, 0) / 100, flip: num(r.flip, 0) / 100, tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, evalDays: FIXED.evalDays, wd0: WD0, plan: presetName(r) === 'plan' }; }
 
 // ---------- dates ----------
@@ -429,7 +480,7 @@ var WD0 = (function(d){ return d === 0 || d === 6 ? 5 : d - 1; })(new Date().get
 function weekStart(t){ var d = new Date(START.getTime()); d.setDate(d.getDate() + 7 * t); return d; }
 function dShort(d){ return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
 // at a weekend the first day of the plan is Monday
-var BUY_K = WD0 === 5 ? 'Buy Monday ' + dShort(weekStart(1)) : 'Buy today';
+var BUY_K = WD0 === 5 ? 'Buy Monday ' + dShort(weekStart(1)) : 'Buy today', BUY_DAY = WD0 === 5 ? 'Monday' : 'today';
 
 // ---------- format ----------
 function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
@@ -569,35 +620,59 @@ function withHistory(res){
 }
 
 // ---------- the page: four totals, the firm table, the chart ----------
-var firmsEl = document.getElementById('firms');
-var RATE_IDS = { pass: 'r-pass', win: 'r-win', flip: 'r-flip' };
-function syncRates(){ Object.keys(RATE_IDS).forEach(function(k){ document.getElementById(RATE_IDS[k]).value = state.rates[k]; }); }
-// 12 weeks from today, plus the average month once the first wave is through (per size and in total)
-function outcome(rr){
-  var firms = state.firms.map(clone), res = runAll(firms, rr, WEEKS);
-  res.runs = monthlyUnits(firms, rr); res.run = res.runs.reduce(function(a, b){ return a + b; }, 0);
+var firmsEl = document.getElementById('firms'), skipEl = document.getElementById('skip');
+var RATE_WORDS = { pass: 'evals passed', win: 'funded trades won', flip: 'flip days won' };
+// the three rate boxes; hovering one shows the live count behind it
+function syncRates(){
+  var c = liveCounts();
+  RATE_KEYS.forEach(function(k){
+    document.getElementById('r-' + k).value = state.rates[k];
+    document.getElementById('c-' + k).title = 'Live: ' + c[k][0] + ' of ' + c[k][1] + ' ' + RATE_WORDS[k];
+  });
+}
+// the most evals the fleet keeps trading: the highest number of eval signals it had in a day (from the dashboard)
+function seats(){ var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
+// 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
+function outcome(rr, all){
+  var firms = state.firms.map(function(f){ var x = clone(f); if (!all && skipped(f)) x.skip = true; return x; }), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
+  res.runs = monthlyUnits(firms, rr, cap); res.run = res.runs.reduce(function(a, b){ return a + b; }, 0);
+  res.buy = 0; res.cost = 0; res.per.forEach(function(p){ if (p.days[0]){ res.buy += p.days[0].buy; res.cost += p.days[0].evalCost; } });
   return res;
+}
+// what skipping does to the four totals, against buying at every firm
+function effect(res, all){
+  var dBuy = res.buy - all.buy, dCost = res.cost - all.cost, dNeed = res.need - all.need, dNet = res.net - all.net, dRun = res.run - all.run, p = [];
+  function amt(v, less, more){ return money(Math.abs(v)) + ' ' + (v < 0 ? less : more); }
+  function tone(v, s){ return '<span class="' + (v > 0 ? 'pos' : 'neg') + '">' + s + '</span>'; }
+  if (dBuy !== 0) p.push(Math.abs(dBuy) + (dBuy < 0 ? ' fewer' : ' more') + (Math.abs(dBuy) === 1 ? ' eval ' : ' evals ') + BUY_DAY + ' (' + amt(dCost, 'saved', 'more') + ')');
+  else if (Math.abs(dCost) > 0.5) p.push('the evals ' + BUY_DAY + ' cost ' + amt(dCost, 'less', 'more'));
+  if (Math.abs(dNeed) > 0.5) p.push(amt(dNeed, 'less', 'more') + ' cash needed');
+  if (Math.abs(dNet) > 0.5) p.push(tone(dNet, amt(dNet, 'less', 'more')) + ' after 12 weeks');
+  if (Math.abs(dRun) > 0.5) p.push(tone(dRun, amt(dRun, 'less', 'more')) + ' a month once running');
+  return p.length ? p.join(', ') + '.' : 'nothing changes.';
 }
 function quiet(s){ return '<span class="mute">' + s + '</span>'; }
 function count(v){ return v > 0 ? acc(v) : quiet('0'); }
 function gain(v){ return Math.abs(v) <= 0.5 ? quiet('$0') : '<span class="' + (v > 0 ? 'pos' : 'neg') + '">' + signed(v) + '</span>'; }
 function update(){
-  var rr = fracRates(state.rates), pn = presetName(state.rates), res = outcome(rr), buy = 0, cost = 0;
+  var rr = fracRates(state.rates), pn = presetName(state.rates), res = outcome(rr), off = state.firms.filter(skipped), all = off.length ? outcome(rr, true) : null;
   document.getElementById('preset-live').setAttribute('aria-pressed', pn === 'live');
   document.getElementById('preset-plan').setAttribute('aria-pressed', pn === 'plan');
-  res.per.forEach(function(p){ if (p.days[0]){ buy += p.days[0].buy; cost += p.days[0].evalCost; } });
   document.getElementById('t-buy-k').textContent = BUY_K;
-  document.getElementById('t-buy').innerHTML = buy + ' evals' + (buy > 0 ? ' <small>' + money(cost) + '</small>' : '');
+  document.getElementById('t-buy').innerHTML = res.buy + ' evals' + (res.buy > 0 ? ' <small>' + money(res.cost) + '</small>' : '');
   document.getElementById('t-need').textContent = money(res.need);
   var tn = document.getElementById('t-net'); tn.textContent = signed(res.net); tn.className = 'v ' + (res.net >= 0 ? 'pos' : 'neg');
   var tr = document.getElementById('t-run'); tr.innerHTML = signed(res.run) + '<small>/mo</small>'; tr.className = 'v ' + (res.run >= 0 ? 'pos' : 'neg');
 
+  // a tick box per firm: unticked, the plan buys no new evals there (the accounts already held keep running)
+  var at = document.activeElement, back = at && at.getAttribute && firmsEl.contains(at) ? at.getAttribute('data-k') : null;
   firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>' + esc(BUY_K) + '</th><th>Next 4 days</th><th>Evals</th><th>Funded</th><th>Flips</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' +
     state.firms.map(function(f, i){
       var p = res.per[i], d0 = p.days[0], inn = 0, out = 0, next = [1, 2, 3, 4].map(function(d){ return p.days[d] ? p.days[d].buy : 0; });
+      var no = skipped(f), name = esc((f.firm + ' ' + f.size).trim());
       p.rows.forEach(function(x){ inn += x.inn; out += x.out; });
       var td = {
-        buy: d0 && d0.buy > 0 ? '<b>' + d0.buy + '</b> ' + quiet(money(d0.evalCost)) : quiet('0'),
+        buy: no ? quiet('skipped') : d0 && d0.buy > 0 ? '<b>' + d0.buy + '</b> ' + quiet(money(d0.evalCost)) : quiet('0'),
         next: next.some(function(n){ return n > 0; }) ? next.join(' · ') : quiet(next.join(' · ')),
         ev: count(num(f.openEvals, 0)) + (num(f.passedNow, 0) > 0 ? ' ' + quiet('+' + acc(num(f.passedNow, 0)) + ' passed') : ''),
         fu: count(num(f.fundedNow, 0) + num(f.idle, 0)),
@@ -605,17 +680,45 @@ function update(){
         w12: gain(inn - out),
         run: gain(res.runs[i]) + quiet('/mo')
       };
-      return '<tr><td>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</td>' + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>';
+      return '<tr' + (no ? ' class="off"' : '') + '><td class="who"><label class="pick" title="Untick to see the plan without buying evals here"><input type="checkbox" data-k="' + unitKey(f) + '"' + (no ? '' : ' checked') + ' aria-label="Buy evals at ' + name + '">' +
+        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>';
     }).join('') + '</tbody></table>';
+  if (back){ var box = firmsEl.querySelector('[data-k="' + back + '"]'); if (box) box.focus(); }
+
+  if (all){
+    var names = off.length > 2 ? off.length + ' firms' : off.map(function(f){ return esc((f.firm + ' ' + f.size).trim()); }).join(' and ');
+    skipEl.innerHTML = 'Skipping ' + names + ': ' + effect(res, all) + ' <button type="button" id="buyall">Buy all</button>';
+    document.getElementById('buyall').onclick = function(){ delete state.skip; save(); update(); };
+  } else skipEl.innerHTML = '';
+  skipEl.hidden = !all;
 
   drawChart(withHistory(res).rows);
 }
-Object.keys(RATE_IDS).forEach(function(k){
-  document.getElementById(RATE_IDS[k]).addEventListener('input', function(e){ state.rates[k] = e.target.value === '' ? 0 : num(e.target.value, 0); save(); update(); });
+firmsEl.addEventListener('change', function(e){
+  var box = e.target, k = box && box.getAttribute ? box.getAttribute('data-k') : null; if (!k) return;
+  var list = state.firms.filter(function(f){ return unitKey(f) === k ? !box.checked : skipped(f); }).map(unitKey);
+  if (list.length) state.skip = list; else delete state.skip;
+  save(); update();
 });
-['live', 'plan'].forEach(function(k){
-  document.getElementById('preset-' + k).addEventListener('click', function(){ state.rates = clone(PRESETS[k]); save(); syncRates(); update(); });
+RATE_KEYS.forEach(function(k){
+  document.getElementById('r-' + k).addEventListener('input', function(e){ state.follow = false; state.rates[k] = e.target.value === '' ? 0 : num(e.target.value, 0); save(); update(); });
 });
+document.getElementById('preset-live').addEventListener('click', function(){ state.follow = true; state.rates = liveRates(); save(); syncRates(); update(); });
+document.getElementById('preset-plan').addEventListener('click', function(){ state.follow = false; state.rates = clone(PLAN); save(); syncRates(); update(); });
+
+// ---------- live counts: what the tracker has added for this fleet ----------
+function syncTrack(){
+  fetch(TRACK_URL, { cache: 'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(j){
+      if (!j || !j.counts || typeof j.counts !== 'object') return;
+      var t = trackOf(j.counts); if (JSON.stringify(t) === JSON.stringify(trackOf(state.track))) return;
+      state.track = t;
+      if (state.follow) state.rates = liveRates();
+      save(); syncRates(); update();
+    })
+    .catch(function(){});
+}
 
 // ---------- dashboard sync: read this fleet's section of the fleet dashboard and fill the accounts ----------
 var G1_URL = 'https://randompotato247.github.io/fleet-dashboard/';
@@ -709,7 +812,7 @@ function drawG1(failed){
   if (has){
     var lack = g.sig ? g.sig.max - g.total.evals : 0;
     s += L + ' ' + esc(g.day || '') + ' ' + esc(g.at || '') + ': ' + g.total.evals + (g.total.evals === 1 ? ' eval' : ' evals') + (g.total.passed ? ' (+' + g.total.passed + ' passed)' : '') + ', ' + g.total.fundeds + ' funded, ' + g.total.flips + ' flipping.';
-    if (g.sig) s += ' Eval signals max ' + g.sig.max + ' a day' + (lack > 0 ? ': ' + lack + (lack === 1 ? ' eval short.' : ' evals short.') : ', enough evals.');
+    if (g.sig) s += ' Max ' + g.sig.max + ' eval signals a day: ' + (lack > 0 ? 'room for ' + lack + ' more.' : 'no room for more evals.');
   } else if (!failed) s += 'Reading ' + L + '…';
   g1El.innerHTML = s + ' <button type="button" id="g1sync">Sync</button>';
   document.getElementById('g1sync').onclick = syncG1;
@@ -722,7 +825,7 @@ function syncG1(){
 }
 
 syncRates(); update();
-drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000);
+drawG1(false); syncG1(); syncTrack(); setInterval(function(){ syncG1(); syncTrack(); }, 30 * 60 * 1000);
 })();
 
 </script>
