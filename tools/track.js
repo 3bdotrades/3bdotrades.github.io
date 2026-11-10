@@ -86,6 +86,11 @@ function step(prev, snap, since){
   const add = k => { if (!fresh) st.counts[k]++; };
   // funded accounts that are new on the dashboard, per firm: each one is an eval that passed
   if (!fresh) snap.funded.concat(snap.flip).forEach(r => { if (!acc[key(r.id)]) born[r.firm] = (born[r.firm] || 0) + 1; });
+  // st.owed: passes already in the start counts whose funded account had not shown up yet, per firm. The next new funded account is theirs.
+  if (st.owed){
+    Object.keys(st.owed).forEach(f => { while (born[f] > 0 && st.owed[f] > 0){ born[f]--; st.owed[f]--; } if (!(st.owed[f] > 0)) delete st.owed[f]; });
+    if (!Object.keys(st.owed).length) delete st.owed;
+  }
 
   snap.eval.forEach(r => {
     const h = key(r.id); seen.add(h);
@@ -151,7 +156,8 @@ function step(prev, snap, since){
 // one remembered row per line, so a change shows as a short diff
 function dump(st){
   const rows = Object.keys(st.acc).map(h => '  ' + JSON.stringify(h) + ': ' + JSON.stringify(st.acc[h])).join(',\n');
-  return '{\n "v": 1,\n "since": ' + JSON.stringify(st.since) + ',\n "day": ' + JSON.stringify(st.day) + ',\n "counts": ' + JSON.stringify(st.counts) + ',\n "acc": {' + (rows ? '\n' + rows + '\n ' : '') + '}\n}\n';
+  return '{\n "v": 1,\n "since": ' + JSON.stringify(st.since) + ',\n "day": ' + JSON.stringify(st.day) + ',\n "counts": ' + JSON.stringify(st.counts) + (st.owed ? ',\n "owed": ' + JSON.stringify(st.owed) : '') +
+    ',\n "acc": {' + (rows ? '\n' + rows + '\n ' : '') + '}\n}\n';
 }
 
 async function main(){

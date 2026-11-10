@@ -47,9 +47,12 @@ h2{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;align-
 .cell .v{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;font-size:20px;font-weight:600;line-height:1.3;font-variant-numeric:tabular-nums}
 .cell .v small{font-size:13px;font-weight:400;color:var(--mute)}
 .pct{display:flex;align-items:baseline;gap:4px;color:var(--mute)}
-.pct input{width:3.1em;font:600 20px/1.3 system-ui,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:0 6px;text-align:right;-moz-appearance:textfield;appearance:textfield}
-.pct input::-webkit-outer-spin-button,.pct input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.pct input:hover{border-color:var(--mute)}
+.pct input,.box{width:3.1em;font:600 20px/1.3 system-ui,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:0 6px;text-align:right;-moz-appearance:textfield;appearance:textfield}
+.pct input::-webkit-outer-spin-button,.pct input::-webkit-inner-spin-button,.box::-webkit-outer-spin-button,.box::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.pct input:hover,.box:hover{border-color:var(--mute)}
+.box{width:3.6em}
+td .box{width:4em;font-size:14px;line-height:1.5}
+.box:disabled{opacity:.4}
 .seg{display:inline-flex;gap:12px;text-transform:none;letter-spacing:0}
 .seg button{font:600 13px/1.2 system-ui,"Segoe UI",sans-serif;color:var(--mute);background:none;border:0;padding:0;cursor:pointer}
 .seg button:hover{color:var(--ink)}
@@ -97,13 +100,13 @@ tr.off .pick{color:var(--mute)}
 <body>
 <main>
   <h1 class="sr">Funded Slots Roadmap</h1>
-  <nav class="tabs" aria-label="Fleet"><a class="tab" id="fleet-g1" href="?fleet=g1">G1</a><a class="tab" id="fleet-v2" href="?fleet=v2">V2 fleet</a></nav>
+  <nav class="tabs" aria-label="Fleet"><a class="tab" id="fleet-g1" href="?fleet=g1">G1</a><a class="tab" id="fleet-v2" href="?fleet=v2">V2 fleet</a><a class="tab" id="fleet-sim" href="?fleet=sim">Simulation</a></nav>
   <p class="note" id="g1"></p>
 
   <div class="top">
     <div>
       <h2 id="sum-h">All firms</h2>
-      <div class="wrap cells tiles">
+      <div class="wrap cells tiles" id="tiles">
         <div class="cell"><span class="k" id="t-buy-k">Buy today</span><span class="v" id="t-buy">–</span></div>
         <div class="cell"><span class="k" title="The most cash you are out before payouts cover it">Cash needed</span><span class="v" id="t-need">–</span></div>
         <div class="cell"><span class="k">Net after 12 weeks</span><span class="v" id="t-net">–</span></div>
@@ -165,28 +168,35 @@ function flipSpec(f, P){
 function groupKey(f){ return String(f.firm !== undefined ? f.firm : (f.name || '')).trim().toLowerCase(); }
 // The firms run the same trading days side by side, because they share the fleet's eval seats: an eval takes one trade a day
 // and the fleet gets only so many eval signals a day, so the evals open across all firms stay within `seats` (no limit when not given).
-// Each free seat goes to the firm furthest from full; at a tie, to the one that pays more.
-function simulateAll(firms, r, weeks, seats){
+// Each free seat goes to the firm furthest from full; at a tie, to the one that pays more. Evals a run starts with (f.start,
+// bought on its first day) take their seats before any new eval is bought. days, when given, ends the run after that many trading days.
+function simulateAll(firms, r, weeks, seats, days){
   var map = {}, groups = [], per = new Array(firms.length);
   firms.forEach(function(f, i){ var k = groupKey(f); if (!(k in map)){ map[k] = groups.length; groups.push([]); } groups[map[k]].push(i); });
-  var sims = groups.map(function(idx){ return simulateGroup(idx.map(function(i){ return firms[i]; }), r, weeks); });
-  var limited = typeof seats === 'number' && isFinite(seats);
+  var sims = groups.map(function(idx){ return simulateGroup(idx.map(function(i){ return firms[i]; }), r, weeks, days); });
+  var limited = typeof seats === 'number' && isFinite(seats), wants, used;
+  // the firm that gets the next seat, among those that can use one
+  function next(can){
+    var best = -1, gap = 0;
+    wants.forEach(function(w, i){
+      if (!can(i)) return;
+      var g = w.need - used[i] * w.pc;
+      if (best < 0 || g > gap + 1e-9 || (g > gap - 1e-9 && w.value > wants[best].value)){ best = i; gap = g; }
+    });
+    if (best >= 0) used[best]++;
+    return best;
+  }
   for (var d = 0, nDays = sims.length ? sims[0].nDays : 0; d < nDays; d++){
-    var wants = sims.map(function(g){ return g.open(d); }), grant = wants.map(function(w){ return w && !limited ? w.n : 0; });
-    if (limited){
-      var held = 0; sims.forEach(function(g){ held += g.held(); });
-      for (var left = Math.max(0, Math.floor(seats - held + 1e-9)); left > 0; left--){
-        var best = -1, gap = 0;
-        wants.forEach(function(w, i){
-          if (!w || grant[i] >= w.n) return;
-          var g = w.need - grant[i] * w.pc;
-          if (best < 0 || g > gap + 1e-9 || (g > gap - 1e-9 && w.value > wants[best].value)){ best = i; gap = g; }
-        });
-        if (best < 0) break;
-        grant[best]++;
-      }
+    wants = sims.map(function(g){ return g.open(d); }); used = wants.map(function(){ return 0; });
+    var grant = wants.map(function(w){ return limited ? 0 : w.n; });
+    if (!limited) sims.forEach(function(g){ g.start(d, g.waiting()); });
+    else {
+      var held = 0, i; sims.forEach(function(g){ held += g.held(); });
+      var left = Math.max(0, Math.floor(seats - held + 1e-9));
+      for (; left > 0 && (i = next(function(k){ return sims[k].waiting() >= 1; })) >= 0; left--) sims[i].start(d, 1);
+      for (; left > 0 && (i = next(function(k){ return grant[k] < wants[k].n; })) >= 0; left--) grant[i]++;
     }
-    sims.forEach(function(g, i){ g.close(d, grant[i]); });
+    sims.forEach(function(g, k){ g.close(d, grant[k]); });
   }
   groups.forEach(function(idx, gi){ var out = sims[gi].done(); idx.forEach(function(i, j){ per[i] = out[j]; }); });
   return per;
@@ -195,11 +205,11 @@ function simulateAll(firms, r, weeks, seats){
 // Evals resolve after E days; a funded account takes one try a day; an account in profit flips one day at a time
 // and gets a payout after enough winning flip days (D1 for the first, D for later ones), or is lost when its losing days run out.
 // open(d) runs a day up to the evals the firm wants, close(d, n) buys n of them and books the day. A size marked skip gets no new evals.
-function simulateGroup(units, r, weeks){
+function simulateGroup(units, r, weeks, days){
   var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c, D = Math.max(P.D, P.D1), L = 1, H = P.E;
   var specs = units.map(function(f){ var sp = flipSpec(f, P); if (sp.Lk[0] > L) L = sp.Lk[0]; return sp; });
   var S = 3 * D * L;
-  var nDays = Math.max(1, weeks * 5 - P.wd0), LD = nDays + P.E + P.tries + 8, capSum = 0;
+  var nDays = Math.max(1, days > 0 ? Math.min(Math.round(days), weeks * 5 - P.wd0) : weeks * 5 - P.wd0), LD = nDays + P.E + P.tries + 8, capSum = 0;
   function zeros(){ var a = new Array(LD); for (var k = 0; k < LD; k++) a[k] = 0; return a; }
   function idx(k, rem, l){ return ((k - 1) * D + (rem - 1)) * L + l; }
   // where a flip cycle starts: the winning days it needs and the losing days it allows
@@ -209,6 +219,8 @@ function simulateGroup(units, r, weeks){
     var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pays: pays, last: pays[2] > 0 ? 3 : pays[1] > 0 ? 2 : 1, q: specs[j].q, Lk: specs[j].Lk, dl: specs[j].dl,
       price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0, skip: !!f.skip,
       evalRes: zeros(), profitAt: zeros(), failAt: zeros(), flips: new Float64Array(S), fc: 0, waitFunded: 0, wait: 0, pending: 0, trying: 0, cash0: 0, days: [] };
+    // evals the run starts with: paid for on its first day, trading once they have a seat
+    u.queue = u.start0 = Math.max(0, Math.round(num(f.start, 0)));
     // chance an account in each flip state leaves (paid out for the last time, or lost) within H flip days:
     // an eval bought today needs its slot E trading days from now, after E more flip days
     var cur = new Float64Array(S);
@@ -292,6 +304,7 @@ function simulateGroup(units, r, weeks){
       }
     });
     pick = -1;
+    var need = -1, total = 0;
     if (pc > 0 && cap > 0){
       var covered = 0, idleWait = 0;
       U.forEach(function(u){
@@ -299,29 +312,31 @@ function simulateGroup(units, r, weeks){
         idleWait += Math.min(u.waitFunded, u.slots);
       });
       // no new evals while the firm is full and an idle funded account is still waiting for a slot
-      var need = free < 1e-9 && idleWait >= 0.5 ? -1 : cap - covered;
+      need = free < 1e-9 && idleWait >= 0.5 ? -1 : cap - covered;
       if (need >= 0.5){
         var maxBatch = trading() >= 0.6 * cap - 1e-6 ? cap : 5 * cap;
-        var total = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
+        total = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
         for (var o = 0; o < order.length; o++){ var v = U[order[o]]; if (!v.skip && v.value > 0 && v.trying + v.fc + v.waitFunded + v.wait + v.pending * P.pass < v.slots){ pick = order[o]; break; } }
         if (pick < 0) for (var o2 = 0; o2 < order.length; o2++){ if (!U[order[o2]].skip && U[order[o2]].value > 0){ pick = order[o2]; break; } }
-        if (pick >= 0) return { n: total, need: need, pc: pc, value: U[pick].value };
       }
     }
-    return null;
+    return { n: pick >= 0 ? total : 0, need: need, pc: pc, value: U[pick >= 0 ? pick : order[0]].value };
   }
   function close(d, n){
     if (pick >= 0 && n > 0) U[pick].buy = n;
     U.forEach(function(u){
       if (u.buy > 0){ u.pending += u.buy; u.evalRes[d + P.E] += u.buy; }
-      var evalCost = u.buy * u.price, actCost = u.act * u.actFee;
+      var bought = u.buy + (d === 0 ? u.start0 : 0), evalCost = bought * u.price, actCost = u.act * u.actFee;
       // a monthly fee builds up a day at a time on every account held, trading or waiting
-      var feeCost = u.monthly > 0 ? u.monthly * 12 / 260 * (u.trying + u.fc + u.pending + u.wait + u.waitFunded) : 0;
-      u.days.push({ d: d, w: Math.floor((P.wd0 + d) / 5), buy: u.buy, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost,
+      var feeCost = u.monthly > 0 ? u.monthly * 12 / 260 * (u.trying + u.fc + u.pending + u.wait + u.waitFunded + u.queue) : 0;
+      u.days.push({ d: d, w: Math.floor((P.wd0 + d) / 5), buy: bought, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost,
                     inn: u.cashIn, winning: u.fc, trying: u.trying, wait: u.wait + u.waitFunded, occupied: u.trying + u.fc });
     });
   }
   function held(){ var s = 0; U.forEach(function(u){ s += u.pending; }); return s; }
+  function waiting(){ var s = 0; U.forEach(function(u){ s += u.queue; }); return s; }
+  // n of the evals the run started with get their seat today, the better-paying size first
+  function start(d, n){ order.forEach(function(j){ var u = U[j], k = Math.min(u.queue, n); if (k > 0){ u.queue -= k; n -= k; u.pending += k; u.evalRes[d + P.E] += k; } }); }
   function done(){
     return U.map(function(u){
       var rows = [];
@@ -334,11 +349,11 @@ function simulateGroup(units, r, weeks){
       return { c: c, pc: pc, rows: rows, days: u.days };
     });
   }
-  return { nDays: nDays, open: open, close: close, held: held, done: done };
+  return { nDays: nDays, open: open, close: close, held: held, waiting: waiting, start: start, done: done };
 }
 
-function runAll(firms, r, weeks, seats){
-  var per = simulateAll(firms, r, weeks, seats);
+function runAll(firms, r, weeks, seats, days){
+  var per = simulateAll(firms, r, weeks, seats, days);
   var rows = [], t, cum = 0, low = 0, lowAt = 0, firstIn = -1, even = -1;
   for (t = 0; t < weeks; t++){
     var row = { t: t, buy: 0, out: 0, inn: 0, winning: 0, trying: 0, wait: 0, buys: [] };
@@ -373,19 +388,23 @@ function perWinning(f, r){
 // ---------- MODEL END ----------
 
 var WEEKS = 12;
-// two fleets on the same dashboard: G1 (default) and the V2 fleet (?fleet=v2); each keeps its own rates and last account counts
-var FLEETS = { g1: { key: 'g1', label: 'G1', store: 'funded-slots-roadmap-v1' }, v2: { key: 'v2', label: 'V2 fleet', store: 'funded-slots-roadmap-v2fleet' } };
-var FLEET = FLEETS[/[?&]fleet=v2(&|$)/i.test((window.location && window.location.search) || '') ? 'v2' : 'g1'];
-var STORE = FLEET.store;
+// two fleets on the same dashboard: G1 (default) and the V2 fleet (?fleet=v2); each keeps its own rates and last account counts.
+// ?fleet=sim is the simulation tab: no accounts, only the evals typed there, run with one fleet's rates and signals
+var FLEETS = { g1: { key: 'g1', label: 'G1', store: 'funded-slots-roadmap-v1' }, v2: { key: 'v2', label: 'V2 fleet', store: 'funded-slots-roadmap-v2fleet' },
+               sim: { key: 'sim', label: 'Simulation', store: 'funded-slots-roadmap-sim' } };
+var FLEET = FLEETS[((/[?&]fleet=(v2|sim)(&|$)/i.exec((window.location && window.location.search) || '') || [])[1] || 'g1').toLowerCase()];
+var STORE = FLEET.store, SIM = FLEET.key === 'sim';
 document.getElementById('fleet-' + FLEET.key).setAttribute('aria-current', 'page');
 if (FLEET.key !== 'g1') document.title = 'Funded Slots Roadmap · ' + FLEET.label;
 // the three rates on the page: Plan is the backtest, Live is counted from real results; the rest of a run is fixed
 var RATE_KEYS = ['pass', 'win', 'flip'], PLAN = { pass: 28, win: 21, flip: 48 };
 var FIXED = { tries: 2, payDays1: 4, payDays: 5, lossDays: 20, evalDays: 3 };
-// Live starts from the counts in the chat's live table: 17 of 60 evals passed, 9 of 18 funded trades won, 5 of 28 flip days won.
-// A GitHub job (tools/track.js, every 30 minutes) reads the fleet dashboard and adds what has happened since, for each fleet.
-var LIVE0 = { pass: [17, 60], win: [9, 18], flip: [5, 28] };
-var TRACK_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/' + FLEET.key + '.json';
+// Live starts from each fleet's own counts; a GitHub job (tools/track.js, every 30 minutes) reads the fleet dashboard and adds what happens after.
+// G1: its history from 18 Oct to 10 Nov 2026 19:00 UTC, from the owner's ledgers. 18 of 68 finished evals passed. Of 12 funded accounts 8 reached
+// profit and 4 were lost, and one more is on its first loss: as trades, 8 won of about 20. Flip days were not in the ledgers' summary:
+// the chat's live table (5 of 28) plus the first day counted (6 of 7). V2: the chat's live table.
+var LIVE0 = { g1: { pass: [18, 68], win: [8, 20], flip: [11, 35] }, v2: { pass: [17, 60], win: [9, 18], flip: [5, 28] } };
+var TRACK_AT = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/';
 var TRACK_KEYS = ['evalPass', 'evalFail', 'fundedWin', 'fundedLoss', 'flipWin', 'flipLoss'];
 
 // ---------- numbers per fleet (set from the chat; nothing here is typed on the page) ----------
@@ -413,7 +432,7 @@ v2: [
   { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 }
 ] };
-var OWNER = OWNER_SETS[FLEET.key];
+var OWNER = OWNER_SETS[FLEET.key] || [];
 var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'pay3', 'idle', 'flip', 'flipPlan', 'lossDays'];
 var COUNT_KEYS = ['openEvals', 'passedNow', 'fundedNow', 'inProfitNow'];
 // max 5 trading at once per firm, shared by its sizes
@@ -447,21 +466,34 @@ function firmRows(saved){
 var state = { rates: {}, follow: true, firms: [] };
 function trackOf(t){ var o = {}; TRACK_KEYS.forEach(function(k){ o[k] = Math.min(1e6, Math.max(0, Math.round(num(t && t[k], 0)))); }); return o; }
 function liveCounts(){
-  var t = trackOf(state.track);
-  return { pass: [LIVE0.pass[0] + t.evalPass, LIVE0.pass[1] + t.evalPass + t.evalFail], win: [LIVE0.win[0] + t.fundedWin, LIVE0.win[1] + t.fundedWin + t.fundedLoss],
-           flip: [LIVE0.flip[0] + t.flipWin, LIVE0.flip[1] + t.flipWin + t.flipLoss] };
+  var t = trackOf(SIM ? state.tracks[state.base] : state.track), z = LIVE0[SIM ? state.base : FLEET.key];
+  return { pass: [z.pass[0] + t.evalPass, z.pass[1] + t.evalPass + t.evalFail], win: [z.win[0] + t.fundedWin, z.win[1] + t.fundedWin + t.fundedLoss],
+           flip: [z.flip[0] + t.flipWin, z.flip[1] + t.flipWin + t.flipLoss] };
 }
 function ratesOf(c){ var o = {}; RATE_KEYS.forEach(function(k){ o[k] = Math.round(100 * c[k][0] / c[k][1]); }); return o; }
 function liveRates(){ return ratesOf(liveCounts()); }
 (function(){
   var s = null; try { s = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
   if (!s || typeof s !== 'object') s = {};
+  if (SIM){
+    // the simulation keeps: whose rates and signals, how many days, the evals typed per firm, the firms taken out, and the last signals and counts read
+    state.base = s.base === 'v2' ? 'v2' : 'g1';
+    state.days = s.days >= 5 && s.days <= 364 ? Math.round(s.days) : 84;
+    state.evals = {}; state.off = []; state.sig = {}; state.tracks = {};
+    if (s.evals && typeof s.evals === 'object') Object.keys(s.evals).slice(0, 40).forEach(function(k){ if (k.length < 60 && s.evals[k] >= 0) state.evals[k] = Math.min(500, Math.round(s.evals[k])); });
+    if (Array.isArray(s.off)) state.off = s.off.filter(function(k){ return typeof k === 'string' && k.length < 60; }).slice(0, 40);
+    ['g1', 'v2'].forEach(function(k){
+      if (s.sig && s.sig[k] > 0) state.sig[k] = Math.round(s.sig[k]);
+      if (s.tracks && s.tracks[k] && typeof s.tracks[k] === 'object') state.tracks[k] = trackOf(s.tracks[k]);
+    });
+  }
   if (s.track && typeof s.track === 'object') state.track = trackOf(s.track);
-  // a browser that saved before Live was counted was on Live if it held the first live rates
-  var r = s.rates && typeof s.rates === 'object' ? s.rates : {}, first = ratesOf(LIVE0), base = +r.win === PLAN.win ? PLAN : first;
+  // a browser that saved before Live was counted was on Live if it held the first live rates, 28 / 50 / 18
+  var r = s.rates && typeof s.rates === 'object' ? s.rates : {}, first = { pass: 28, win: 50, flip: 18 }, base = +r.win === PLAN.win ? PLAN : first;
   state.follow = typeof s.follow === 'boolean' ? s.follow : RATE_KEYS.every(function(k){ return r[k] === undefined || +r[k] === first[k]; });
   if (state.follow) state.rates = liveRates();
   else RATE_KEYS.forEach(function(k){ state.rates[k] = r[k] === undefined ? base[k] : num(r[k], base[k]); });
+  if (SIM){ delete state.firms; return; }
   if (Array.isArray(s.skip)){ var sk = s.skip.filter(function(k){ return typeof k === 'string' && k.length < 60; }).slice(0, 40); if (sk.length) state.skip = sk; }
   if (s.g1 && s.g1.total && typeof s.g1.total === 'object') state.g1 = s.g1;
   if (Array.isArray(s.cashLog)) state.cashLog = s.cashLog;
@@ -631,7 +663,7 @@ function syncRates(){
   });
 }
 // the most evals the fleet keeps trading: the highest number of eval signals it had in a day (from the dashboard)
-function seats(){ var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
+function seats(){ if (SIM) return state.sig[state.base] > 0 ? state.sig[state.base] : undefined; var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
 // 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
 function outcome(rr, all){
   var firms = state.firms.map(function(f){ var x = clone(f); if (!all && skipped(f)) x.skip = true; return x; }), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
@@ -655,6 +687,7 @@ function quiet(s){ return '<span class="mute">' + s + '</span>'; }
 function count(v){ return v > 0 ? acc(v) : quiet('0'); }
 function gain(v){ return Math.abs(v) <= 0.5 ? quiet('$0') : '<span class="' + (v > 0 ? 'pos' : 'neg') + '">' + signed(v) + '</span>'; }
 function update(){
+  if (SIM) return updateSim();
   var rr = fracRates(state.rates), pn = presetName(state.rates), res = outcome(rr), off = state.firms.filter(skipped), all = off.length ? outcome(rr, true) : null;
   document.getElementById('preset-live').setAttribute('aria-pressed', pn === 'live');
   document.getElementById('preset-plan').setAttribute('aria-pressed', pn === 'plan');
@@ -696,6 +729,13 @@ function update(){
 }
 firmsEl.addEventListener('change', function(e){
   var box = e.target, k = box && box.getAttribute ? box.getAttribute('data-k') : null; if (!k) return;
+  if (SIM){
+    // in or out of the simulation
+    state.off = state.off.filter(function(x){ return x !== k; }); if (!box.checked) state.off.push(k);
+    save(); buildSim(); update();
+    var again = firmsEl.querySelector('[data-k="' + k + '"]'); if (again) again.focus();
+    return;
+  }
   var list = state.firms.filter(function(f){ return unitKey(f) === k ? !box.checked : skipped(f); }).map(unitKey);
   if (list.length) state.skip = list; else delete state.skip;
   save(); update();
@@ -706,18 +746,122 @@ RATE_KEYS.forEach(function(k){
 document.getElementById('preset-live').addEventListener('click', function(){ state.follow = true; state.rates = liveRates(); save(); syncRates(); update(); });
 document.getElementById('preset-plan').addEventListener('click', function(){ state.follow = false; state.rates = clone(PLAN); save(); syncRates(); update(); });
 
-// ---------- live counts: what the tracker has added for this fleet ----------
-function syncTrack(){
-  fetch(TRACK_URL, { cache: 'no-store' })
+// ---------- live counts: what the tracker has added for a fleet ----------
+function readTrack(k, got){
+  fetch(TRACK_AT + k + '.json', { cache: 'no-store' })
     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(j){
-      if (!j || !j.counts || typeof j.counts !== 'object') return;
-      var t = trackOf(j.counts); if (JSON.stringify(t) === JSON.stringify(trackOf(state.track))) return;
-      state.track = t;
-      if (state.follow) state.rates = liveRates();
-      save(); syncRates(); update();
-    })
+    .then(function(j){ if (j && j.counts && typeof j.counts === 'object') got(trackOf(j.counts)); })
     .catch(function(){});
+}
+function syncTrack(){
+  readTrack(FLEET.key, function(t){
+    if (JSON.stringify(t) === JSON.stringify(trackOf(state.track))) return;
+    state.track = t;
+    if (state.follow) state.rates = liveRates();
+    save(); syncRates(); update();
+  });
+}
+
+// ---------- simulation tab: start from zero with the evals typed here, in one fleet's rates and signals ----------
+var tilesEl = document.getElementById('tiles'), simFirms = [], simDown = false;
+function simEvals(k){ return state.evals[k] === undefined ? 10 : state.evals[k]; }
+// the chosen fleet's firms with no accounts: a ticked one starts with its evals, bought on the first day, and buys none after that
+function simRows(){
+  return OWNER_SETS[state.base].map(function(o){
+    var f = clone(NEW_FIRM); f.firm = o.firm; f.size = o.size;
+    OWNER_KEYS.forEach(function(k){ if (o[k] !== undefined) f[k] = o[k]; });
+    f.idle = 0; f.skip = true; f.start = state.off.indexOf(unitKey(f)) >= 0 ? 0 : simEvals(unitKey(f));
+    return f;
+  });
+}
+// the inputs: total evals and days in the strip, a tick box and an evals box per firm
+function buildSim(){
+  simFirms = simRows();
+  tilesEl.innerHTML = '<div class="cell"><label for="s-total">Evals</label><span class="v"><input class="box" id="s-total" type="number" inputmode="numeric" min="0" max="4000" step="1" title="Type a total to split it evenly over the ticked firms"><small id="s-cost"></small></span></div>' +
+    '<div class="cell"><label for="s-days">Days</label><span class="v"><input class="box" id="s-days" type="number" inputmode="numeric" min="5" max="364" step="1" title="Calendar days from today"></span></div>' +
+    '<div class="cell"><span class="k">Payouts</span><span class="v" id="s-in">–</span></div>' +
+    '<div class="cell"><span class="k" id="s-net-k">Net</span><span class="v" id="s-net">–</span></div>';
+  document.getElementById('s-days').value = state.days;
+  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Evals</th><th>Cost</th><th>Payouts</th><th>Net</th></tr></thead><tbody>' +
+    simFirms.map(function(f, i){
+      var k = unitKey(f), no = state.off.indexOf(k) >= 0, name = esc((f.firm + ' ' + f.size).trim());
+      return '<tr' + (no ? ' class="off"' : '') + '><td class="who"><label class="pick"><input type="checkbox" data-k="' + k + '"' + (no ? '' : ' checked') + ' aria-label="' + name + ' in the simulation">' +
+        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' +
+        '<td><input class="box" id="s' + i + '-n" data-n="' + i + '" type="number" inputmode="numeric" min="0" max="500" step="1" value="' + simEvals(k) + '"' + (no ? ' disabled' : '') + ' aria-label="Evals at ' + name + '"></td>' +
+        '<td id="s' + i + '-cost"></td><td id="s' + i + '-in"></td><td id="s' + i + '-net"></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+function updateSim(){
+  // calendar days to trading days; the weeks drawn are the ones those days reach into
+  var rr = fracRates(state.rates), pn = presetName(state.rates), cap = seats(), T = Math.max(1, Math.round(state.days * 5 / 7)), W = Math.ceil((WD0 + T) / 5), tot = 0;
+  simFirms = simRows();
+  var res = runAll(simFirms.map(clone), rr, W, cap, T);
+  document.getElementById('preset-live').setAttribute('aria-pressed', pn === 'live');
+  document.getElementById('preset-plan').setAttribute('aria-pressed', pn === 'plan');
+  simFirms.forEach(function(f, i){
+    var inn = 0, out = 0; res.per[i].rows.forEach(function(x){ inn += x.inn; out += x.out; });
+    tot += f.start;
+    document.getElementById('s' + i + '-cost').innerHTML = out > 0.5 ? money(out) : quiet('$0');
+    document.getElementById('s' + i + '-in').innerHTML = inn > 0.5 ? money(inn) : quiet('$0');
+    document.getElementById('s' + i + '-net').innerHTML = gain(inn - out);
+  });
+  var total = document.getElementById('s-total'); if (document.activeElement !== total) total.value = tot;
+  document.getElementById('s-cost').textContent = tot > 0 ? money(res.totOut) : '';
+  document.getElementById('s-in').textContent = money(res.totIn);
+  document.getElementById('s-net-k').textContent = 'Net after ' + state.days + ' days';
+  var net = document.getElementById('s-net'); net.textContent = signed(res.net); net.className = 'v ' + (res.net >= 0 ? 'pos' : 'neg');
+  // whose rates and signals, and what the signals mean for this many evals
+  g1El.innerHTML = 'Rates and signals of <span class="seg" role="group" aria-label="Fleet">' + ['g1', 'v2'].map(function(k){ return '<button type="button" id="base-' + k + '" aria-pressed="' + (state.base === k) + '">' + esc(FLEETS[k].label) + '</button>'; }).join('') + '</span>' +
+    (cap ? ': max ' + cap + ' eval signals a day' + (tot > cap ? ', so ' + cap + ' of the ' + tot + ' evals trade at once and the rest wait for a seat.' : '.')
+         : simDown ? ': the dashboard is not readable right now, so every eval trades from day one.' : ': reading the dashboard…');
+  ['g1', 'v2'].forEach(function(k){
+    document.getElementById('base-' + k).onclick = function(){
+      if (state.base === k) return;
+      state.base = k; if (state.follow) state.rates = liveRates();
+      save(); syncRates(); buildSim(); update();
+    };
+  });
+  drawChart(res.rows);
+}
+if (SIM){
+  firmsEl.addEventListener('input', function(e){
+    var i = e.target && e.target.getAttribute ? e.target.getAttribute('data-n') : null; if (i === null || !simFirms[i]) return;
+    state.evals[unitKey(simFirms[i])] = Math.min(500, Math.max(0, Math.round(num(e.target.value, 0))));
+    save(); update();
+  });
+  tilesEl.addEventListener('input', function(e){
+    var el = e.target || {}, v = Math.round(num(el.value, 0));
+    if (el.id === 's-days') state.days = v > 0 ? Math.min(364, Math.max(5, v)) : 84;
+    else if (el.id === 's-total'){
+      // a typed total is split evenly over the ticked firms
+      var on = simFirms.filter(function(f){ return state.off.indexOf(unitKey(f)) < 0; }), n = Math.min(500 * on.length, Math.max(0, v));
+      on.forEach(function(f, j){ state.evals[unitKey(f)] = Math.floor(n / on.length) + (j < n % on.length ? 1 : 0); });
+      simFirms.forEach(function(f, i){ document.getElementById('s' + i + '-n').value = simEvals(unitKey(f)); });
+      if (n !== v) el.value = n;
+    }
+    else return;
+    save(); update();
+  });
+}
+// the signals of both fleets from the dashboard, and both fleets' live counts
+function syncSim(){
+  fetch(G1_URL + '?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(function(html){
+      var any = false;
+      ['g1', 'v2'].forEach(function(k){ var g = parseG1(html, k); if (g && g.sig && g.sig.max > 0){ state.sig[k] = g.sig.max; any = true; } });
+      if (!any) throw new Error('signals not readable');
+      simDown = false; save(); update();
+    })
+    .catch(function(){ simDown = true; update(); });
+  ['g1', 'v2'].forEach(function(k){
+    readTrack(k, function(t){
+      if (JSON.stringify(t) === JSON.stringify(trackOf(state.tracks[k]))) return;
+      state.tracks[k] = t;
+      if (state.follow && k === state.base) state.rates = liveRates();
+      save(); syncRates(); update();
+    });
+  });
 }
 
 // ---------- dashboard sync: read this fleet's section of the fleet dashboard and fill the accounts ----------
@@ -742,9 +886,10 @@ function g1Size(id, total, isEval){
   if (isEval){ var t = /of \$([\d,]+)/.exec(total); if (t){ var v = +t[1].replace(/,/g, ''); return v <= 1600 ? 25 : v <= 3500 ? 50 : v <= 6500 ? 100 : 150; } }
   return 50;
 }
-function parseG1(html){
+function parseG1(html, K){
   var doc = new DOMParser().parseFromString(html, 'text/html');
-  var K = FLEET.key, sec = doc.getElementById('eng-' + K); if (!sec) return null;
+  K = K || FLEET.key;
+  var sec = doc.getElementById('eng-' + K); if (!sec) return null;
   var units = {};
   function unit(firmText, size){
     var fk = normFirm(firmText), key = fk + '|' + size;
@@ -824,8 +969,8 @@ function syncG1(){
     .catch(function(){ drawG1(true); });
 }
 
-syncRates(); update();
-drawG1(false); syncG1(); syncTrack(); setInterval(function(){ syncG1(); syncTrack(); }, 30 * 60 * 1000);
+if (SIM){ buildSim(); syncRates(); update(); syncSim(); setInterval(syncSim, 30 * 60 * 1000); }
+else { syncRates(); update(); drawG1(false); syncG1(); syncTrack(); setInterval(function(){ syncG1(); syncTrack(); }, 30 * 60 * 1000); }
 })();
 
 </script>
