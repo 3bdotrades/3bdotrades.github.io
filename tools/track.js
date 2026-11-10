@@ -109,8 +109,8 @@ function todays(st){
 }
 
 // One build. st = the counts file so far (null before the first one), snap = what the build shows, meta = { sha, built }.
-// What is remembered of an account: p = its table (e eval, f funded, x flip), f = its firm, z = its result is counted,
-// r = a funded stage that is not its first, gone = the date it left the dashboard, u = it was counted because it left.
+// What is remembered of an account: p = its table (e eval, f funded, x flip), f = its firm, z = its result is in the counts,
+// r = a funded stage that is not its first, gone = the date it left the dashboard, u = its result was set because it left.
 function step(st, snap, meta){
   const first = !st;                                           // the first build read: what it shows was there before
   st = st ? copy(st) : { v: 2, at: '', built: '', day: '', counts: null, flipDone: null, base: null, today: {}, marks: [], acc: {}, log: [] };
@@ -129,10 +129,14 @@ function step(st, snap, meta){
   const note = (what, firm, h) => { if (!based) st.log.push(when + ' ' + what + ' · ' + firm + ' ' + h.slice(0, 6)); };
   const add = (k, won) => { if (!based){ st.counts[k][1]++; if (won) st.counts[k][0]++; } };
   const out = r => r.dead || (r.room !== null && r.room <= 0);
-  // an account that was gone is back: if it was counted because it left and it is not out after all, that count is taken back
+  // An account that was gone is back. If its result was set only because it left (u: 1 = counted here, 2 = left on a build
+  // with the Lifetime table, so not counted here) and it is not out after all, it is running again: a count made here is taken back.
   const back = (a, r, k, h, stillOut) => {
     if (a.u){
-      if (!stillOut && !based){ st.counts[k][1]--; delete a.z; note('back on the dashboard: its count is taken back', r.firm, h); }
+      if (!stillOut){
+        if (a.u === 1 && !based){ st.counts[k][1]--; note('back on the dashboard: its count is taken back', r.firm, h); }
+        delete a.z;
+      }
       delete a.u;
     }
     delete a.gone;
@@ -186,9 +190,9 @@ function step(st, snap, meta){
     if (a.gone){ if (dayNo(meta.built) - dayNo(a.gone) > KEEP_GONE_DAYS) delete acc[h]; return; }
     a.gone = meta.built.slice(0, 10);
     if (a.z || a.r || a.p === 'x') return;
-    a.z = 1;
-    if (based) return;
-    a.u = 1; add(a.p === 'e' ? 'pass' : 'win', false);
+    a.z = 1; a.u = based ? 2 : 1;
+    if (based) return;                                         // the table has it, whatever it was
+    add(a.p === 'e' ? 'pass' : 'win', false);
     note(a.p === 'e' ? 'eval left the dashboard without a pass: blown' : 'funded account left the dashboard without a win: lost', a.f, h);
   });
 
