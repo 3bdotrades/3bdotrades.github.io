@@ -1,0 +1,45 @@
+name: Count live rates
+
+# Twice an hour: reads the builds of the fleet dashboard it has not read yet (each one is a commit in the dashboard's
+# public repository) and keeps the counts behind the page's four Live rates on the "track" branch. See tools/track.js.
+on:
+  schedule:
+    - cron: '13,43 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - tools/track.js
+      - .github/workflows/track.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: track
+  cancel-in-progress: false
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: track
+          path: counts
+      - name: Dashboard history
+        run: git clone --quiet --no-checkout https://github.com/randompotato247/fleet-dashboard.git dash
+      - name: Count
+        run: node tools/track.js counts dash
+      - name: Save
+        working-directory: counts
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -q -m "Counts $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git push -q
+          fi

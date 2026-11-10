@@ -137,32 +137,87 @@ tr.off .pick{color:var(--mute)}
 function num(v, d){ v = Number(v); return isFinite(v) ? v : d; }
 function clamp01(v){ v = Number(v); return isFinite(v) ? Math.min(1, Math.max(0, v)) : 0; }
 function fundedToProfit(win, tries){ return 1 - Math.pow(1 - clamp01(win), Math.min(10, Math.max(1, Math.round(num(tries, 1))))); }
-// Chance a flip cycle reaches its payout: D winning flip days before L losing ones.
-function cycleOdds(q, D, L){
-  q = clamp01(q); D = Math.max(1, Math.round(num(D, 5))); L = Math.max(1, Math.round(num(L, 12)));
-  var s = 0, term = Math.pow(q, D);
-  for (var k = 0; k < L; k++){ s += term; term *= (1 - q) * (D + k) / (k + 1); }
-  return Math.min(1, s);
-}
 function params(r){
   var D = Math.min(30, Math.max(1, Math.round(num(r.payDays, 5))));
   return { pass: clamp01(r.pass), win: clamp01(r.win), tries: Math.min(10, Math.max(1, Math.round(num(r.tries, 2)))), q: clamp01(r.flip),
     D: D, D1: Math.min(30, Math.max(1, Math.round(num(r.payDays1, D)))), L: Math.min(60, Math.max(1, Math.round(num(r.lossDays, 20)))),
     E: Math.min(30, Math.max(1, Math.round(num(r.evalDays, 3)))), wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), plan: !!r.plan };
 }
-// A losing flip day costs about this much room (more where the fleet's stop is bigger); it turns room and payouts into losing days.
-var DAY_LOSS = 160, DAY_LOSS_AT = { 'aqua|50': 215, 'topstep|50': 167, 'tradeify|50': 168 };
+// ----- the flip stage -----
+// A flip account trades one day at a time. A losing day takes `loss` dollars of its room (the distance to the firm's floor),
+// a winning day adds `win`. The fleet's flip is 5 MNQ with a 15-point stop: $150 plus about $7.50 of fees lost; its target is
+// 16 points on a 50K ($160 less fees) and 10.75 points on a 25K. Aqua's days are bigger: its two numbers are what its
+// accounts showed on the dashboards (losses of $212, $210 and $224, wins of $203).
+var DAY_LOSS = 157.5, DAY_LOSS_AT = { 'aqua|50': 215 }, DAY_WIN = 152.5, DAY_WIN_25 = 100, DAY_WIN_AT = { 'aqua|50': 203 };
 var FIRM_ALIAS = { bg: 'blueguardian' }, FIRM_KEYS = ['lucid', 'topstep', 'aqua', 'blueguardian', 'futureselite', 'tradeify'];
 function dayLoss(firm, size){ return DAY_LOSS_AT[normFirm(firm) + '|' + sizeNum(size)] || DAY_LOSS; }
-// Flip numbers for one size: its own flip win and losing days when set, else the rates bar.
-// (The page sets a 25K row's flip win from its 25K rate. flipPlan is an older per-size plan value, no longer set.)
-// A payout takes its cash out of the room, so each later cycle allows fewer losing days.
-function flipSpec(f, P){
-  var fq = P.plan && num(f.flipPlan, 0) > 0 ? num(f.flipPlan, 0) : num(f.flip, 0);
-  var q = fq > 0 ? clamp01(fq / 100) : P.q;
-  var L1 = num(f.lossDays, 0) > 0 ? Math.min(60, Math.max(1, Math.round(num(f.lossDays, 0)))) : P.L;
-  var p1 = Math.max(0, num(f.pay1, 0)), p2 = Math.max(0, num(f.pay2, 0)), dl = dayLoss(f.firm, f.size);
-  return { q: q, dl: dl, Lk: [L1, Math.max(1, Math.round(L1 - p1 / dl)), Math.max(1, Math.round(L1 - (p1 + p2) / dl))] };
+function dayWin(firm, size){ return DAY_WIN_AT[normFirm(firm) + '|' + sizeNum(size)] || (sizeNum(size) === 25 ? DAY_WIN_25 : DAY_WIN); }
+// A payout is a request taken out of the room. About 88% of a request is booked (requests of $1,000 and $1,735.14 booked $870
+// and $1,531.63). A request is at least $500, and an account keeps at least one losing day of room.
+// (TIE: two amounts closer than this count as equal.)
+var KEEP = 0.88, MIN_REQUEST = 500, TIE = 1e-6;
+// The flip numbers of one size: its flip win (its own when set, else the rates bar), what a day wins and loses, its room at
+// the start, its payouts (as many cycles as it has payouts) and the winning days a payout takes (D1 the first, D the later ones).
+// done(k, room): the end of cycle k, with the room the account has once its last winning day is in: what is booked and whether
+// the account goes on. The size's usual payout is booked when the room can pay its request and keep one losing day; the account
+// then goes on to the next cycle, if the size has one. If the room cannot, what is above one losing day is requested (when that
+// is at least the smallest request) and the account stops.
+function flipOf(f, P){
+  var fq = num(f.flip, 0), s = dayLoss(f.firm, f.size);
+  var pays = [Math.max(0, num(f.pay1, 0)), Math.max(0, num(f.pay2, 0)), Math.max(0, num(f.pay3, 0))], last = pays[2] > 0 ? 3 : pays[1] > 0 ? 2 : 1;
+  var F = { q: fq > 0 ? clamp01(fq / 100) : P.q, s: s, g: dayWin(f.firm, f.size), room: num(f.room, 0) > 0 ? num(f.room, 0) : P.L * s,
+            last: last, D1: P.D1, D: P.D, req: pays.map(function(p){ return p / KEEP; }) };
+  F.done = function(k, room){
+    if (room - F.req[k - 1] >= s - TIE) return { pay: pays[k - 1], next: k < last };
+    var rest = room - s;
+    return { pay: rest >= MIN_REQUEST - TIE ? KEEP * rest : 0, next: false };
+  };
+  return F;
+}
+// The road of a flip account from a known point: cycle k0 with rem0 winning days still needed and room0 dollars of room.
+// From there its state is (cycle, winning days still needed, losing days since). Its room follows from the three, because every
+// win adds the same, every loss takes the same and every payout on the way took its usual request. For each state:
+// win = the state after a winning day (-1: the account stops), pay = what that day books, loss = the state after a losing day
+// (-1: the room is gone and the account is lost). start = the state of the known point; flips = the accounts in each state.
+function flipRoad(F, k0, rem0, room0){
+  room0 = Math.min(room0, 200 * F.s);
+  var W = Math.max(F.D, F.D1), N = Math.floor((room0 + (rem0 + (F.last - k0) * F.D) * F.g) / F.s) + 2, S = 3 * W * N, k, rem, l;
+  function at(k, rem, l){ return ((k - 1) * W + (rem - 1)) * N + l; }
+  function roomAt(k, rem, l){
+    var room = room0 - l * F.s + (k === k0 ? rem0 - rem : rem0 + (k - k0) * F.D - rem) * F.g;
+    for (var j = k0; j < k; j++) room -= F.req[j - 1];
+    return room;
+  }
+  var road = { S: S, W: W, N: N, start: at(k0, rem0, 0), win: new Int32Array(S), loss: new Int32Array(S), pay: new Float64Array(S), flips: new Float64Array(S) };
+  for (k = 0; k < S; k++){ road.win[k] = -1; road.loss[k] = -1; }
+  for (k = k0; k <= F.last; k++) for (rem = 1; rem <= (k === k0 ? rem0 : F.D); rem++) for (l = 0; l < N; l++){
+    var room = roomAt(k, rem, l), i = at(k, rem, l);
+    if (!(room > TIE)) break;                                  // no room left: no account gets here, nor to any state with more losing days
+    if (rem > 1) road.win[i] = at(k, rem - 1, l);
+    else { var fin = F.done(k, room + F.g); road.pay[i] = fin.pay; if (fin.next) road.win[i] = at(k + 1, F.D, l); }
+    if (l + 1 < N && room - F.s > TIE) road.loss[i] = at(k, rem, l + 1);
+  }
+  return road;
+}
+// what an account in each state of a road is still expected to book
+function roadValue(road, q){
+  var V = new Float64Array(road.S), k, rem, l, i;
+  // a win leads to fewer winning days needed or to the next cycle, a loss to one more losing day: those are worked out first
+  for (k = 3; k >= 1; k--) for (rem = 1; rem <= road.W; rem++) for (l = road.N - 1; l >= 0; l--){
+    i = ((k - 1) * road.W + (rem - 1)) * road.N + l;
+    V[i] = q * (road.pay[i] + (road.win[i] >= 0 ? V[road.win[i]] : 0)) + (1 - q) * (road.loss[i] >= 0 ? V[road.loss[i]] : 0);
+  }
+  return V;
+}
+// the chance an account in each state of a road has left (stopped after a payout, or lost) within h flip days
+function roadExit(road, q, h){
+  var cur = new Float64Array(road.S), nx, i;
+  for (; h > 0; h--){
+    nx = new Float64Array(road.S);
+    for (i = 0; i < road.S; i++) nx[i] = q * (road.win[i] < 0 ? 1 : cur[road.win[i]]) + (1 - q) * (road.loss[i] < 0 ? 1 : cur[road.loss[i]]);
+    cur = nx;
+  }
+  return cur;
 }
 function groupKey(f){ return String(f.firm !== undefined ? f.firm : (f.name || '')).trim().toLowerCase(); }
 // The firms run the same trading days side by side, because they share the fleet's eval seats: an eval takes one trade a day
@@ -201,75 +256,74 @@ function simulateAll(firms, r, weeks, seats, days){
   return per;
 }
 // One firm, trading day by trading day. Sizes share the firm's max-trading cap; accounts above it wait idle.
-// Evals resolve after E days; a funded account takes one try a day; an account in profit flips one day at a time
-// and gets a payout after enough winning flip days (D1 for the first, D for later ones), or is lost when its losing days run out.
+// Evals resolve after E days; a funded account takes one try a day; an account in profit flips one day at a time:
+// a winning day brings it closer to its payout (D1 winning days for the first, D for later ones), a losing day takes room,
+// and it is lost when the room is gone. Its state is (cycle, winning days still needed, losing days so far): see flipRoad.
 // open(d) runs a day up to the evals the firm wants, close(d, n) buys n of them and books the day. A size marked skip gets no new evals.
 function simulateGroup(units, r, weeks, days){
-  var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c, D = Math.max(P.D, P.D1), L = 1, H = P.E;
-  var specs = units.map(function(f){ var sp = flipSpec(f, P); if (sp.Lk[0] > L) L = sp.Lk[0]; return sp; });
-  var S = 3 * D * L;
+  var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c, H = P.E;
   var nDays = Math.max(1, days > 0 ? Math.min(Math.round(days), weeks * 5 - P.wd0) : weeks * 5 - P.wd0), LD = nDays + P.E + P.tries + 8, capSum = 0;
   function zeros(){ var a = new Array(LD); for (var k = 0; k < LD; k++) a[k] = 0; return a; }
-  function idx(k, rem, l){ return ((k - 1) * D + (rem - 1)) * L + l; }
-  // where a flip cycle starts: the winning days it needs and the losing days it allows
-  function entry(u, k){ return idx(k, k === 1 ? P.D1 : P.D, L - u.Lk[k - 1]); }
-  var U = units.map(function(f, j){
-    var w = perWinning(f, r), pays = [Math.max(0, num(f.pay1, 0)), Math.max(0, num(f.pay2, 0)), Math.max(0, num(f.pay3, 0))];
-    var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), pays: pays, last: pays[2] > 0 ? 3 : pays[1] > 0 ? 2 : 1, q: specs[j].q, Lk: specs[j].Lk, dl: specs[j].dl,
+  // The road of a size's accounts from one known point, made once. With it: the chance an account in each state leaves
+  // (stops after a payout, or is lost) within H flip days: an eval bought today needs its slot E trading days from now.
+  function roadOf(u, k0, rem0, room0){
+    var key = k0 + '|' + rem0 + '|' + room0, road = u.byKey[key];
+    if (!road){ road = u.byKey[key] = flipRoad(u.F, k0, rem0, room0); road.exit = roadExit(road, u.q, H); u.roads.push(road); }
+    return road;
+  }
+  var U = units.map(function(f){
+    var w = perWinning(f, r), F = flipOf(f, P);
+    var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), F: F, q: F.q,
       price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0, skip: !!f.skip,
-      evalRes: zeros(), profitAt: zeros(), failAt: zeros(), flips: new Float64Array(S), fc: 0, waitFunded: 0, wait: 0, pending: 0, trying: 0, cash0: 0, days: [] };
+      evalRes: zeros(), profitAt: zeros(), failAt: zeros(), roads: [], byKey: {}, fc: 0, waitFunded: 0, wait: 0, pending: 0, trying: 0, days: [] };
+    // an account that has just reached profit starts its first cycle with the size's full room
+    u.fresh = roadOf(u, 1, P.D1, F.room);
     // evals the run starts with: paid for on its first day, trading once they have a seat
     u.queue = u.start0 = Math.max(0, Math.round(num(f.start, 0)));
-    // chance an account in each flip state leaves (paid out for the last time, or lost) within H flip days:
-    // an eval bought today needs its slot E trading days from now, after E more flip days
-    var cur = new Float64Array(S);
-    for (var h = 0; h < H; h++){
-      var nx = new Float64Array(S);
-      for (var k = 1; k <= 3; k++) for (var rem = 1; rem <= D; rem++) for (var l = 0; l < L; l++){
-        var pw = rem <= 1 ? (k >= u.last ? 1 : cur[entry(u, k + 1)]) : cur[idx(k, rem - 1, l)];
-        var pl = l + 1 >= L ? 1 : cur[idx(k, rem, l + 1)];
-        nx[idx(k, rem, l)] = u.q * pw + (1 - u.q) * pl;
-      }
-      cur = nx;
-    }
-    u.exitP = cur;
     capSum += u.slots;
     return u;
   });
   var cap = units[0].firmCap !== undefined ? Math.max(0, Math.floor(num(units[0].firmCap, 0))) : capSum;
   var order = U.map(function(u, j){ return j; }).sort(function(a, b){ return (U[b].value - U[a].value) || (a - b); });
-  function sumF(u){ var s = 0, a = u.flips; for (var i = 0; i < S; i++) s += a[i]; return s; }
-  function soonExits(u){ var s = 0, a = u.flips, e = u.exitP; for (var i = 0; i < S; i++) if (a[i] > 0) s += a[i] * e[i]; return s; }
+  function sumF(u){ var s = 0; u.roads.forEach(function(road){ for (var i = 0, a = road.flips; i < road.S; i++) s += a[i]; }); return s; }
+  function soonExits(u){ var s = 0; u.roads.forEach(function(road){ for (var i = 0, a = road.flips; i < road.S; i++) if (a[i] > 0) s += a[i] * road.exit[i]; }); return s; }
   function trading(){ var s = 0; U.forEach(function(u){ s += u.trying + u.fc; }); return s; }
+  // one flip day for every account of a size: the cash booked that day
   function flipStep(u){
-    var cur = u.flips, nx = new Float64Array(S), cash = 0;
-    for (var k = 1; k <= 3; k++) for (var rem = 1; rem <= D; rem++) for (var l = 0; l < L; l++){
-      var n = cur[idx(k, rem, l)]; if (!(n > 1e-12)) continue;
-      var wins = n * u.q, losses = n - wins;
-      if (wins > 0){ if (rem <= 1){ cash += wins * u.pays[k - 1]; if (k < u.last) nx[entry(u, k + 1)] += wins; } else nx[idx(k, rem - 1, l)] += wins; }
-      if (losses > 0 && l + 1 < L) nx[idx(k, rem, l + 1)] += losses;
-    }
-    u.flips = nx;
+    var cash = 0;
+    u.roads.forEach(function(road){
+      var cur = road.flips, nx = new Float64Array(road.S);
+      for (var i = 0; i < road.S; i++){
+        var n = cur[i]; if (!(n > 1e-12)) continue;
+        var wins = n * u.q, losses = n - wins;
+        if (wins > 0){ cash += wins * road.pay[i]; if (road.win[i] >= 0) nx[road.win[i]] += wins; }
+        if (losses > 0 && road.loss[i] >= 0) nx[road.loss[i]] += losses;
+      }
+      road.flips = nx;
+    });
     return cash;
   }
   units.forEach(function(f, j){
-    var u = U[j];
+    var u = U[j], F = u.F;
     var fn = Math.max(0, num(f.fundedNow, 0)) + Math.max(0, num(f.idle, 0)), ps = Math.max(0, num(f.passedNow, 0)), ip = Math.max(0, num(f.inProfitNow, 0)), oe = Math.max(0, num(f.openEvals, 0));
     u.waitFunded = fn; u.wait = ps;
-    // accounts the dashboard reported keep their own place (cycle, winning days still needed, losing days left); any others start a first cycle
+    // accounts the dashboard reported keep their own place (cycle, winning days still needed, room); any others start a first cycle
     var known = Array.isArray(f.g1Flips) && ip > 0 ? f.g1Flips.slice(0, Math.floor(ip)) : [];
     known.forEach(function(x){
       x = x || {};
-      var k0 = Math.min(u.last, num(x.cycle, 1) >= 2 ? 2 : 1), top = k0 === 1 ? P.D1 : P.D;
-      var rem = Math.min(top, Math.round(num(x.rem, top))), left = Math.max(1, Math.min(L, Math.round(num(x.left, u.Lk[k0 - 1]))));
-      if (rem <= 0){
-        // every winning day is in: the payout is due now, and the next cycle starts with the room that is left
-        u.cash0 += u.pays[k0 - 1];
-        if (u.last > k0) u.flips[idx(k0 + 1, P.D, L - Math.max(1, Math.min(L, Math.round(left - u.pays[k0 - 1] / u.dl))))] += 1;
-      }
-      else u.flips[idx(k0, rem, L - left)] += 1;
+      var k0 = Math.min(F.last, num(x.cycle, 1) >= 2 ? 2 : 1), top = k0 === 1 ? P.D1 : P.D;
+      var rem = Math.min(top, Math.round(num(x.rem, top))), road = null;
+      // its room as the dashboard shows it, this cycle's winning days included. (A count kept by an older page has losing days
+      // left instead of the room.) With no room read, the size's room at the start.
+      var room = x.room !== undefined && x.room !== null ? num(x.room, NaN) : x.left !== undefined && x.left !== null ? num(x.left, NaN) * F.s : NaN;
+      if (!(isFinite(room) && room > 0)) room = F.room;
+      if (rem > 0) road = roadOf(u, k0, rem, room);
+      // Every winning day is in. The fleet books that payout the same day, so it is in the cash it has received already:
+      // nothing is added here, the account only moves on to its next cycle (or stops).
+      else if (F.done(k0, room).next) road = roadOf(u, k0 + 1, P.D, room - F.req[k0 - 1]);
+      if (road) road.flips[road.start] += 1;
     });
-    if (ip > known.length) u.flips[entry(u, 1)] += ip - known.length;
+    if (ip > known.length) u.fresh.flips[u.fresh.start] += ip - known.length;
     u.fc = sumF(u);
     u.pending = oe;
     if (oe > 0) for (var e = 0; e < P.E; e++) u.evalRes[1 + e] += oe / P.E;
@@ -277,12 +331,12 @@ function simulateGroup(units, r, weeks, days){
   var pick = -1;
   function open(d){
     U.forEach(function(u){
-      u.cashIn = d === 0 ? u.cash0 : 0; u.buy = 0; u.act = 0;
+      u.buy = 0; u.act = 0;
       var n = u.evalRes[d];
       if (n > 0){ u.wait += n * P.pass; u.pending = Math.max(0, u.pending - n); }
-      u.cashIn += flipStep(u);
+      u.cashIn = flipStep(u);
       var m = u.profitAt[d], fl = u.failAt[d];
-      if (m > 0){ u.trying -= m; u.flips[entry(u, 1)] += m; }
+      if (m > 0){ u.trying -= m; u.fresh.flips[u.fresh.start] += m; }
       if (fl > 0) u.trying -= fl;
       if (Math.abs(u.trying) < 1e-9) u.trying = 0;
       if (Math.abs(u.wait) < 1e-9) u.wait = 0;
@@ -374,14 +428,13 @@ function monthlyUnits(firms, r, seats){
   return simulateAll(firms, r, W, seats).map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
 }
 
+// What one account that reaches profit is expected to book over its flips, and what it costs in evals to get one.
 function perWinning(f, r){
   var P = params(r), c = fundedToProfit(P.win, P.tries), pc = P.pass * c;
   if (!(pc > 0)) return null;
-  // chance of reaching payout 1, 2 and 3: each cycle has its own winning days needed and losing days allowed
-  var fs = flipSpec(f, P), s1 = cycleOdds(fs.q, P.D1, fs.Lk[0]), s2 = s1 * cycleOdds(fs.q, P.D, fs.Lk[1]), s3 = s2 * cycleOdds(fs.q, P.D, fs.Lk[2]), evals = 1 / pc;
-  var cost = evals * Math.max(0, num(f.evalPrice, 0)) + Math.max(0, num(f.activation, 0)) / c;
-  var cash = Math.max(0, num(f.pay1, 0)) * s1 + Math.max(0, num(f.pay2, 0)) * s2 + Math.max(0, num(f.pay3, 0)) * s3;
-  return { evals: evals, cost: cost, cash: cash, net: cash - cost, reach: [s1, s2, s3], spec: fs };
+  var F = flipOf(f, P), road = flipRoad(F, 1, F.D1, F.room), cash = roadValue(road, F.q)[road.start];
+  var evals = 1 / pc, cost = evals * Math.max(0, num(f.evalPrice, 0)) + Math.max(0, num(f.activation, 0)) / c;
+  return { evals: evals, cost: cost, cash: cash, net: cash - cost };
 }
 
 // ---------- MODEL END ----------
@@ -395,45 +448,52 @@ var FLEET = FLEETS[((/[?&]fleet=(v2|sim)(&|$)/i.exec((window.location && window.
 var STORE = FLEET.store, SIM = FLEET.key === 'sim';
 document.getElementById('fleet-' + FLEET.key).setAttribute('aria-current', 'page');
 if (FLEET.key !== 'g1') document.title = 'Funded Slots Roadmap · ' + FLEET.label;
-// The four rates on the page. Live is read from the Lifetime table of the fleet dashboard, so it is the fleet's own exact record;
+// The four rates on the page. Live is the fleet's own record: the Lifetime table of the fleet dashboard when it carries one,
+// else the counts kept from the dashboard's builds since its last Lifetime table (tools/track.js, see counted below).
 // Plan is the backtest. Funded win is the share of funded accounts that reach profit (the dashboard's "Funded first win"):
 // an account gets FIXED.tries trades at it, and the plan's 21% a trade comes to 37.6% of accounts.
-// 50K and 25K accounts flip different boxes, so each size has its own flip rate. The rest of a run is fixed.
+// 50K and 25K accounts flip different boxes, so each size has its own flip rate. The rest of a run is fixed: two trades at the
+// funded win, 4 winning flip days to the first payout and 5 to each later one, 3 trading days for an eval to finish
+// (lossDays: the room, in losing days, of a size that has no room set: a firm the dashboard lists and the sets below do not).
 var RATE_KEYS = ['pass', 'win', 'flip', 'flip25'], PLAN = { pass: 28, win: 37.6, flip: 48, flip25: 58 }, PLAN_TRY = 0.21;
 var FIXED = { tries: 2, payDays1: 4, payDays: 5, lossDays: 20, evalDays: 3 };
-// the Lifetime counts as read on 10 Nov 2026 14:28 ET, each [won, finished]: used only until this browser has read the dashboard itself
-var LIVE0 = { g1: { pass: [18, 67], win: [8, 12], flip: [12, 38], flip25: [13, 25] }, v2: { pass: [31, 112], win: [11, 33], flip: [60, 138], flip25: [40, 65] } };
+// the counts on 10 Nov 2026 21:07 UTC, each [won, finished]: used only until this browser has read them itself
+var LIVE0 = { g1: { pass: [18, 67], win: [8, 12], flip: [12, 38], flip25: [13, 25] }, v2: { pass: [31, 114], win: [11, 33], flip: [60, 138], flip25: [40, 65] } };
 
-// ---------- numbers per fleet (set from the chat; nothing here is typed on the page) ----------
-// payouts: Lucid's own; Topstep from the chat advice; every other firm pays like Lucid at the same size
-// losing days: the dashboards' room at the start of a flip / the loss on a losing day there (Topstep 24, Aqua 19);
-// Tradeify 50K 29 = its starting room over the fleet's 50K stop (no flip trade seen there yet)
+// ---------- numbers per fleet (from the chat and the two fleets' ledgers; nothing here is typed on the page) ----------
+// evalPrice: what an eval costs at that firm and size (the owner's prices; no activation or monthly fees).
+// pay1, pay2, pay3: what a payout books when the account's room can pay it: the average of the payouts booked so far in the
+// two fleets' ledgers. Lucid 50K $1,785, $1,790.10 and $1,786.76 (its second was as big as its first). Lucid 25K first $890,
+// $800, $891 and $870, second $521.37. Topstep 50K first $1,715, $1,955 and $1,531.63, second $908; its third is the chat's
+// advice, none is booked yet. Tradeify 50K first $1,800. Where nothing is booked yet, the size pays like Lucid.
+// room: the room a flip account starts with, from the fleets' flip ledgers and dashboards (G1's Lucid 25K accounts start at
+// $1,896, V2's at $1,993; Aqua's at $3,989 in G1 and $3,912 in V2). A firm with no flip account yet starts like Lucid.
 // idle: funded accounts held that are not on the dashboard
 var OWNER_SETS = { g1: [
-  { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, idle: 2, lossDays: 24 },
-  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, idle: 2, lossDays: 12 },
-  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 24 },
-  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 19 },
-  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
-  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
-  { firm: 'Tradeify', size: '25K', evalPrice: 72.38, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, lossDays: 12 },
-  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 29 }
+  { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1787.29, pay2: 1787.29, pay3: 0, idle: 2, room: 3895 },
+  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 862.75, pay2: 521.37, pay3: 0, idle: 2, room: 1896 },
+  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1733.88, pay2: 908, pay3: 450, room: 3992 },
+  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1787.29, pay2: 1787.29, pay3: 0, room: 3989 },
+  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1787.29, pay2: 1787.29, pay3: 0, room: 3895 },
+  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1787.29, pay2: 1787.29, pay3: 0, room: 3895 },
+  { firm: 'Tradeify', size: '25K', evalPrice: 72.38, activation: 0, pay1: 862.75, pay2: 521.37, pay3: 0, room: 1896 },
+  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1800, pay2: 1787.29, pay3: 0, room: 4889 }
 ],
-// V2 fleet: G1's numbers; no idle accounts
+// V2 fleet: G1's prices and payouts, its own rooms; no idle accounts
 v2: [
-  { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
-  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, lossDays: 12 },
-  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 24 },
-  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 19 },
-  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 29 },
-  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
-  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 }
+  { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1787.29, pay2: 1787.29, pay3: 0, room: 3895 },
+  { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 862.75, pay2: 521.37, pay3: 0, room: 1993 },
+  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1733.88, pay2: 908, pay3: 450, room: 3992 },
+  { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1787.29, pay2: 1787.29, pay3: 0, room: 3912 },
+  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1800, pay2: 1787.29, pay3: 0, room: 4889 },
+  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1787.29, pay2: 1787.29, pay3: 0, room: 3895 },
+  { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1787.29, pay2: 1787.29, pay3: 0, room: 3895 }
 ] };
 var OWNER = OWNER_SETS[FLEET.key] || [];
-var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'pay3', 'idle', 'lossDays'];
+var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'pay3', 'idle', 'room'];
 var COUNT_KEYS = ['openEvals', 'passedNow', 'fundedNow', 'inProfitNow'];
 // max 5 trading at once per firm, shared by its sizes
-var NEW_FIRM = { firm: 'Firm', size: '', firmCap: 5, slots: 5, openEvals: 0, passedNow: 0, fundedNow: 0, inProfitNow: 0, idle: 0, evalPrice: 0, activation: 0, monthly: 0, pay1: 0, pay2: 0, pay3: 0, flip: 0, lossDays: 0 };
+var NEW_FIRM = { firm: 'Firm', size: '', firmCap: 5, slots: 5, openEvals: 0, passedNow: 0, fundedNow: 0, inProfitNow: 0, idle: 0, evalPrice: 0, activation: 0, monthly: 0, pay1: 0, pay2: 0, pay3: 0, flip: 0, room: 0 };
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 function sameUnit(f, firm, size){ return normFirm(f.firm) === normFirm(firm) && sizeNum(f.size) === sizeNum(size); }
 function unitKey(f){ return normFirm(f.firm) + '|' + sizeNum(f.size); }
@@ -636,7 +696,7 @@ var ACTUALS = FLEET.key !== 'g1' ? [] : [
   ['2026-09-26','Topstep','fee',864.50], ['2026-09-29','Topstep','fee',425.00], ['2026-10-18','Lucid','fee',955.70], ['2026-10-22','Lucid','fee',928.80],
   ['2026-10-29','Topstep','fee',708.10], ['2026-11-01','Aqua','fee',648.98], ['2026-11-01','Topstep','fee',425.00], ['2026-11-04','Tradify','fee',729.60],
   ['2026-11-04','Aqua','fee',648.98], ['2026-11-04','Lucid','payout',891.23], ['2026-11-06','Topstep','fee',312.75], ['2026-11-08','Futureselite','fee',845.61],
-  ['2026-11-08','BG','fee',443.74], ['2026-11-09','Topstep','fee',425.00], ['2026-11-09','Lucid','payout',891.23]
+  ['2026-11-08','BG','fee',443.74], ['2026-11-09','Topstep','fee',425.00], ['2026-11-09','Lucid','payout',870.00]
 ];
 // G1's dashboard totals that the typed history above already covers; cash beyond them is new
 var CASH0 = FLEET.key === 'g1' ? { inn: 1761, out: 8420 } : null;
@@ -848,6 +908,7 @@ if (SIM){
 }
 // the eval signals and the Lifetime counts of both fleets, from the dashboard
 function syncSim(){
+  var kept = { g1: counted('g1'), v2: counted('v2') };
   fetch(G1_URL + '?t=' + Date.now(), { cache: 'no-store' })
     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
     .then(function(html){
@@ -856,6 +917,7 @@ function syncSim(){
         var g = parseG1(html, k); if (!g) return;
         if (g.sig && g.sig.max > 0){ state.sig[k] = g.sig.max; any = true; }
         if (g.life) state.life[k] = g.life;
+        else kept[k].then(function(c){ if (!c) return; state.life[k] = c; if (state.follow) state.rates = liveRates(); save(); syncRates(); update(); });
       });
       if (!any) throw new Error('signals not readable');
       simDown = false;
@@ -867,6 +929,15 @@ function syncSim(){
 
 // ---------- dashboard sync: read this fleet's section of the fleet dashboard and fill the accounts ----------
 var G1_URL = 'https://randompotato247.github.io/fleet-dashboard/';
+// The Lifetime counts for when the dashboard carries no Lifetime table: tools/track.js keeps them on this site's "track"
+// branch, counted on from the last table the dashboard showed, build by build. null when they cannot be read.
+var COUNTS_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/';
+function counted(k){
+  return fetch(COUNTS_URL + k + '.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(j){ var o = j && j.v === 2 ? lifeOf(j.counts) : {}; return RATE_KEYS.every(function(x){ return o[x]; }) ? o : null; })
+    .catch(function(){ return null; });
+}
 function lev(a, b){
   var p = [], i, j; for (j = 0; j <= b.length; j++) p[j] = j;
   for (i = 1; i <= a.length; i++){ var q = [i]; for (j = 1; j <= b.length; j++) q[j] = Math.min(p[j] + 1, q[j - 1] + 1, p[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1)); p = q; }
@@ -910,7 +981,7 @@ function parseG1(html, K){
   // G1 shows "n/4 days" before the first payout and "n/5 days" after one
   rows('p-' + K + '-flip').forEach(function(c){
     var m = /(\d+)\s*\/\s*(\d+)\s*days/i.exec(c[3]), room = moneyNum(c[4]), u = unit(c[1], g1Size(c[0], c[3], false));
-    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, left: room !== null ? Math.max(1, Math.round(room / dayLoss(u.fkey, u.size))) : null });
+    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null });
   });
   // eval signals: the "Avg signals" row of the summary table that has an Evals column
   var sig = null;
@@ -949,7 +1020,7 @@ function applyG1(g){
     state.firms.forEach(function(y){ if (!f && normFirm(y.firm) === x.fkey && sizeNum(y.size) === x.size) f = y; });
     if (!f) f = addRow(state.firms, x.firm, x.size + 'K');
     f.openEvals = x.evals; f.passedNow = x.passed; f.fundedNow = x.fundeds; f.inProfitNow = x.flips.length;
-    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, left: z.left === null ? undefined : z.left }; });
+    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room }; });
     f.g1 = true; seen.push(f);
   });
   // a firm or size the dashboard no longer lists: its counts go to zero, and a row that is not in this fleet's set goes away
@@ -976,9 +1047,15 @@ function drawG1(failed){
   document.getElementById('g1sync').onclick = syncG1;
 }
 function syncG1(){
+  var kept = counted(FLEET.key);
   fetch(G1_URL + '?t=' + Date.now(), { cache: 'no-store' })
     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-    .then(function(html){ var g = parseG1(html); if (!g) throw new Error('fleet section not readable'); applyG1(g); })
+    .then(function(html){
+      var g = parseG1(html); if (!g) throw new Error('fleet section not readable');
+      applyG1(g);
+      // no Lifetime table on the dashboard: the counts kept from its builds
+      if (!g.life) kept.then(function(c){ if (!c || !state.g1) return; state.g1.life = c; if (state.follow) state.rates = liveRates(); save(); syncRates(); update(); });
+    })
     .catch(function(){ drawG1(true); });
 }
 
