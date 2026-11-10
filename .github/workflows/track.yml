@@ -1,10 +1,11 @@
 name: Count live rates
 
-# Twice an hour: reads the builds of the fleet dashboard it has not read yet (each one is a commit in the dashboard's
-# public repository) and keeps the counts behind the page's four Live rates on the "track" branch. See tools/track.js.
+# Every 10 minutes, just after the dashboard's own build: reads the builds of the fleet dashboard it has not read yet (each
+# one is a commit in the dashboard's public repository) and keeps the counts behind the page's four Live rates on the
+# "track" branch. See tools/track.js.
 on:
   schedule:
-    - cron: '13,43 * * * *'
+    - cron: '9-59/10 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
