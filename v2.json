@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "c537c5a94953bfc7751c831e4362f96e60e21113",
- "built": "2026-11-10T21:37:02.000Z",
+ "at": "2bf48de4ea4b9ecf762bcf298624a24bc45c1bc8",
+ "built": "2026-11-10T22:57:02.000Z",
  "day": "Tue 10 Nov",
  "counts": {"pass":[31,114],"win":[11,33],"flip":[60,138],"flip25":[40,65]},
  "flipDone": {"flip":[56,130],"flip25":[40,64]},
@@ -14,10 +14,10 @@
   "3a56a55921a8": {"p":"e","f":"Topstep"},
   "edbed5789edf": {"p":"e","f":"Topstep"},
   "1291730a1cc5": {"p":"e","f":"Topstep"},
-  "c662ea72f256": {"p":"e","f":"Lucid","z":1},
+  "c662ea72f256": {"p":"e","f":"Lucid","z":1,"gone":"2026-11-10"},
   "5c9f576c5070": {"p":"e","f":"Aqua"},
   "33414b633c81": {"p":"e","f":"Aqua"},
-  "55502b7aa454": {"p":"e","f":"Aqua","z":1},
+  "55502b7aa454": {"p":"e","f":"Aqua","z":1,"gone":"2026-11-10"},
   "1955b82efba6": {"p":"e","f":"Aqua"},
   "4f0f9efa2147": {"p":"e","f":"Aqua"},
   "610af3b4fa4a": {"p":"e","f":"Aqua","z":1},
@@ -40,15 +40,19 @@
   "939ef825819d": {"p":"x","f":"Lucid"},
   "4c6f76a5cbb2": {"p":"x","f":"Topstep"},
   "7fabe4d2615e": {"p":"x","f":"Topstep"},
-  "9de325a435f4": {"p":"x","f":"Topstep"},
+  "9de325a435f4": {"p":"f","f":"Topstep","r":1},
   "5d81a0098624": {"p":"x","f":"Tradeify"},
   "b3cf5df8a1dd": {"p":"x","f":"Lucid"},
   "6dcd002486dc": {"p":"x","f":"Lucid"},
   "d8f70597508a": {"p":"x","f":"Lucid"},
-  "9a1c66562989": {"p":"x","f":"Aqua"}
+  "9a1c66562989": {"p":"x","f":"Aqua"},
+  "af73a4438004": {"p":"e","f":"Blue Guardian"},
+  "8ed4795daaa6": {"p":"e","f":"Blue Guardian"},
+  "671bc9e4deff": {"p":"e","f":"Blue Guardian"}
  },
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
-  "2026-11-10 20:57 eval left the dashboard without a pass: blown · Tradeify 17cb01"
+  "2026-11-10 20:57 eval left the dashboard without a pass: blown · Tradeify 17cb01",
+  "2026-11-10 22:47 flip account back in the funded table: no first win to count · Topstep 9de325"
  ]
 }

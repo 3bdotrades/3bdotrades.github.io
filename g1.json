@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "c537c5a94953bfc7751c831e4362f96e60e21113",
- "built": "2026-11-10T21:37:02.000Z",
+ "at": "2bf48de4ea4b9ecf762bcf298624a24bc45c1bc8",
+ "built": "2026-11-10T22:57:02.000Z",
  "day": "Tue 10 Nov",
- "counts": {"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]},
+ "counts": {"pass":[18,68],"win":[8,12],"flip":[12,38],"flip25":[13,25]},
  "flipDone": {"flip":[6,31],"flip25":[13,23]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"808bd921c1fb":[0,1],"3debf3957a49":[0,1],"0375f3fcc515":[0,1],"38b9209a2597":[1,-1],"8f43dd7465bf":[1,-1],"e0028132017c":[0,-1],"6d5033218423":[0,1],"0818c51c6877":[0,1],"b3bb30ebaeb4":[0,1]},
@@ -15,7 +15,7 @@
   "72dc043f4b02": {"p":"e","f":"Blue Guardian"},
   "9bbba5c4fcd3": {"p":"e","f":"Blue Guardian"},
   "57f4d75cb949": {"p":"e","f":"FuturesElite"},
-  "9a75237998fa": {"p":"e","f":"FuturesElite"},
+  "9a75237998fa": {"p":"e","f":"FuturesElite","gone":"2026-11-10","z":1,"u":1},
   "f84f1f803a61": {"p":"e","f":"FuturesElite"},
   "bd926e162267": {"p":"e","f":"FuturesElite"},
   "4040af924c0c": {"p":"e","f":"FuturesElite"},
@@ -44,8 +44,10 @@
   "93f31a30919c": {"p":"x","f":"Lucid"},
   "e0028132017c": {"p":"x","f":"Lucid"},
   "6d5033218423": {"p":"x","f":"Lucid"},
-  "0818c51c6877": {"p":"x","f":"Topstep"},
+  "0818c51c6877": {"p":"x","f":"Topstep","gone":"2026-11-10"},
   "b3bb30ebaeb4": {"p":"x","f":"Topstep"}
  },
- "log": []
+ "log": [
+  "2026-11-10 22:17 eval left the dashboard without a pass: blown · FuturesElite 9a7523"
+ ]
 }
