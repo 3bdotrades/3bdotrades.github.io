@@ -215,7 +215,8 @@ function dump(st){
 // everything in a counts file except how far it has read
 function body(st){ const o = copy(st); delete o.at; delete o.built; return JSON.stringify(o); }
 
-function git(dir, args){ return cp.execFileSync('git', ['-C', dir].concat(args), { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }); }
+// (windowsHide: on a Windows PC, where the counter also runs as a scheduled task, no git call may open a window)
+function git(dir, args){ return cp.execFileSync('git', ['-C', dir].concat(args), { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }); }
 // the builds after one commit (all of them when none is given), oldest first
 function builds(dir, after){
   return git(dir, ['log', '--reverse', '--format=%H %cI', after ? after + '..HEAD' : 'HEAD', '--', 'index.html']).trim().split('\n').filter(Boolean)
