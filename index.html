@@ -293,7 +293,7 @@ function params(r){
     E: Math.min(30, Math.max(1, Math.round(num(r.evalDays, 3)))), wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), plan: !!r.plan };
 }
 // A losing flip day costs about this much room (more where the fleet's stop is bigger); it turns room and payouts into losing days.
-var DAY_LOSS = 160, DAY_LOSS_AT = { 'aqua|50': 215, 'topstep|50': 167 };
+var DAY_LOSS = 160, DAY_LOSS_AT = { 'aqua|50': 215, 'topstep|50': 167, 'tradeify|50': 168 };
 var FIRM_ALIAS = { bg: 'blueguardian' }, FIRM_KEYS = ['lucid', 'topstep', 'aqua', 'blueguardian', 'futureselite', 'tradeify'];
 function dayLoss(firm, size){ return DAY_LOSS_AT[normFirm(firm) + '|' + sizeNum(size)] || DAY_LOSS; }
 // Flip numbers for one size: its own flip win and losing days when set, else the rates bar.
@@ -1080,8 +1080,9 @@ function nextDays(p){ var a = []; for (var d = 1; d <= 4; d++) a.push(p.days[d] 
 // ---------- numbers per fleet (set from the chat; bump that fleet's v to push changes into every browser once) ----------
 var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'pay3', 'idle', 'flip', 'flipPlan', 'lossDays'];
 // payouts: Lucid's own; Topstep from the chat advice; every other firm pays like Lucid at the same size
-// losing days: the dashboards' room at the start of a flip / the loss on a losing day there (Topstep 24, Aqua 19)
-var OWNER_SETS = { g1: { v: 5, rows: [
+// losing days: the dashboards' room at the start of a flip / the loss on a losing day there (Topstep 24, Aqua 19);
+// Tradeify 50K 29 = its starting room over the fleet's 50K stop (no flip trade seen there yet)
+var OWNER_SETS = { g1: { v: 6, rows: [
   { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, idle: 2, flip: 53, flipPlan: 58, lossDays: 12 },
   { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, idle: 2, lossDays: 24 },
   { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 24 },
@@ -1089,15 +1090,15 @@ var OWNER_SETS = { g1: { v: 5, rows: [
   { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'Tradeify', size: '25K', evalPrice: 72.38, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, flip: 53, flipPlan: 58, lossDays: 12 },
-  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 }
+  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 29 }
 ] },
 // V2 fleet: G1's numbers; no idle accounts
-v2: { v: 3, rows: [
+v2: { v: 4, rows: [
   { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 445.5, pay3: 0, flip: 53, flipPlan: 58, lossDays: 12 },
   { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, pay3: 450, lossDays: 24 },
   { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 19 },
-  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
+  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 29 },
   { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 },
   { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1782, pay2: 891, pay3: 0, lossDays: 24 }
 ] } };
