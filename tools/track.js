@@ -22,12 +22,15 @@
 // A counts file: counts = for each rate [won, finished], what the page reads; base = the last Lifetime table read;
 // day and today = the trading day being counted and the flip days seen on it so far; acc = what is remembered of each
 // account (by a hash of its number); log = what was counted and when.
+// marks = each eval that passed and each new funded account that showed up, with the time and the firm and size
+// ("topstep|50"): the page uses them to know which of the funded accounts it holds as "not on the dashboard yet" have
+// come onto it since.
 const fs = require('fs'), path = require('path'), crypto = require('crypto'), cp = require('child_process');
 
 const FLEETS = ['g1', 'v2'], KEYS = ['pass', 'win', 'flip', 'flip25'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', times: '×', minus: '-' };
-const KEEP_GONE_DAYS = 10, LOG_LINES = 400, SAVE_EVERY = 200;
+const KEEP_GONE_DAYS = 10, LOG_LINES = 400, MARK_LINES = 400, SAVE_EVERY = 200;
 
 function entity(m, e){
   if (e[0] !== '#') return ENT[e.toLowerCase()] !== undefined ? ENT[e.toLowerCase()] : m;
@@ -43,6 +46,12 @@ function key(id){ return crypto.createHash('sha256').update(String(id)).digest('
 function small(id){ const m = /^LF[EF]0?(25|50|100|150)/i.exec(id) || /DFYSLX?(25|50|100|150)/i.exec(id); return !!m && +m[1] === 25; }
 // "Topstep XFA", "Aqua funded" and "Tradeify Flex" are the funded accounts of Topstep, Aqua and Tradeify
 function firmName(s){ return String(s || '').replace(/\s+(XFA|funded|Flex)$/i, '').trim(); }
+// a firm and size the way the page names them: "lucid|25", "blueguardian|50". An eval with no size in its number is sized by its target.
+function unit(r, isEval){
+  let m = /^LF[EF]0?(25|50|100|150)/i.exec(r.id) || /DFYSLX?(25|50|100|150)/i.exec(r.id), size = m ? +m[1] : 50;
+  if (!m && isEval && r.target > 0) size = r.target <= 1600 ? 25 : r.target <= 3500 ? 50 : r.target <= 6500 ? 100 : 150;
+  return r.firm.toLowerCase().replace(/[^a-z]/g, '') + '|' + size;
+}
 
 // one table of accounts: its rows, or null when it is not the table this script knows
 function pane(sec, k, name){
@@ -103,8 +112,11 @@ function todays(st){
 // What is remembered of an account: p = its table (e eval, f funded, x flip), f = its firm, z = its result is counted,
 // r = a funded stage that is not its first, gone = the date it left the dashboard, u = it was counted because it left.
 function step(st, snap, meta){
-  st = st ? copy(st) : { v: 2, at: '', built: '', day: '', counts: null, flipDone: null, base: null, today: {}, acc: {}, log: [] };
+  const first = !st;                                           // the first build read: what it shows was there before
+  st = st ? copy(st) : { v: 2, at: '', built: '', day: '', counts: null, flipDone: null, base: null, today: {}, marks: [], acc: {}, log: [] };
+  if (!st.marks) st.marks = [];                                // a file from before the marks were kept
   const acc = st.acc, seen = {}, when = meta.built.slice(0, 16).replace('T', ' ');
+  const mark = (what, r, isEval) => { if (!first) st.marks.push([meta.built.slice(0, 16), what, unit(r, isEval)]); };
   // a new trading day: the flip days of the one before are final
   if (snap.day !== st.day){
     if (st.counts){ const s = todays(st); ['flip', 'flip25'].forEach(k => { st.flipDone[k][0] += s[k][0]; st.flipDone[k][1] += s[k][1]; }); }
@@ -136,13 +148,14 @@ function step(st, snap, meta){
     a.z = 1;
     // a row that shows up with its result already on it is counted only when that result is from this trading day
     if (isNew && r.day !== snap.date){ note('eval listed with an older result: not counted', r.firm, h); return; }
+    if (r.passed) mark('pass', r, true);
     add('pass', r.passed); note(r.passed ? 'eval passed' : 'eval blown', r.firm, h);
   });
 
   snap.funded.forEach(r => {
     const h = key(r.id); seen[h] = 1;
     let a = acc[h]; const isNew = !a || a.p === 'e';
-    if (isNew) a = acc[h] = { p: 'f', f: r.firm };
+    if (isNew){ a = acc[h] = { p: 'f', f: r.firm }; if (!r.dead) mark('wired', r, false); }
     else if (a.p === 'x'){ a = acc[h] = { p: 'f', f: r.firm, r: 1 }; note('flip account back in the funded table: no first win to count', r.firm, h); }
     const won = r.target > 0 && r.pnl !== null && r.pnl >= r.target, lost = !won && out(r);
     if (a.gone) back(a, r, 'win', h, lost);
@@ -184,6 +197,7 @@ function step(st, snap, meta){
   if (based) st.flipDone = { flip: [st.counts.flip[0] - s.flip[0], st.counts.flip[1] - s.flip[1]], flip25: [st.counts.flip25[0] - s.flip25[0], st.counts.flip25[1] - s.flip25[1]] };
   ['flip', 'flip25'].forEach(k => { st.counts[k] = [st.flipDone[k][0] + s[k][0], st.flipDone[k][1] + s[k][1]]; });
   if (st.log.length > LOG_LINES) st.log = st.log.slice(-LOG_LINES);
+  if (st.marks.length > MARK_LINES) st.marks = st.marks.slice(-MARK_LINES);
   return st;
 }
 
@@ -191,7 +205,8 @@ function step(st, snap, meta){
 function dump(st){
   const rows = Object.keys(st.acc).map(h => '  ' + JSON.stringify(h) + ': ' + JSON.stringify(st.acc[h])).join(',\n');
   const head = ['v', 'at', 'built', 'day', 'counts', 'flipDone', 'base', 'today'].map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
-  return '{\n' + head + ',\n "acc": {' + (rows ? '\n' + rows + '\n ' : '') + '},\n "log": [' + (st.log.length ? '\n' + st.log.map(l => '  ' + JSON.stringify(l)).join(',\n') + '\n ' : '') + ']\n}\n';
+  const lines = a => a.length ? '\n' + a.map(l => '  ' + JSON.stringify(l)).join(',\n') + '\n ' : '';
+  return '{\n' + head + ',\n "marks": [' + lines(st.marks || []) + '],\n "acc": {' + (rows ? '\n' + rows + '\n ' : '') + '},\n "log": [' + lines(st.log) + ']\n}\n';
 }
 // everything in a counts file except how far it has read
 function body(st){ const o = copy(st); delete o.at; delete o.built; return JSON.stringify(o); }
