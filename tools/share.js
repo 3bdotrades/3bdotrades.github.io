@@ -62,11 +62,17 @@ function dump(state){
   return JSON.stringify(o, null, 1) + '\n';
 }
 
-// everything the relay holds for the topic, one message a line
+// everything the relay holds for the topic, one message a line (three tries: now and then a connection is not answered)
 async function relayText(){
-  const r = await fetch(RELAY, { signal: AbortSignal.timeout(20000) });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.text();
+  let last;
+  for (let i = 0; i < 3; i++){
+    try {
+      const r = await fetch(RELAY, { signal: AbortSignal.timeout(12000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.text();
+    } catch (e){ last = e; await new Promise(done => setTimeout(done, 1500)); }
+  }
+  throw last;
 }
 // One pass over a folder; returns the line to print. The file is written when a part got a newer version, so a relay that is
 // empty or does not answer leaves it as it is. The first pass makes the file even with nothing shared yet, so that a page
