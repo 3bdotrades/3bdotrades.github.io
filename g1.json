@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "2d3746b3f3ffdf96dab0ea0cdbcc4afb2bc47a31",
- "built": "2026-11-11T00:07:00.000Z",
+ "at": "b2ac8562c611bf2eddc35d6766cb355f97378090",
+ "built": "2026-11-11T00:57:00.000Z",
  "day": "Wed 11 Nov",
- "counts": {"pass":[19,69],"win":[8,12],"flip":[12,39],"flip25":[13,25]},
+ "counts": {"pass":[19,69],"win":[8,13],"flip":[12,39],"flip25":[13,25]},
  "flipDone": {"flip":[12,38],"flip25":[13,25]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"6d5033218423":[0,-1]},
@@ -38,7 +38,7 @@
   "4c97b93e8f79": {"p":"e","f":"Tradeify"},
   "dab4ce6d8f9f": {"p":"e","f":"Tradeify"},
   "2994ee909327": {"p":"e","f":"Tradeify"},
-  "a4bccbd8343b": {"p":"f","f":"Aqua"},
+  "a4bccbd8343b": {"p":"f","f":"Aqua","z":1},
   "808bd921c1fb": {"p":"x","f":"Aqua"},
   "3debf3957a49": {"p":"x","f":"Aqua"},
   "0375f3fcc515": {"p":"x","f":"Aqua"},
@@ -53,6 +53,7 @@
  },
  "log": [
   "2026-11-10 22:17 eval left the dashboard without a pass: blown · FuturesElite 9a7523",
-  "2026-11-10 23:37 eval passed · Aqua 5860b6"
+  "2026-11-10 23:37 eval passed · Aqua 5860b6",
+  "2026-11-11 00:57 funded account lost · Aqua a4bccb"
  ]
 }
