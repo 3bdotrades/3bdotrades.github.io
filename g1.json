@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "95c967296c878b6f83e22ae5128066e865234cd5",
- "built": "2026-11-11T14:57:01.000Z",
+ "at": "2f8763eb7c1475d91f211467bfc7d179184bfad3",
+ "built": "2026-11-11T15:07:00.000Z",
  "day": "Wed 11 Nov",
- "counts": {"pass":[20,73],"win":[8,13],"flip":[17,44],"flip25":[15,28]},
+ "counts": {"pass":[20,74],"win":[8,13],"flip":[17,44],"flip25":[15,28]},
  "flipDone": {"flip":[12,38],"flip25":[13,25]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"6d5033218423":[0,-1],"808bd921c1fb":[0,1],"0375f3fcc515":[0,1],"3debf3957a49":[0,1],"38b9209a2597":[1,1],"b3bb30ebaeb4":[0,1],"8f43dd7465bf":[1,1],"93f31a30919c":[1,-1],"e0028132017c":[0,1]},
@@ -22,7 +22,7 @@
   "57f4d75cb949": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
   "9a75237998fa": {"p":"e","f":"FuturesElite","gone":"2026-11-10","z":1,"u":1},
   "f84f1f803a61": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
-  "bd926e162267": {"p":"e","f":"FuturesElite"},
+  "bd926e162267": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
   "4040af924c0c": {"p":"e","f":"FuturesElite"},
   "761ca3928af4": {"p":"e","f":"FuturesElite"},
   "aa289bb5aa5b": {"p":"e","f":"FuturesElite"},
@@ -61,6 +61,7 @@
   "2026-11-11 01:17 eval passed · Tradeify 2994ee",
   "2026-11-11 08:36 eval left the dashboard without a pass: blown · Tradeify a54c1e",
   "2026-11-11 14:37 eval left the dashboard without a pass: blown · FuturesElite 57f4d7",
-  "2026-11-11 14:57 eval left the dashboard without a pass: blown · FuturesElite f84f1f"
+  "2026-11-11 14:57 eval left the dashboard without a pass: blown · FuturesElite f84f1f",
+  "2026-11-11 15:07 eval left the dashboard without a pass: blown · FuturesElite bd926e"
  ]
 }
