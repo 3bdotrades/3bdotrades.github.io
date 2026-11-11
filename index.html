@@ -128,8 +128,8 @@ tr.off .pick{color:var(--mute)}
   <div class="wrap" id="firms"></div>
   <p class="note after" id="skip" aria-live="polite" hidden></p>
 
-  <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span><span id="lg-coin" title="The same plan from today with every trade at the Chance rates of the Simulation tab instead of the live ones" hidden><i class="line dash"></i>Coin flip</span></span></h2>
-  <div class="wrap chartcard"><div class="chartbox" id="chart" tabindex="0" role="img" aria-label="Weekly cash in and out with the running total. Use the left and right arrow keys to read each week."></div></div>
+  <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span><span id="lg-coin" title="The same plan from today with every trade at chance (what the fleet's trade sizes give with no edge) instead of its live rates" hidden><i class="line dash"></i>Coin flip</span></span></h2>
+  <div class="wrap chartcard"><div class="chartbox" id="chart" tabindex="0" role="img" aria-label="Weekly cash in and out with the running total and, for the weeks ahead, the same plan at coin-flip rates. Use the left and right arrow keys to read each week."></div></div>
 </main>
 
 <script>
@@ -143,7 +143,7 @@ function params(r){
   var D = Math.min(30, Math.max(1, Math.round(num(r.payDays, 5))));
   return { pass: clamp01(r.pass), win: clamp01(r.win), tries: Math.min(10, Math.max(1, Math.round(num(r.tries, 2)))), q: clamp01(r.flip),
     D: D, D1: Math.min(30, Math.max(1, Math.round(num(r.payDays1, D)))), L: Math.min(60, Math.max(1, Math.round(num(r.lossDays, 20)))),
-    wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), chance: !!r.chance };
+    wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), chance: !!r.chance, odds: r.odds > 0 && r.odds < 1 ? Number(r.odds) : FUNDED_ODDS };
 }
 // ----- the eval stage -----
 // An eval trades one day at a time. A winning day is worth just over half of its target, because no day may be more than 50%
@@ -152,7 +152,8 @@ function params(r){
 // $1,142 on $3,000), half of the drawdown: two losing days in a row end the eval. It has passed once its profit reaches the
 // target. So an eval lasts at least 2 days (Tradeify 3), and longer when losing days come in between.
 var EVAL_WIN = 1508 / 3000, EVAL_WIN_AT = { tradeify: 1198 / 3000 }, EVAL_LOSS = 0.345, EVAL_MAX = 16;
-function evalWin(firm){ return EVAL_WIN_AT[normFirm(firm)] || EVAL_WIN; }
+function ownOf(o, k){ return Object.prototype.hasOwnProperty.call(o, k) ? o[k] : undefined; }      // o[k], never something every object has
+function evalWin(firm){ return ownOf(EVAL_WIN_AT, normFirm(firm)) || EVAL_WIN; }
 // Chance: with no edge a trade wins stop / (stop + target) of the time, counted on the price moves themselves (fees change
 // what a day books, not how often it wins). What the fleets' trades risk and aim for, from what they book on the dashboards:
 // an eval day risks $1,000 (EVAL_STOP; stops book $988 to $1,142 with fees and slippage) for $1,520, which books $1,508
@@ -216,6 +217,11 @@ function dayWin(firm, size){ return DAY_WIN_AT[normFirm(firm) + '|' + sizeNum(si
 // 25K): 20% a trade. A new funded account has $2,000 of room (FUNDED_ROOM), $1,000 on a 25K.
 var FLIP_FEE = 7.5, FUNDED_STOP = 1000, FUNDED_TARGET = 4000, FUNDED_ODDS = FUNDED_STOP / (FUNDED_STOP + FUNDED_TARGET), FUNDED_ROOM = 2000, FUNDED_ROOM_25 = 1000;
 function flipOdds(firm, size){ var stop = dayLoss(firm, size) - FLIP_FEE; return stop / (stop + dayWin(firm, size) + FLIP_FEE); }
+// V2's funded trade risks the same $1,000 for $5,000 (its wins book $4,988 and $4,992; $2,500 on a 25K): 1 in 6 on chance.
+// A fleet's funded odds are what its coin-flip line gives a funded trade, and the odds its live funded win was earned at
+// (see tryWin).
+var FUNDED_TARGET_AT = { v2: 5000 };
+function fundedOdds(fleet){ return FUNDED_STOP / (FUNDED_STOP + (ownOf(FUNDED_TARGET_AT, fleet) || FUNDED_TARGET)); }
 // A payout is a request taken out of the room. The trader's share of a request is 90% (SPLIT). On its way to the bank that
 // share loses 1% in fees (PAY_FEE); at Topstep it loses a fixed $30 a payout instead, whatever its size (PAY_FIXED). The
 // owner's numbers of 11 Nov 2026 (3.5% at every firm before that). A $2,000 request is a payout of $1,800 and books $1,782,
@@ -251,19 +257,20 @@ function flipOf(f, P){
   var F = { q: fq > 0 ? clamp01(fq / 100) : P.q, s: s, g: dayWin(f.firm, f.size), room: Math.min(ROOM_MAX, num(f.room, 0) > 0 ? num(f.room, 0) : P.L * s), D1: P.D1, D: P.D,
             req1: Math.max(0, num(f.pay1, 0)) / SPLIT, req2: Math.max(0, num(f.pay2, 0)) / SPLIT, cut: fixed > 0 ? 0 : PAY_FEE, fee: fixed,
             keep: small ? KEEP_ROOM_25 : KEEP_ROOM, again: small ? RE_WIN_25 : RE_WIN,
-            net: NET_FIRMS[normFirm(f.firm)] === true, win: P.win, chance: P.chance };
+            net: NET_FIRMS[normFirm(f.firm)] === true, win: P.win, ref: P.odds > 0 && P.odds < 1 ? P.odds : FUNDED_ODDS, chance: P.chance };
   F.re = tryWin(F, small ? RE_TARGET_25 : RE_TARGET);
   return F;
 }
 // The chance that a funded trade which risks RE_RISK for `target` wins. On chance alone: its odds. With a fleet's rates: the
-// fleet's own funded win per trade, which it has on a trade with odds of 20% (FUNDED_ODDS), moved by as much as these odds differ
-// from that (on the log-odds scale, so a trade with the same odds wins exactly as often as the fleet's).
+// fleet's own funded win per trade, which it has on its usual funded trade (odds F.ref: 20% at G1, 1 in 6 at V2, see
+// fundedOdds), moved by as much as these odds differ from that (on the log-odds scale, so a trade with the same odds wins
+// exactly as often as the fleet's).
 function tryWin(F, target){
   var odds = RE_RISK / (RE_RISK + target);
   if (F.chance) return odds;
   if (!(F.win > 0)) return 0;
   if (F.win >= 1) return 1;
-  return 1 / (1 + Math.exp(-(Math.log(odds / (1 - odds)) + Math.log(F.win / (1 - F.win)) - Math.log(FUNDED_ODDS / (1 - FUNDED_ODDS)))));
+  return 1 / (1 + Math.exp(-(Math.log(odds / (1 - odds)) + Math.log(F.win / (1 - F.win)) - Math.log(F.ref / (1 - F.ref)))));
 }
 // The life of an account in profit as a road of states, made as far as it is needed. A state is where an account stands at
 // the start of a day: flipping in cycle k of its round, with rem winning days still needed and so much room; about to take the
@@ -326,7 +333,7 @@ function lifeRoad(F){
 // One road per set of flip numbers, kept: the pages' sizes share them from run to run.
 var ROADS = {}, ROADS_N = 0;
 function roadFor(F){
-  var key = [F.q, F.s, F.g, F.D, F.req1, F.req2, F.cut, F.fee, F.keep, F.again, F.net ? 1 : 0, F.chance ? 'c' : F.win].join('|');
+  var key = [F.q, F.s, F.g, F.D, F.req1, F.req2, F.cut, F.fee, F.keep, F.again, F.net ? 1 : 0, F.chance ? 'c' : F.win + '@' + F.ref].join('|');
   if (!ROADS[key]){ if (ROADS_N >= 16){ ROADS = {}; ROADS_N = 0; } ROADS[key] = lifeRoad(F); ROADS_N++; }
   return ROADS[key];
 }
@@ -362,7 +369,7 @@ function groupKey(f){ return String(f.firm !== undefined ? f.firm : (f.name || '
 // Each free seat goes to the firm furthest from full; at a tie, to the one that pays more. Evals a run starts with (f.start,
 // bought on its first day) take their seats before any new eval is bought. days, when given, ends the run after that many trading days.
 function simulateAll(firms, r, weeks, seats, days){
-  var map = {}, groups = [], per = new Array(firms.length);
+  var map = Object.create(null), groups = [], per = new Array(firms.length);      // by firm name: holds nothing a name could run into
   firms.forEach(function(f, i){ var k = groupKey(f); if (!(k in map)){ map[k] = groups.length; groups.push([]); } groups[map[k]].push(i); });
   var sims = groups.map(function(idx){ return simulateGroup(idx.map(function(i){ return firms[i]; }), r, weeks, days); });
   var limited = typeof seats === 'number' && isFinite(seats), wants, used;
@@ -404,6 +411,9 @@ function simulateGroup(units, r, weeks, days){
   var nDays = Math.max(1, days > 0 ? Math.min(Math.round(days), weeks * 5 - P.wd0) : weeks * 5 - P.wd0), LD = nDays + EVAL_MAX + P.tries + 8, capSum = 0;
   // a funded account that has lost a try already has one fewer left
   var triesLeft = Math.max(1, P.tries - 1), c1 = fundedToProfit(P.win, triesLeft), M = nDays + H + 2;
+  // on: the run starts on the fleet's own trading day, so an account marked done (it has traded today) takes its next trade
+  // tomorrow. late0: the share of an eval bought on the first day that starts tomorrow (see planFirms).
+  var on = !!units[0].dayOn, late0 = on ? clamp01(num(units[0].lateShare, 0)) : 0;
   function zeros(){ var a = new Array(LD); for (var k = 0; k < LD; k++) a[k] = 0; return a; }
   // n evals of a size trade from day d on, from one point of their road: the days they finish on (outAt) and pass on (passAt).
   // pending = evals still going, each holding a seat; due = the passes still to come from them.
@@ -416,7 +426,7 @@ function simulateGroup(units, r, weeks, days){
     var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), F: F, road: road,
       price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0, skip: !!f.skip,
       outAt: zeros(), passAt: zeros(), profitAt: zeros(), failAt: zeros(), came: zeros(), held: [], fc: 0, soon: 0, cashIn: 0,
-      waitFunded: 0, waitOne: 0, wait: 0, pending: 0, due: 0, trying: 0, days: [] };
+      waitFunded: 0, waitOne: 0, wait: 0, lateFunded: 0, lateOne: 0, latePass: 0, pending: 0, due: 0, trying: 0, days: [] };
     // an account that has just reached profit starts its first cycle with the size's full room
     u.first = road.flip(1, P.D1, F.room, 0); u.fresh = lifeRun(road, u.first, M);
     // evals the run starts with: paid for on its first day, trading once they have a seat
@@ -427,8 +437,9 @@ function simulateGroup(units, r, weeks, days){
   var cap = units[0].firmCap !== undefined ? Math.max(0, Math.floor(num(units[0].firmCap, 0))) : capSum;
   var order = U.map(function(u, j){ return j; }).sort(function(a, b){ return (U[b].value - U[a].value) || (a - b); });
   function trading(){ var s = 0; U.forEach(function(u){ s += u.trying + u.fc; }); return s; }
-  // n accounts the run starts with in state i of their size's road (-1: done, nothing to follow)
-  function hold(u, i, n){ if (i >= 0 && n > 0) u.held.push({ run: lifeRun(u.road, i, M), n: n }); }
+  // n accounts the run starts with in state i of their size's road (-1: done, nothing to follow). late: they have traded
+  // today, so their first day from there is tomorrow.
+  function hold(u, i, n, late){ if (i >= 0 && n > 0) u.held.push({ run: lifeRun(u.road, i, M), n: n, off: late ? 1 : 0 }); }
   // n funded accounts start their tries on day d, one a day, `left` of them each
   function tries(u, d, n, left){
     u.trying += n;
@@ -441,35 +452,35 @@ function simulateGroup(units, r, weeks, days){
   // that many days from now.
   function flipDay(u, d){
     var cash = 0, fc = 0, soon = 0, x = u.fresh, e, n, j;
-    u.held.forEach(function(h){ var a = h.run.alive[d + 1]; cash += h.n * h.run.cash[d + 1]; fc += h.n * a; soon += h.n * (a - h.run.alive[d + 1 + H]); });
+    u.held.forEach(function(h){ var k = d + 1 - h.off, a = h.run.alive[k]; cash += h.n * h.run.cash[k]; fc += h.n * a; soon += h.n * (a - h.run.alive[k + H]); });
     for (e = 0; e < d; e++){ n = u.came[e]; if (n > 0){ j = d - e; cash += n * x.cash[j]; fc += n * x.alive[j]; soon += n * (x.alive[j] - x.alive[j + H]); } }
     u.cashIn = cash; u.fc = fc; u.soon = soon;
   }
   units.forEach(function(f, j){
     var u = U[j], F = u.F, road = u.road, small = sizeNum(f.size) === 25;
     var fn = Math.max(0, num(f.fundedNow, 0)), ps = Math.max(0, num(f.passedNow, 0)), ip = Math.max(0, num(f.inProfitNow, 0)), oe = Math.max(0, num(f.openEvals, 0));
-    u.wait = ps;
+    u.wait = ps; u.latePass = on ? Math.min(ps, Math.max(0, num(f.passedDone, 0))) : 0;
     // Funded accounts the dashboard reported, each as its row shows it (aim = the "of $..." of its total, pnl = the total so
     // far, room). Any others, and the ones held off the dashboard (idle), are new: every try still to take.
     var rowsF = Array.isArray(f.g1Funded) && fn > 0 ? f.g1Funded.slice(0, Math.floor(fn)) : [];
     u.waitFunded = fn - rowsF.length + Math.max(0, num(f.idle, 0));
     rowsF.forEach(function(x){
       x = x || {};
-      var aim = num(x.aim, 0), pnl = num(x.pnl, 0), room = num(x.room, NaN), own = small ? FUNDED_ROOM_25 : FUNDED_ROOM, lost = pnl < -TIE;
+      var aim = num(x.aim, 0), pnl = num(x.pnl, 0), room = num(x.room, NaN), own = small ? FUNDED_ROOM_25 : FUNDED_ROOM, lost = pnl < -TIE, was = on && !!x.done;
       if (aim > 0 && pnl >= aim - TIE){
         // It has reached its aim: in profit from today. One that was sent back from the flips (little room: V2's dashboard shows
         // the room from before the win) starts over with that room and the win.
-        if (isFinite(room) && room > 0 && room < 0.75 * own) hold(u, road.flip(1, P.D, room + pnl, 0), 1);
+        if (isFinite(room) && room > 0 && room < 0.75 * own) hold(u, road.flip(1, P.D, room + pnl, 0), 1, was);
         else { u.trying += 1; u.profitAt[0] += 1; }
       } else if (isFinite(room) && room - Math.min(0, pnl) < 0.75 * own){
         // It started this trade with less room than a new funded account has: a flip account sent back. At a net-profit firm, with
         // an aim that is not the usual one, it is after what its cycle is short of (a lost try is missing too). Else it has
         // one try: still to take, or lost and the account is done.
-        if (F.net && aim > 0 && Math.abs(aim - F.again) > 0.05 * F.again){ if (room > 0) hold(u, road.short(2, room, aim - pnl), 1); }
-        else if (!lost && room > 0) hold(u, road.again(room), 1);
+        if (F.net && aim > 0 && Math.abs(aim - F.again) > 0.05 * F.again){ if (room > 0) hold(u, road.short(2, room, aim - pnl), 1, was); }
+        else if (!lost && room > 0) hold(u, road.again(room), 1, was);
       }
-      else if (lost) u.waitOne += 1;
-      else u.waitFunded += 1;
+      else if (lost){ u.waitOne += 1; if (was) u.lateOne += 1; }
+      else { u.waitFunded += 1; if (was) u.lateFunded += 1; }
     });
     // accounts the dashboard reported keep their own place (cycle, winning days still needed, room); any others start a first cycle
     var known = Array.isArray(f.g1Flips) && ip > 0 ? f.g1Flips.slice(0, Math.floor(ip)) : [];
@@ -483,12 +494,12 @@ function simulateGroup(units, r, weeks, days){
       if (!(isFinite(room) && room > 0)) room = F.room;
       // With every winning day in, the fleet books that payout the same day, so it is in the cash it has received already:
       // nothing is added here, the account only moves on to what follows that payout.
-      hold(u, rem > 0 ? road.flip(k0, rem, room, x.net) : road.paid(k0, room, x.net), 1);
+      hold(u, rem > 0 ? road.flip(k0, rem, room, x.net) : road.paid(k0, room, x.net), 1, on && !!x.done);
     });
     if (ip > known.length) hold(u, u.first, ip - known.length);
     // evals the dashboard reported go on from where they stand (profit so far, room down to one losing day or not); any others are new
     var here = Array.isArray(f.g1Evals) && oe > 0 ? f.g1Evals.slice(0, Math.floor(oe)) : [];
-    here.forEach(function(x){ x = x || {}; evals(u, 0, x.gone ? EVAL_GONE : evalRoad(ev.win, ev.p, Math.max(-1, Math.min(1.5, num(x.at, 0))), !!x.hurt), 1); });
+    here.forEach(function(x){ x = x || {}; evals(u, on && x.done && !x.gone ? 1 : 0, x.gone ? EVAL_GONE : evalRoad(ev.win, ev.p, Math.max(-1, Math.min(1.5, num(x.at, 0))), !!x.hurt), 1); });
     if (oe > here.length) evals(u, 0, ev.fresh, oe - here.length);
   });
   var pick = -1;
@@ -512,12 +523,18 @@ function simulateGroup(units, r, weeks, days){
     var free = Math.max(0, cap - trading());
     order.forEach(function(j){
       var u = U[j], room = Math.max(0, u.slots - u.trying - u.fc);
-      var a0 = Math.min(u.waitOne, free, room); free -= a0; room -= a0; u.waitOne -= a0;
-      var a1 = Math.min(u.waitFunded, free, room); free -= a1; room -= a1; u.waitFunded -= a1;
-      var a2 = Math.min(u.wait, free, room); free -= a2; u.wait -= a2;
+      var a0 = Math.min(u.waitOne, free, room); free -= a0; room -= a0;
+      var a1 = Math.min(u.waitFunded, free, room); free -= a1; room -= a1;
+      var a2 = Math.min(u.wait, free, room); free -= a2;
+      // On the first day the ones that have not traded today get their place first; of those that have, the ones that get
+      // a place too (l0, l1, l2) take their first try tomorrow. From the second day on there is no such difference.
+      var l0 = d === 0 ? Math.max(0, a0 - (u.waitOne - u.lateOne)) : 0, l1 = d === 0 ? Math.max(0, a1 - (u.waitFunded - u.lateFunded)) : 0, l2 = d === 0 ? Math.max(0, a2 - (u.wait - u.latePass)) : 0;
+      u.waitOne -= a0; u.waitFunded -= a1; u.wait -= a2;
       u.act = a2;
-      if (a0 > 0) tries(u, d, a0, triesLeft);
-      if (a1 + a2 > 0) tries(u, d, a1 + a2, P.tries);
+      if (a0 - l0 > 0) tries(u, d, a0 - l0, triesLeft);
+      if (l0 > 0) tries(u, d + 1, l0, triesLeft);
+      if (a1 + a2 - l1 - l2 > 0) tries(u, d, a1 + a2 - l1 - l2, P.tries);
+      if (l1 + l2 > 0) tries(u, d + 1, l1 + l2, P.tries);
     });
     pick = -1;
     var need = -1, total = 0;
@@ -541,7 +558,9 @@ function simulateGroup(units, r, weeks, days){
   function close(d, n){
     if (pick >= 0 && n > 0) U[pick].buy = n;
     U.forEach(function(u){
-      if (u.buy > 0) evals(u, d, ev.fresh, u.buy);
+      // an eval bought on the first day: the share of today's eval trades that is behind it already starts tomorrow
+      if (u.buy > 0 && d === 0 && late0 > 0){ if (late0 < 1) evals(u, 0, ev.fresh, u.buy * (1 - late0)); evals(u, 1, ev.fresh, u.buy * late0); }
+      else if (u.buy > 0) evals(u, d, ev.fresh, u.buy);
       var bought = u.buy + (d === 0 ? u.start0 : 0), evalCost = bought * u.price, actCost = u.act * u.actFee;
       // a monthly fee builds up a day at a time on every account held, trading or waiting
       var feeCost = u.monthly > 0 ? u.monthly * 12 / 260 * (u.trying + u.fc + u.pending + u.wait + u.waitFunded + u.waitOne + u.queue) : 0;
@@ -700,6 +719,7 @@ function firmRows(saved){
     rows.forEach(function(x){ if (!f && sameUnit(x, y.firm, y.size)) f = x; });
     if (!f){ if (!(held > 0)) return; f = addRow(rows, y.firm, String(y.size || '')); }
     COUNT_KEYS.forEach(function(k){ f[k] = Math.max(0, num(y[k], 0)); });
+    f.passedDone = Math.max(0, num(y.passedDone, 0));
     f.g1Flips = Array.isArray(y.g1Flips) ? y.g1Flips : []; f.g1Evals = Array.isArray(y.g1Evals) ? y.g1Evals : []; f.g1 = true;
     if (Array.isArray(y.g1Funded)) f.g1Funded = y.g1Funded;
   });
@@ -877,18 +897,21 @@ function shareEdit(){
 // The Simulation tab's own rates, "Chance": what the trade sizes give a trader with no edge (see evalOdds and flipOdds).
 // pass = how often a new eval that needs two winning days passes at those odds; win = the funded trade's odds; flip and
 // flip25 = a flip day's odds on a 50K and on a 25K. A run with them takes every firm's own odds (chance: true).
-function chanceRates(){
-  return { pass: evalRoad(EVAL_WIN, evalOdds(''), 0, false).rate, win: FUNDED_ODDS, flip: flipOdds('', '50K'), flip25: flipOdds('', '25K'), chance: true,
+// fleet: whose funded trade (see fundedOdds). The Simulation tab's Chance is G1's, the owner's own numbers.
+function chanceRates(fleet){
+  var odds = fundedOdds(fleet);
+  return { pass: evalRoad(EVAL_WIN, evalOdds(''), 0, false).rate, win: odds, odds: odds, flip: flipOdds('', '50K'), flip25: flipOdds('', '25K'), chance: true,
     tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
 }
 function onChance(){ return SIM && state.base === 'chance'; }
 // The rates a run takes: the live ones, as the page shows them. Funded win becomes the chance per trade p:
-// an account with FIXED.tries trades at it reaches profit with 1 - (1 - p)^tries.
+// an account with FIXED.tries trades at it reaches profit with 1 - (1 - p)^tries. odds = the odds of the funded trade that
+// rate was earned on.
 function fracRates(){
-  if (onChance()) return chanceRates();
+  if (onChance()) return chanceRates(SIM ? 'g1' : FLEET.key);
   var r = liveRates(), f = {};
   RATE_KEYS.forEach(function(k){ f[k] = r[k] / 100; });
-  return { pass: f.pass, win: 1 - Math.pow(1 - clamp01(f.win), 1 / FIXED.tries), flip: f.flip, flip25: f.flip25,
+  return { pass: f.pass, win: 1 - Math.pow(1 - clamp01(f.win), 1 / FIXED.tries), odds: fundedOdds(SIM ? state.base : FLEET.key), flip: f.flip, flip25: f.flip25,
     tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
 }
 // a 25K account flips the 25K box: its row takes that rate. On chance alone every row has the odds of its own flip day.
@@ -903,6 +926,25 @@ var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov',
 function mondayOf(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
 var START = mondayOf(new Date());
 var WD0 = (function(d){ return d === 0 || d === 6 ? 5 : d - 1; })(new Date().getDay());
+// The plan starts on this browser's today. When the dashboard's trading day is that same day, an account that has already
+// traded today takes its next trade tomorrow (see planFirms and simulateGroup). On any other day every account trades on the
+// plan's first day: in the hour after midnight here the fleet's day has not rolled yet (18:00 ET), at a weekend the plan
+// starts on Monday, and numbers kept from an earlier day say nothing about today.
+var TODAY = new Date();
+function dayOn(){
+  var g = state.g1, m = /^[A-Za-z]{3} (\d{1,2}) ([A-Za-z]{3})$/.exec((g && g.day) || '');
+  return !!m && WD0 < 5 && +m[1] === TODAY.getDate() && MONTHS.indexOf(m[2]) === TODAY.getMonth();
+}
+// The share of the fleet's open evals that have traded today (of its other accounts when it has no eval): an eval bought
+// now has that much of today's trade behind it.
+function lateShare(){
+  var n = 0, k = 0, n2 = 0, k2 = 0;
+  state.firms.forEach(function(f){
+    (f.g1Evals || []).forEach(function(x){ if (x && !x.gone){ n++; if (x.done) k++; } });
+    (f.g1Funded || []).concat(f.g1Flips || []).forEach(function(x){ if (x){ n2++; if (x.done) k2++; } });
+  });
+  return n > 0 ? k / n : n2 > 0 ? k2 / n2 : 0;
+}
 function weekStart(t){ var d = new Date(START.getTime()); d.setDate(d.getDate() + 7 * t); return d; }
 function dShort(d){ return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
 // at a weekend the first day of the plan is Monday
@@ -1080,7 +1122,7 @@ function syncRates(){
     var text = {
       pass: 'an eval day risks ' + usd(3000 * EVAL_STOP) + ' for ' + usd(3000 * (EVAL_WIN + EVAL_FEE)) + ' and wins ' + pc(evalOdds('')) + ' of the time; two winning days before two losing days in a row = ' + pc(rr.pass) +
             '. At Tradeify (' + usd(3000 * EVAL_STOP) + ' for ' + usd(3000 * (EVAL_WIN_AT.tradeify + EVAL_FEE)) + ', ' + pc(evalOdds('Tradeify')) + ' a day, 3 winning days): ' + three,
-      win: 'a funded trade risks ' + usd(FUNDED_STOP) + ' for ' + usd(FUNDED_TARGET) + ' and wins ' + pc(rr.win) + ' of the time; an account has ' + rr.tries + ' tries = ' + pc(shown.win),
+      win: 'a funded trade risks ' + usd(FUNDED_STOP) + ' for ' + usd(FUNDED_STOP * (1 / rr.win - 1)) + ' and wins ' + pc(rr.win) + ' of the time; an account has ' + rr.tries + ' tries = ' + pc(shown.win),
       flip: 'a flip day on a 50K risks ' + usd(stop) + ' for ' + usd(DAY_WIN + FLIP_FEE) + ' and wins ' + pc(rr.flip) + ' of the time',
       flip25: 'a flip day on a 25K risks ' + usd(stop) + ' for ' + usd(DAY_WIN_25 + FLIP_FEE) + ' and wins ' + pc(rr.flip25) + ' of the time'
     };
@@ -1100,7 +1142,10 @@ function syncRates(){
 // the most evals the fleet keeps trading: the highest number of eval signals it had in a day (from the dashboard)
 function seats(){ if (SIM) return state.sig[state.base] > 0 ? state.sig[state.base] : undefined; var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
 // the fleet's firms as a run at these rates takes them; all = with no firm skipped
-function planFirms(rr, all){ return state.firms.map(function(f){ var x = slotted(boxed(clone(f), rr)); x.idle = idleOf(f); if (!all && skipped(f)) x.skip = true; return x; }); }
+function planFirms(rr, all){
+  var on = dayOn(), late = on ? lateShare() : 0;
+  return state.firms.map(function(f){ var x = slotted(boxed(clone(f), rr)); x.idle = idleOf(f); x.dayOn = on; x.lateShare = late; if (!all && skipped(f)) x.skip = true; return x; });
+}
 // 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
 function outcome(rr, all){
   var firms = planFirms(rr, all), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
@@ -1109,9 +1154,10 @@ function outcome(rr, all){
   return res;
 }
 // The chart's coin-flip line: the same 12 weeks from today (the accounts held, where each one stands, the eval seats, the
-// firms skipped) with every trade at Chance rates instead of the fleet's live ones: what the trade sizes alone give a trader
-// with no edge (see chanceRates). The fleet's line above it means its trades do better than chance, below it worse.
-function coinFlip(){ var cr = chanceRates(); return runAll(planFirms(cr), cr, WEEKS, seats()); }
+// firms skipped, the slots) with every trade at chance instead of the fleet's live rates: what the fleet's own trade sizes
+// give a trader with no edge (see chanceRates; V2's funded trade has longer odds than G1's). The fleet's line above it
+// means its trades do better than chance, below it worse.
+function coinFlip(){ var cr = chanceRates(FLEET.key); return runAll(planFirms(cr), cr, WEEKS, seats()); }
 // what skipping does to the four totals, against buying at every firm
 function effect(res, all){
   var dBuy = res.buy - all.buy, dCost = res.cost - all.cost, dNeed = res.need - all.need, dNet = res.net - all.net, dRun = res.run - all.run, p = [];
@@ -1172,6 +1218,7 @@ function update(){
 function slotsCell(rows, i){
   var f = rows[i], k = normFirm(f.firm), name = esc(f.firm);
   if (i > 0 && normFirm(rows[i - 1].firm) === k) return '<td class="slots same"></td>';
+  if (!FIRM_RX.test(k)) return '<td class="slots"></td>';      // a name that cannot be kept as a firm: no box
   return '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + SLOTS_MAX + '" step="1" value="' + slotsAt(k) + '" data-s="' + esc(k) + '" aria-label="Slots at ' + name + '" title="Accounts trading at once at ' + name + ', all its sizes together: 0 to ' + SLOTS_MAX + '"></td>';
 }
 // a firm's slots typed in its box (emptied to type a new number: nothing yet)
@@ -1218,6 +1265,9 @@ function simRows(){
 }
 // the inputs: total evals and days in the strip, a tick box and an evals box per firm
 function buildSim(){
+  // the box that has the cursor gets it back once the inputs are made again
+  var at = document.activeElement, mine = at && at.getAttribute && (tilesEl.contains(at) || firmsEl.contains(at));
+  var keep = !mine ? '' : at.id ? '#' + at.id : at.getAttribute('data-s') ? '[data-s="' + at.getAttribute('data-s') + '"]' : '';
   simFirms = simRows();
   tilesEl.innerHTML = '<div class="cell"><label for="s-total">Evals</label><span class="v"><input class="box" id="s-total" type="number" inputmode="numeric" min="0" max="4000" step="1" title="Type a total to split it evenly over the ticked firms"><small id="s-cost"></small></span></div>' +
     '<div class="cell"><label for="s-days">Days</label><span class="v"><input class="box" id="s-days" type="number" inputmode="numeric" min="5" max="364" step="1" title="Calendar days from today"></span></div>' +
@@ -1232,6 +1282,7 @@ function buildSim(){
         '<td><input class="box" id="s' + i + '-n" data-n="' + i + '" type="number" inputmode="numeric" min="0" max="500" step="1" value="' + simEvals(k) + '"' + (no ? ' disabled' : '') + ' aria-label="Evals at ' + name + '"></td>' +
         '<td id="s' + i + '-cost"></td><td id="s' + i + '-in"></td><td id="s' + i + '-net"></td></tr>';
     }).join('') + '</tbody></table>';
+  if (keep){ var again = document.querySelector(keep); if (again && again.focus) again.focus(); }
 }
 function updateSim(){
   // calendar days to trading days; the weeks drawn are the ones those days reach into
@@ -1332,7 +1383,7 @@ function lev(a, b){
 }
 // a firm name as a key; a near-miss spelling of one of the fleet's firms ("Blue Gurdian", "Tradify") gets that firm's key
 function normFirm(s){
-  s = String(s || '').toLowerCase().replace(/\b(xfa|funded|flex)\b/g, '').replace(/[^a-z]/g, ''); s = FIRM_ALIAS[s] || s;
+  s = String(s || '').toLowerCase().replace(/\b(xfa|funded|flex)\b/g, '').replace(/[^a-z]/g, ''); s = ownOf(FIRM_ALIAS, s) || s;
   if (FIRM_KEYS.indexOf(s) >= 0) return s;
   for (var i = 0; i < FIRM_KEYS.length; i++){ var k = FIRM_KEYS[i]; if (lev(s, k) <= (k.length >= 10 ? 2 : k.length >= 5 ? 1 : 0)) return k; }
   return s;
@@ -1350,9 +1401,14 @@ function parseG1(html, K){
   K = K || FLEET.key;
   var sec = doc.getElementById('eng-' + K); if (!sec) return null;
   var units = {};
+  // The fleet's trading day ("Wed 11 Nov"; it rolls at 18:00 ET) as the "MM-DD" its rows date their last trade with. An
+  // account whose last trade has that date, or whose day P&L is not zero, has traded today (done).
+  var dm = /Trading day [A-Za-z]{3} (\d{1,2}) ([A-Za-z]{3})/.exec((doc.querySelector('.foot') || {}).textContent || ''), mi = dm ? MONTHS.indexOf(dm[2]) : -1;
+  var dayKey = mi >= 0 ? ('0' + (mi + 1)).slice(-2) + '-' + ('0' + dm[1]).slice(-2) : '';
+  function traded(c){ var p = moneyNum(c[2]); return (dayKey !== '' && String(c[5] || '').indexOf(dayKey) === 0) || (p !== null && p !== 0); }
   function unit(firmText, size){
     var fk = normFirm(firmText), key = fk + '|' + size;
-    if (!units[key]) units[key] = { fkey: fk, firm: firmText.replace(/\s+(XFA|funded|Flex)$/i, ''), size: size, evals: 0, passed: 0, fundeds: 0, fundedsAt: [], flips: [], evalsAt: [] };
+    if (!units[key]) units[key] = { fkey: fk, firm: firmText.replace(/\s+(XFA|funded|Flex)$/i, ''), size: size, evals: 0, passed: 0, passedDone: 0, fundeds: 0, fundedsAt: [], flips: [], evalsAt: [] };
     return units[key];
   }
   function cells(tr){ return Array.prototype.map.call(tr.children, function(c){ return c.textContent.replace(/\s+/g, ' ').trim(); }); }
@@ -1367,13 +1423,14 @@ function parseG1(html, K){
   // hurt = its room is down to one losing day (the bigger of its last loss and the usual one, with a little slack),
   // gone = it has no room left (finished, though still listed)
   rows('p-' + K + '-eval').forEach(function(c){
-    var u = unit(c[1], g1Size(c[0], c[3], true)); if (/PASSED/i.test(c[3])){ u.passed++; return; }
+    var u = unit(c[1], g1Size(c[0], c[3], true)); if (/PASSED/i.test(c[3])){ u.passed++; if (traded(c)) u.passedDone++; return; }
     var t = /of \$([\d,]+)/.exec(c[3]), target = t ? +t[1].replace(/,/g, '') : 0, pnl = moneyNum(c[3]), room = moneyNum(c[4]), last = moneyNum(c[5]), o = {};
     if (target > 0 && pnl !== null){
       o.at = Math.round(1e4 * pnl / target) / 1e4;
       if (room !== null && room <= 1.05 * Math.max(last !== null && last < 0 ? -last : 0, EVAL_LOSS * target)) o.hurt = 1;
       if (room !== null && room <= 0) o.gone = 1;
     }
+    if (traded(c)) o.done = 1;
     u.evals++; u.evalsAt.push(o);
   });
   // a funded account: what its trade is after ("-$1,022 of $3,800": aim 3800, pnl -1022) and its room
@@ -1382,12 +1439,13 @@ function parseG1(html, K){
     if (t) o.aim = +t[1].replace(/,/g, '');
     if (pnl !== null) o.pnl = pnl;
     if (room !== null) o.room = room;
+    if (traded(c)) o.done = 1;
     u.fundeds++; u.fundedsAt.push(o);
   });
   // G1 shows "n/4 days" before the first payout and "n/5 days" after one; net = the total of its flips since the last payout
   rows('p-' + K + '-flip').forEach(function(c){
     var m = /(\d+)\s*\/\s*(\d+)\s*days/i.exec(c[3]), room = moneyNum(c[4]), u = unit(c[1], g1Size(c[0], c[3], false));
-    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null, net: moneyNum(c[3]) });
+    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null, net: moneyNum(c[3]), done: traded(c) });
   });
   // eval signals: the "Avg signals" row of the summary table that has an Evals column
   var sig = null;
@@ -1425,15 +1483,15 @@ function applyG1(g){
     var x = g.units[key], f = null;
     state.firms.forEach(function(y){ if (!f && normFirm(y.firm) === x.fkey && sizeNum(y.size) === x.size) f = y; });
     if (!f) f = addRow(state.firms, x.firm, x.size + 'K');
-    f.openEvals = x.evals; f.passedNow = x.passed; f.fundedNow = x.fundeds; f.inProfitNow = x.flips.length;
-    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net }; });
+    f.openEvals = x.evals; f.passedNow = x.passed; f.passedDone = x.passedDone; f.fundedNow = x.fundeds; f.inProfitNow = x.flips.length;
+    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net, done: z.done ? 1 : undefined }; });
     f.g1Evals = x.evalsAt; f.g1Funded = x.fundedsAt;
     f.g1 = true; seen.push(f);
   });
   // a firm or size the dashboard no longer lists: its counts go to zero, and a row that is not in this fleet's set goes away
   state.firms = state.firms.filter(function(f){
     if (seen.indexOf(f) >= 0) return true;
-    f.openEvals = 0; f.passedNow = 0; f.fundedNow = 0; f.inProfitNow = 0; f.g1Flips = []; f.g1Evals = []; f.g1Funded = [];
+    f.openEvals = 0; f.passedNow = 0; f.passedDone = 0; f.fundedNow = 0; f.inProfitNow = 0; f.g1Flips = []; f.g1Evals = []; f.g1Funded = [];
     return inSet(f);
   });
   logCash(g.cash);
@@ -1469,8 +1527,16 @@ if (SIM){ buildSim(); syncRates(); update(); syncSim(); setInterval(syncSim, 30 
 else { syncRates(); update(); drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000); }
 // edits made in other browsers: now, whenever this tab is shown again, and every two minutes while it is
 pullShared(true);
-setInterval(function(){ if (document.visibilityState !== 'hidden') pullShared(false); }, 2 * 60 * 1000);
-if (document.addEventListener) document.addEventListener('visibilitychange', function(){ if (document.visibilityState !== 'hidden') pullShared(false); });
+// A tab left open past midnight would go on planning from the day it was opened on ("Buy today", the weeks, who has traded
+// today). Once the date has changed it loads itself again, unless an edit is on its way or a number is being typed.
+function newDay(){
+  var d = new Date();
+  if ((d.getDate() === TODAY.getDate() && d.getMonth() === TODAY.getMonth()) || shareBusy || typing()) return false;
+  try { if (window.location && typeof window.location.reload === 'function'){ window.location.reload(); return true; } } catch (e) {}
+  return false;
+}
+setInterval(function(){ if (document.visibilityState !== 'hidden' && !newDay()) pullShared(false); }, 2 * 60 * 1000);
+if (document.addEventListener) document.addEventListener('visibilitychange', function(){ if (document.visibilityState !== 'hidden' && !newDay()) pullShared(false); });
 })();
 
 </script>
