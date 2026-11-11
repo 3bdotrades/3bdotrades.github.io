@@ -1,3 +1,22 @@
 {
- "v": 1
+ "v": 1,
+ "sim": {
+  "n": 1,
+  "t": "2026-11-11T08:55:13.155Z",
+  "by": "smfmu5ik",
+  "base": "chance",
+  "days": 90,
+  "evals": {
+   "lucid|50": 34,
+   "topstep|50": 34,
+   "aqua|50": 33,
+   "blueguardian|50": 33,
+   "futureselite|50": 33,
+   "tradeify|50": 33
+  },
+  "off": [
+   "lucid|25",
+   "tradeify|25"
+  ]
+ }
 }
