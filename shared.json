@@ -11,9 +11,9 @@
   "slots": {}
  },
  "sim": {
-  "n": 1,
-  "t": "2026-11-11T08:55:13.155Z",
-  "by": "smfmu5ik",
+  "n": 3,
+  "t": "2026-11-11T23:13:38.647Z",
+  "by": "rn8d1547",
   "base": "chance",
   "days": 90,
   "evals": {
@@ -25,8 +25,10 @@
    "tradeify|50": 33
   },
   "off": [
-   "lucid|25",
-   "tradeify|25"
+   "tradeify|25",
+   "futureselite|50",
+   "aqua|50",
+   "lucid|25"
   ],
   "slots": {}
  }
