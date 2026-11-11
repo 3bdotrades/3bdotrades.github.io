@@ -50,6 +50,8 @@ h2{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;align-
 .box::-webkit-outer-spin-button,.box::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .box:hover{border-color:var(--mute)}
 td .box{width:4em;font-size:14px;line-height:1.5}
+td .box.s{width:2.8em;text-align:center}
+tbody tr+tr td.same{border-top-color:transparent}
 .box:disabled{opacity:.4}
 .seg{display:inline-flex;gap:12px;text-transform:none;letter-spacing:0}
 .seg button{font:600 13px/1.2 system-ui,"Segoe UI",sans-serif;color:var(--mute);background:none;border:0;padding:0;cursor:pointer}
@@ -654,8 +656,20 @@ v2: [
 var OWNER = OWNER_SETS[FLEET.key] || [];
 var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'idle', 'room'];
 var COUNT_KEYS = ['openEvals', 'passedNow', 'fundedNow', 'inProfitNow'];
-// max 5 trading at once per firm, shared by its sizes
-var NEW_FIRM = { firm: 'Firm', size: '', firmCap: 5, slots: 5, openEvals: 0, passedNow: 0, fundedNow: 0, inProfitNow: 0, idle: 0, evalPrice: 0, activation: 0, monthly: 0, pay1: 0, pay2: 0, flip: 0, room: 0 };
+// A firm lets 5 accounts trade at once, shared by its sizes (the owner's "5 max funding per firm"). The Slots box of a firm
+// sets a smaller number for it, 0 to 5 (the owner, 11 Nov 2026): a run then fills that many places there and buys the evals
+// for them. state.slots keeps the firms that have fewer than 5, by firm; it is shared like the tick boxes.
+var SLOTS_MAX = 5, FIRM_RX = /^[a-z]{1,40}$/;
+function cleanSlots(o){
+  var p = {};
+  if (o && typeof o === 'object' && !Array.isArray(o)) Object.keys(o).slice(0, 40).forEach(function(k){ var v = o[k], n = Math.round(v); if (FIRM_RX.test(k) && typeof v === 'number' && n >= 0 && n < SLOTS_MAX) p[k] = n; });
+  return p;
+}
+function slotsAt(k){ var v = state.slots ? state.slots[k] : undefined; return typeof v === 'number' && v >= 0 && v < SLOTS_MAX ? Math.round(v) : SLOTS_MAX; }
+function slotsOf(f){ return slotsAt(normFirm(f.firm)); }
+// a row as a run takes it: with its firm's slots
+function slotted(f){ f.firmCap = f.slots = slotsOf(f); return f; }
+var NEW_FIRM = { firm: 'Firm', size: '', firmCap: SLOTS_MAX, slots: SLOTS_MAX, openEvals: 0, passedNow: 0, fundedNow: 0, inProfitNow: 0, idle: 0, evalPrice: 0, activation: 0, monthly: 0, pay1: 0, pay2: 0, flip: 0, room: 0 };
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 function sameUnit(f, firm, size){ return normFirm(f.firm) === normFirm(firm) && sizeNum(f.size) === sizeNum(size); }
 function unitKey(f){ return normFirm(f.firm) + '|' + sizeNum(f.size); }
@@ -736,6 +750,7 @@ function liveRates(){ var c = liveCounts(), o = {}; RATE_KEYS.forEach(function(k
   // for the edits shared by every browser (see shareEdit): a name for this browser, and the version of this view's part it holds
   state.dev = typeof s.dev === 'string' && /^[a-z0-9]{6,16}$/.test(s.dev) ? s.dev : (Math.random().toString(36) + '00000000').slice(2, 10);
   var held = cleanVersion(s.sh); if (held) state.sh = held;
+  state.slots = cleanSlots(s.slots);
   if (SIM){ delete state.firms; return; }
   if (Array.isArray(s.skip)){ var sk = s.skip.filter(function(k){ return typeof k === 'string' && k.length < 60; }).slice(0, 40); if (sk.length) state.skip = sk; }
   if (Array.isArray(s.cashLog)) state.cashLog = s.cashLog;
@@ -775,17 +790,20 @@ function cleanPart(o){
     if (o.evals && typeof o.evals === 'object' && !Array.isArray(o.evals)) Object.keys(o.evals).slice(0, 40).forEach(function(k){ var v = o.evals[k]; if (KEY_RX.test(k) && typeof v === 'number' && v >= 0) p.evals[k] = Math.min(500, Math.round(v)); });
     p.off = cleanKeys(o.off);
   } else p.skip = cleanKeys(o.skip);
+  p.slots = cleanSlots(o.slots);
   return p;
 }
 // this view's part as this browser has it, with its version
 function myPart(){
   var o = { k: SHARE_KEY, n: state.sh.n, t: state.sh.t, by: state.sh.by };
   if (SIM){ o.base = state.base; o.days = state.days; o.evals = state.evals; o.off = state.off; } else o.skip = cleanKeys(state.skip);
+  o.slots = cleanSlots(state.slots);
   return o;
 }
 function takePart(p){
   if (SIM){ state.base = p.base; state.days = p.days; state.evals = p.evals; state.off = p.off; }
   else if (p.skip.length) state.skip = p.skip; else delete state.skip;
+  state.slots = p.slots;
   state.sh = { n: p.n, t: p.t, by: p.by };
   save();
   if (SIM){ syncRates(); buildSim(); }
@@ -816,9 +834,12 @@ function keptPart(){
 function sendPart(){
   return fetch(SHARE_URL, { method: 'POST', body: JSON.stringify(myPart()) }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); });
 }
-var shareSeq = 0, shareBusy = false, shareTimer = 0, keptSeen = null;
-// a number box of the Simulation tab is being typed in: nothing is put in its place meanwhile
-function typing(){ var el = document.activeElement; return !!(SIM && el && el.tagName === 'INPUT' && el.getAttribute && el.getAttribute('type') === 'number'); }
+var shareSeq = 0, shareBusy = false, shareTimer = 0, keptSeen = null, typedAt = 0, TYPING_MS = 5000;
+// A number box (a firm's slots, the Simulation tab's evals and days) is being typed in: it has the cursor and a key went into
+// it in the last few seconds. Nothing is put in its place meanwhile. A box that only keeps the cursor holds nothing back.
+function isNumberBox(el){ return !!(el && el.tagName === 'INPUT' && el.getAttribute && el.getAttribute('type') === 'number'); }
+function typed(e){ if (isNumberBox(e && e.target)) typedAt = Date.now(); }
+function typing(){ return isNumberBox(document.activeElement) && Date.now() - typedAt < TYPING_MS; }
 // Take what another browser changed. first: when the page opens, the version kept on the "track" branch is read as well.
 function pullShared(first){
   return Promise.all([relayPart(), first ? keptPart() : Promise.resolve(keptSeen)]).then(function(got){
@@ -835,6 +856,7 @@ function pullShared(first){
   });
 }
 function ownChoices(){
+  if (Object.keys(state.slots || {}).length > 0) return true;
   return SIM ? state.base !== 'chance' || state.days !== 84 || Object.keys(state.evals).length > 0 || state.off.length > 0 : !!(state.skip && state.skip.length);
 }
 // After an edit made here: tell the others, a moment later so that typing sends one message. The edit takes the version
@@ -1078,7 +1100,7 @@ function syncRates(){
 // the most evals the fleet keeps trading: the highest number of eval signals it had in a day (from the dashboard)
 function seats(){ if (SIM) return state.sig[state.base] > 0 ? state.sig[state.base] : undefined; var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
 // the fleet's firms as a run at these rates takes them; all = with no firm skipped
-function planFirms(rr, all){ return state.firms.map(function(f){ var x = boxed(clone(f), rr); x.idle = idleOf(f); if (!all && skipped(f)) x.skip = true; return x; }); }
+function planFirms(rr, all){ return state.firms.map(function(f){ var x = slotted(boxed(clone(f), rr)); x.idle = idleOf(f); if (!all && skipped(f)) x.skip = true; return x; }); }
 // 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
 function outcome(rr, all){
   var firms = planFirms(rr, all), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
@@ -1115,8 +1137,8 @@ function update(){
   var tr = document.getElementById('t-run'); tr.innerHTML = signed(res.run) + '<small>/mo</small>'; tr.className = 'v ' + (res.run >= 0 ? 'pos' : 'neg');
 
   // a tick box per firm: unticked, the plan buys no new evals there (the accounts already held keep running)
-  var at = document.activeElement, back = at && at.getAttribute && firmsEl.contains(at) ? at.getAttribute('data-k') : null;
-  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>' + esc(BUY_K) + '</th><th>Next 4 days</th><th>Evals</th><th>Funded</th><th>Flips</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' +
+  var at = document.activeElement, here = at && at.getAttribute && firmsEl.contains(at), back = here ? at.getAttribute('data-k') : null, backS = here ? at.getAttribute('data-s') : null;
+  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Slots</th><th>' + esc(BUY_K) + '</th><th>Next 4 days</th><th>Evals</th><th>Funded</th><th>Flips</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' +
     state.firms.map(function(f, i){
       var p = res.per[i], d0 = p.days[0], inn = 0, out = 0, next = [1, 2, 3, 4].map(function(d){ return p.days[d] ? p.days[d].buy : 0; });
       var no = skipped(f), name = esc((f.firm + ' ' + f.size).trim());
@@ -1131,9 +1153,10 @@ function update(){
         run: gain(res.runs[i]) + quiet('/mo')
       };
       return '<tr' + (no ? ' class="off"' : '') + '><td class="who"><label class="pick" title="Untick to see the plan without buying evals here"><input type="checkbox" data-k="' + unitKey(f) + '"' + (no ? '' : ' checked') + ' aria-label="Buy evals at ' + name + '">' +
-        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>';
+        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' + slotsCell(state.firms, i) + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>';
     }).join('') + '</tbody></table>';
   if (back){ var box = firmsEl.querySelector('[data-k="' + back + '"]'); if (box) box.focus(); }
+  if (backS){ var sbox = firmsEl.querySelector('[data-s="' + backS + '"]'); if (sbox){ sbox.focus(); if (sbox.select) sbox.select(); } }
 
   if (all){
     var names = off.length > 2 ? off.length + ' firms' : off.map(function(f){ return esc((f.firm + ' ' + f.size).trim()); }).join(' and ');
@@ -1144,6 +1167,26 @@ function update(){
 
   drawChart(withHistory(res, coinFlip()).rows);
 }
+// The Slots cell of row i: a firm's sizes share its slots, so its first row has the box and its other rows an empty cell
+// that joins it.
+function slotsCell(rows, i){
+  var f = rows[i], k = normFirm(f.firm), name = esc(f.firm);
+  if (i > 0 && normFirm(rows[i - 1].firm) === k) return '<td class="slots same"></td>';
+  return '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + SLOTS_MAX + '" step="1" value="' + slotsAt(k) + '" data-s="' + esc(k) + '" aria-label="Slots at ' + name + '" title="Accounts trading at once at ' + name + ', all its sizes together: 0 to ' + SLOTS_MAX + '"></td>';
+}
+// a firm's slots typed in its box (emptied to type a new number: nothing yet)
+firmsEl.addEventListener('input', function(e){
+  var el = e.target, k = el && el.getAttribute ? el.getAttribute('data-s') : null; if (!k || String(el.value).trim() === '') return;
+  var v = Math.min(SLOTS_MAX, Math.max(0, Math.round(num(el.value, SLOTS_MAX))));
+  if (String(v) !== String(el.value)) el.value = v;
+  if (v === slotsAt(k)) return;
+  if (v < SLOTS_MAX) state.slots[k] = v; else delete state.slots[k];
+  save(); update(); shareEdit();
+});
+firmsEl.addEventListener('change', function(e){
+  var el = e.target, k = el && el.getAttribute ? el.getAttribute('data-s') : null;
+  if (k) el.value = slotsAt(k);
+});
 firmsEl.addEventListener('change', function(e){
   var box = e.target, k = box && box.getAttribute ? box.getAttribute('data-k') : null; if (!k) return;
   if (SIM){
@@ -1160,6 +1203,7 @@ firmsEl.addEventListener('change', function(e){
 
 // ---------- simulation tab: start from zero with the evals typed here, on chance alone or in one fleet's rates and signals ----------
 var tilesEl = document.getElementById('tiles'), simFirms = [], simDown = false;
+firmsEl.addEventListener('input', typed); tilesEl.addEventListener('input', typed);
 var BASES = ['chance', 'g1', 'v2'], BASE_NAMES = { chance: 'Chance', g1: FLEETS.g1.label, v2: FLEETS.v2.label };
 function simEvals(k){ return state.evals[k] === undefined ? 10 : state.evals[k]; }
 // the chosen fleet's firms (on Chance: G1's, the owner's own numbers) with no accounts: a ticked one starts with its evals,
@@ -1169,7 +1213,7 @@ function simRows(){
     var f = clone(NEW_FIRM); f.firm = o.firm; f.size = o.size;
     OWNER_KEYS.forEach(function(k){ if (o[k] !== undefined) f[k] = o[k]; });
     f.idle = 0; f.skip = true; f.start = state.off.indexOf(unitKey(f)) >= 0 ? 0 : simEvals(unitKey(f));
-    return f;
+    return slotted(f);
   });
 }
 // the inputs: total evals and days in the strip, a tick box and an evals box per firm
@@ -1180,11 +1224,11 @@ function buildSim(){
     '<div class="cell"><span class="k">Payouts</span><span class="v" id="s-in">–</span></div>' +
     '<div class="cell"><span class="k" id="s-net-k">Net</span><span class="v" id="s-net">–</span></div>';
   document.getElementById('s-days').value = state.days;
-  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Evals</th><th>Cost</th><th>Payouts</th><th>Net</th></tr></thead><tbody>' +
+  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Slots</th><th>Evals</th><th>Cost</th><th>Payouts</th><th>Net</th></tr></thead><tbody>' +
     simFirms.map(function(f, i){
       var k = unitKey(f), no = state.off.indexOf(k) >= 0, name = esc((f.firm + ' ' + f.size).trim());
       return '<tr' + (no ? ' class="off"' : '') + '><td class="who"><label class="pick"><input type="checkbox" data-k="' + k + '"' + (no ? '' : ' checked') + ' aria-label="' + name + ' in the simulation">' +
-        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' +
+        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' + slotsCell(simFirms, i) +
         '<td><input class="box" id="s' + i + '-n" data-n="' + i + '" type="number" inputmode="numeric" min="0" max="500" step="1" value="' + simEvals(k) + '"' + (no ? ' disabled' : '') + ' aria-label="Evals at ' + name + '"></td>' +
         '<td id="s' + i + '-cost"></td><td id="s' + i + '-in"></td><td id="s' + i + '-net"></td></tr>';
     }).join('') + '</tbody></table>';

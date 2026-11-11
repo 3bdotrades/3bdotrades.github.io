@@ -1,5 +1,6 @@
 'use strict';
-// Keeps for good what people change on the page: the firms unticked in a fleet's view, and the Simulation tab's set-up.
+// Keeps for good what people change on the page: the firms unticked in a fleet's view, a firm's slots, and the Simulation
+// tab's set-up.
 //
 // The page sends every such edit to a public relay (ntfy.sh), and the relay forgets a message after 12 hours. This reads what
 // the relay holds right now and writes the newest version of each part (g1, v2, sim) into shared.json, next to the counts on
@@ -12,8 +13,14 @@ const fs = require('fs'), path = require('path');
 
 const TOPIC = process.env.SHARE_TOPIC || 'funded-slots-roadmap-edits-7c41f9';
 const RELAY = 'https://ntfy.sh/' + TOPIC + '/json?poll=1&since=all';
-const PARTS = ['g1', 'v2', 'sim'], BASES = ['chance', 'g1', 'v2'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/;
+const PARTS = ['g1', 'v2', 'sim'], BASES = ['chance', 'g1', 'v2'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX = /^[a-z]{1,40}$/, SLOTS_MAX = 5;
 
+// the firms that have fewer slots than the usual 5: { firm: 0 to 4 }
+function cleanSlots(o){
+  const p = {};
+  if (o && typeof o === 'object' && !Array.isArray(o)) Object.keys(o).slice(0, 40).forEach(k => { const v = o[k], n = Math.round(v); if (FIRM_RX.test(k) && typeof v === 'number' && n >= 0 && n < SLOTS_MAX) p[k] = n; });
+  return p;
+}
 function cleanKeys(a){ const o = []; (Array.isArray(a) ? a : []).forEach(k => { if (typeof k === 'string' && KEY_RX.test(k) && o.indexOf(k) < 0 && o.length < 40) o.push(k); }); return o; }
 // a version: n counts the edits of a part, t is when the last one was made, by is the browser that made it
 function cleanVersion(o){
@@ -36,6 +43,7 @@ function cleanPart(o, name){
     if (o.evals && typeof o.evals === 'object' && !Array.isArray(o.evals)) Object.keys(o.evals).slice(0, 40).forEach(x => { const v = o.evals[x]; if (KEY_RX.test(x) && typeof v === 'number' && v >= 0) p.evals[x] = Math.min(500, Math.round(v)); });
     p.off = cleanKeys(o.off);
   } else p.skip = cleanKeys(o.skip);
+  p.slots = cleanSlots(o.slots);
   return [k, p];
 }
 // what a kept file holds, checked
@@ -91,4 +99,4 @@ if (require.main === module){
   if (!process.argv[2]){ console.error('usage: node tools/share.js <folder>'); process.exit(2); }
   pass(process.argv[2]).then(line => console.log(line), e => console.log('shared: ' + String(e && e.message || e).slice(0, 120)));
 }
-module.exports = { cleanKeys: cleanKeys, cleanVersion: cleanVersion, ahead: ahead, cleanPart: cleanPart, readKept: readKept, merge: merge, dump: dump, pass: pass, TOPIC: TOPIC };
+module.exports = { cleanKeys: cleanKeys, cleanSlots: cleanSlots, cleanVersion: cleanVersion, ahead: ahead, cleanPart: cleanPart, readKept: readKept, merge: merge, dump: dump, pass: pass, TOPIC: TOPIC };
