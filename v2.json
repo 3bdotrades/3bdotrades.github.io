@@ -1,15 +1,15 @@
 {
  "v": 2,
- "at": "fa4610820e62d03cf398fc5d52504ac57f9bf66e",
- "built": "2026-11-11T00:17:00.000Z",
+ "at": "7a69d50feb063fa875f27492274cbdc89062faa1",
+ "built": "2026-11-11T01:07:02.000Z",
  "day": "Wed 11 Nov",
- "counts": {"pass":[31,114],"win":[11,33],"flip":[60,140],"flip25":[40,66]},
+ "counts": {"pass":[31,115],"win":[11,33],"flip":[60,140],"flip25":[40,66]},
  "flipDone": {"flip":[60,138],"flip25":[40,65]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"939ef825819d":[1,-1],"6dcd002486dc":[0,-1],"9a1c66562989":[0,-1]},
  "marks": [],
  "acc": {
-  "ed27ecd04c07": {"p":"e","f":"Topstep"},
+  "ed27ecd04c07": {"p":"e","f":"Topstep","gone":"2026-11-11","z":1,"u":1},
   "4d0abf093dc9": {"p":"e","f":"Topstep"},
   "3a56a55921a8": {"p":"e","f":"Topstep"},
   "edbed5789edf": {"p":"e","f":"Topstep"},
@@ -53,6 +53,7 @@
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
   "2026-11-10 20:57 eval left the dashboard without a pass: blown · Tradeify 17cb01",
-  "2026-11-10 22:47 flip account back in the funded table: no first win to count · Topstep 9de325"
+  "2026-11-10 22:47 flip account back in the funded table: no first win to count · Topstep 9de325",
+  "2026-11-11 01:07 eval left the dashboard without a pass: blown · Topstep ed27ec"
  ]
 }
