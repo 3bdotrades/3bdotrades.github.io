@@ -10,7 +10,7 @@ The four Live rates cannot be typed: they are the fleet's own counts. Evals pass
 
 An eval has no fixed length. It trades one day at a time, passes when its profit reaches its target and ends when it loses two days in a row. A winning day is worth half the target (the 50% consistency rule), so it takes at least 2 days; at Tradeify the rule is 40%, so it takes at least 3 and passes less often. The win rate per day comes from the fleet's live eval pass rate; Tradeify's smaller winning day has a closer target, so its days win more often, by as much as chance says.
 
-A flip account pays twice: $1,800 and then half of it on a 50K, $900 and then $450 on a 25K; Tradeify (Select Flex) pays $2,250 and $1,125 first. 3.5% of every payout goes in fees.
+A flip account pays twice: $1,800 and then half of it on a 50K, $900 and then $450 on a 25K; Tradeify (Select Flex) pays $2,250 and $1,125 first. 3.5% of every payout goes in fees. A payout is accepted once its winning days are in and the account has any room at all: it takes its usual amount, or all the room there is when that is less, so a second payout can be small and leave the account at zero.
 
 G1 also holds funded accounts that are not on the dashboard yet (on 10 Nov 2026: two Lucid 50K, two Lucid 25K and one Topstep, set in `index.html`). The counts files note every new funded account and every pass the dashboard shows, and the page takes those off the held ones as they come onto the dashboard.
 
