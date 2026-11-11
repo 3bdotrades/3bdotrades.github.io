@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "012926fdd284fa7f1e3034f329ab4798496028ab",
- "built": "2026-11-11T06:56:59.000Z",
+ "at": "4f518db724d31e8cace457e9181863cf1bf6379c",
+ "built": "2026-11-11T08:06:59.000Z",
  "day": "Wed 11 Nov",
- "counts": {"pass":[31,118],"win":[11,33],"flip":[60,140],"flip25":[40,66]},
+ "counts": {"pass":[31,118],"win":[11,34],"flip":[60,140],"flip25":[40,66]},
  "flipDone": {"flip":[60,138],"flip25":[40,65]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"939ef825819d":[1,-1],"6dcd002486dc":[0,-1],"9a1c66562989":[0,-1]},
@@ -37,7 +37,7 @@
   "682b0ee6fb60": {"p":"f","f":"Topstep","z":1,"gone":"2026-11-10"},
   "330b52a2f44f": {"p":"f","f":"Tradeify","z":1,"gone":"2026-11-10"},
   "3728faaf5196": {"p":"f","f":"Lucid"},
-  "7f3775cde54a": {"p":"f","f":"Aqua"},
+  "7f3775cde54a": {"p":"f","f":"Aqua","z":1},
   "78f321c3c627": {"p":"f","f":"Aqua"},
   "939ef825819d": {"p":"x","f":"Lucid"},
   "4c6f76a5cbb2": {"p":"x","f":"Topstep"},
@@ -61,6 +61,7 @@
   "2026-11-11 04:57 funded account listed with an older result: not counted · Blue Guardian 2845ee",
   "2026-11-11 04:57 eval left the dashboard without a pass: blown · Blue Guardian afc10d",
   "2026-11-11 05:16 eval left the dashboard without a pass: blown · Topstep 3a56a5",
-  "2026-11-11 06:56 eval left the dashboard without a pass: blown · Blue Guardian af73a4"
+  "2026-11-11 06:56 eval left the dashboard without a pass: blown · Blue Guardian af73a4",
+  "2026-11-11 08:06 funded account lost · Aqua 7f3775"
  ]
 }
