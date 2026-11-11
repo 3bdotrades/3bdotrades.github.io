@@ -11,6 +11,7 @@ on:
     branches: [main]
     paths:
       - tools/track.js
+      - tools/share.js
       - .github/workflows/track.yml
 
 permissions:
@@ -34,6 +35,9 @@ jobs:
         run: git clone --quiet --no-checkout https://github.com/randompotato247/fleet-dashboard.git dash
       - name: Count
         run: node tools/track.js counts dash
+      # the edits people make on the page (unticked firms, the simulation's set-up), kept next to the counts: see tools/share.js
+      - name: Shared edits
+        run: node tools/share.js counts
       - name: Save
         working-directory: counts
         run: |

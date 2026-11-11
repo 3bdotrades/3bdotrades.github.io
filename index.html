@@ -645,6 +645,9 @@ function liveRates(){ var c = liveCounts(), o = {}; RATE_KEYS.forEach(function(k
     });
   }
   else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); }
+  // for the edits shared by every browser (see shareEdit): a name for this browser, and the version of this view's part it holds
+  state.dev = typeof s.dev === 'string' && /^[a-z0-9]{6,16}$/.test(s.dev) ? s.dev : (Math.random().toString(36) + '00000000').slice(2, 10);
+  var held = cleanVersion(s.sh); if (held) state.sh = held;
   if (SIM){ delete state.firms; return; }
   if (Array.isArray(s.skip)){ var sk = s.skip.filter(function(k){ return typeof k === 'string' && k.length < 60; }).slice(0, 40); if (sk.length) state.skip = sk; }
   if (Array.isArray(s.cashLog)) state.cashLog = s.cashLog;
@@ -652,6 +655,109 @@ function liveRates(){ var c = liveCounts(), o = {}; RATE_KEYS.forEach(function(k
   state.firms = firmRows(s.firms);
 })();
 function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+
+// ---------- edits shared by every browser ----------
+// What a person changes on the page is the same in every browser that opens it, with no key and no sign-in: the firms
+// unticked in a fleet's view, and the Simulation tab's rates, days, evals and firms. Anyone with the page can change them.
+// An edit is sent to a public relay (ntfy.sh, which keeps a message for 12 hours). A page asks the relay when it opens, when
+// its tab is shown again and every two minutes. The counter's pass (tools/share.js) writes what the relay holds into
+// shared.json on the "track" branch, and a page reads that too when it opens: it is what is left once the relay has forgotten.
+// Each view's part (g1, v2, sim) has a version: n counts its edits; t (when) and by (which browser) settle a tie.
+// A copy of the page somewhere else (a preview on a PC) talks to a relay topic of its own.
+var LIVE_SITE = /^3bdotrades\.github\.io$/i.test(String((window.location && window.location.hostname) || ''));
+var SHARE_URL = 'https://ntfy.sh/funded-slots-roadmap-edits-7c41f9' + (LIVE_SITE ? '' : '-dev'), SHARE_KEY = FLEET.key;
+var KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/;
+function cleanKeys(a){ var o = []; (Array.isArray(a) ? a : []).forEach(function(k){ if (typeof k === 'string' && KEY_RX.test(k) && o.indexOf(k) < 0 && o.length < 40) o.push(k); }); return o; }
+function cleanVersion(o){
+  if (!o || typeof o !== 'object') return null;
+  var n = o.n;
+  if (typeof n !== 'number' || !(n >= 1 && n < 1e12) || Math.floor(n) !== n) return null;
+  if (typeof o.t !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(o.t) || typeof o.by !== 'string' || !/^[a-z0-9]{6,16}$/.test(o.by)) return null;
+  return { n: n, t: o.t, by: o.by };
+}
+// is version a newer than version b?
+function ahead(a, b){ return !!a && (!b || (a.n !== b.n ? a.n > b.n : a.t !== b.t ? a.t > b.t : a.by > b.by)); }
+// this view's part as it came from somewhere else, with nothing in it but what the page understands; null when it is not one
+function cleanPart(o){
+  var p = cleanVersion(o); if (!p || o.k !== SHARE_KEY) return null;
+  if (SIM){
+    p.base = BASES.indexOf(o.base) >= 0 ? o.base : 'chance';
+    p.days = typeof o.days === 'number' && o.days >= 5 && o.days <= 364 ? Math.round(o.days) : 84;
+    p.evals = {};
+    if (o.evals && typeof o.evals === 'object' && !Array.isArray(o.evals)) Object.keys(o.evals).slice(0, 40).forEach(function(k){ var v = o.evals[k]; if (KEY_RX.test(k) && typeof v === 'number' && v >= 0) p.evals[k] = Math.min(500, Math.round(v)); });
+    p.off = cleanKeys(o.off);
+  } else p.skip = cleanKeys(o.skip);
+  return p;
+}
+// this view's part as this browser has it, with its version
+function myPart(){
+  var o = { k: SHARE_KEY, n: state.sh.n, t: state.sh.t, by: state.sh.by };
+  if (SIM){ o.base = state.base; o.days = state.days; o.evals = state.evals; o.off = state.off; } else o.skip = cleanKeys(state.skip);
+  return o;
+}
+function takePart(p){
+  if (SIM){ state.base = p.base; state.days = p.days; state.evals = p.evals; state.off = p.off; }
+  else if (p.skip.length) state.skip = p.skip; else delete state.skip;
+  state.sh = { n: p.n, t: p.t, by: p.by };
+  save();
+  if (SIM){ syncRates(); buildSim(); }
+  update();
+}
+// the newest version of this view's part on the relay (ok: the relay answered)
+function relayPart(){
+  return fetch(SHARE_URL + '/json?poll=1&since=all', { cache: 'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(function(text){
+      var best = null;
+      String(text).split('\n').forEach(function(line){
+        var p = null; try { var m = JSON.parse(line); if (m && m.event === 'message' && typeof m.message === 'string') p = cleanPart(JSON.parse(m.message)); } catch (e) {}
+        if (ahead(p, best)) best = p;
+      });
+      return { ok: true, best: best };
+    })
+    .catch(function(){ return { ok: false, best: null }; });
+}
+// the version kept on the "track" branch
+function keptPart(){
+  if (!LIVE_SITE) return Promise.resolve(null);
+  return fetch(COUNTS_URL + 'shared.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(j){ var o = j && j.v === 1 && j[SHARE_KEY]; if (!o || typeof o !== 'object') return null; o.k = SHARE_KEY; return cleanPart(o); })
+    .catch(function(){ return null; });
+}
+function sendPart(){
+  return fetch(SHARE_URL, { method: 'POST', body: JSON.stringify(myPart()) }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); });
+}
+var shareSeq = 0, shareBusy = false, shareTimer = 0, keptSeen = null;
+// a number box of the Simulation tab is being typed in: nothing is put in its place meanwhile
+function typing(){ var el = document.activeElement; return !!(SIM && el && el.tagName === 'INPUT' && el.getAttribute && el.getAttribute('type') === 'number'); }
+// Take what another browser changed. first: when the page opens, the version kept on the "track" branch is read as well.
+function pullShared(first){
+  return Promise.all([relayPart(), first ? keptPart() : Promise.resolve(keptSeen)]).then(function(got){
+    var relay = got[0], best = relay.best;
+    keptSeen = got[1];
+    if (ahead(keptSeen, best)) best = keptSeen;
+    if (shareBusy || typing()) return;                 // an edit made here is on its way, or being typed: it goes first
+    if (ahead(best, state.sh)) takePart(best);
+    // nobody has this browser's version any more (the relay forgot it and it was never kept): the relay gets it again
+    else if (relay.ok && state.sh && ahead(state.sh, best)) sendPart().catch(function(){});
+  });
+}
+// After an edit made here: tell the others, a moment later so that typing sends one message. The edit takes the version
+// after the newest one anybody has, so the last edit made is the one every browser ends up with.
+function shareEdit(){
+  var mine = ++shareSeq;
+  shareBusy = true; clearTimeout(shareTimer);
+  shareTimer = setTimeout(function(){
+    relayPart().then(function(relay){
+      if (mine !== shareSeq) return;                   // edited again meanwhile: that edit sends
+      var top = Math.max(relay.best ? relay.best.n : 0, state.sh ? state.sh.n : 0, keptSeen ? keptSeen.n : 0);
+      state.sh = { n: top + 1, t: new Date().toISOString(), by: state.dev }; save();
+      return sendPart();
+    }).catch(function(){}).then(function(){ if (mine === shareSeq) shareBusy = false; });
+  }, 1200);
+}
+
 // The Simulation tab's own rates, "Chance": what the trade sizes give a trader with no edge (see evalOdds and flipOdds).
 // pass = how often a new eval that needs two winning days passes at those odds; win = the funded trade's odds; flip and
 // flip25 = a flip day's odds on a 50K and on a 25K. A run with them takes every firm's own odds (chance: true).
@@ -911,7 +1017,7 @@ function update(){
   if (all){
     var names = off.length > 2 ? off.length + ' firms' : off.map(function(f){ return esc((f.firm + ' ' + f.size).trim()); }).join(' and ');
     skipEl.innerHTML = 'Skipping ' + names + ': ' + effect(res, all) + ' <button type="button" id="buyall">Buy all</button>';
-    document.getElementById('buyall').onclick = function(){ delete state.skip; save(); update(); };
+    document.getElementById('buyall').onclick = function(){ delete state.skip; save(); update(); shareEdit(); };
   } else skipEl.innerHTML = '';
   skipEl.hidden = !all;
 
@@ -922,13 +1028,13 @@ firmsEl.addEventListener('change', function(e){
   if (SIM){
     // in or out of the simulation
     state.off = state.off.filter(function(x){ return x !== k; }); if (!box.checked) state.off.push(k);
-    save(); buildSim(); update();
+    save(); buildSim(); update(); shareEdit();
     var again = firmsEl.querySelector('[data-k="' + k + '"]'); if (again) again.focus();
     return;
   }
   var list = state.firms.filter(function(f){ return unitKey(f) === k ? !box.checked : skipped(f); }).map(unitKey);
   if (list.length) state.skip = list; else delete state.skip;
-  save(); update();
+  save(); update(); shareEdit();
 });
 
 // ---------- simulation tab: start from zero with the evals typed here, on chance alone or in one fleet's rates and signals ----------
@@ -988,7 +1094,7 @@ function updateSim(){
     document.getElementById('base-' + k).onclick = function(){
       if (state.base === k) return;
       state.base = k;
-      save(); syncRates(); buildSim(); update();
+      save(); syncRates(); buildSim(); update(); shareEdit();
     };
   });
   drawChart(res.rows);
@@ -997,7 +1103,7 @@ if (SIM){
   firmsEl.addEventListener('input', function(e){
     var i = e.target && e.target.getAttribute ? e.target.getAttribute('data-n') : null; if (i === null || !simFirms[i]) return;
     state.evals[unitKey(simFirms[i])] = Math.min(500, Math.max(0, Math.round(num(e.target.value, 0))));
-    save(); update();
+    save(); update(); shareEdit();
   });
   tilesEl.addEventListener('input', function(e){
     var el = e.target || {}, v = Math.round(num(el.value, 0));
@@ -1010,7 +1116,7 @@ if (SIM){
       if (n !== v) el.value = n;
     }
     else return;
-    save(); update();
+    save(); update(); shareEdit();
   });
 }
 // the eval signals and the Lifetime counts of both fleets, from the dashboard
@@ -1189,6 +1295,10 @@ function syncG1(){
 
 if (SIM){ buildSim(); syncRates(); update(); syncSim(); setInterval(syncSim, 30 * 60 * 1000); }
 else { syncRates(); update(); drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000); }
+// edits made in other browsers: now, whenever this tab is shown again, and every two minutes while it is
+pullShared(true);
+setInterval(function(){ if (document.visibilityState !== 'hidden') pullShared(false); }, 2 * 60 * 1000);
+if (document.addEventListener) document.addEventListener('visibilitychange', function(){ if (document.visibilityState !== 'hidden') pullShared(false); });
 })();
 
 </script>
