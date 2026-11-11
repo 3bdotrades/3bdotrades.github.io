@@ -741,7 +741,13 @@ function pullShared(first){
     if (ahead(best, state.sh)) takePart(best);
     // nobody has this browser's version any more (the relay forgot it and it was never kept): the relay gets it again
     else if (relay.ok && state.sh && ahead(state.sh, best)) sendPart().catch(function(){});
+    // This browser has choices from before edits were shared, and nobody has shared any for this view yet: they become the
+    // shared ones, as if made now. (A browser that starts as a new one does has nothing to tell.)
+    else if (first && relay.ok && !state.sh && !best && ownChoices()) shareEdit();
   });
+}
+function ownChoices(){
+  return SIM ? state.base !== 'chance' || state.days !== 84 || Object.keys(state.evals).length > 0 || state.off.length > 0 : !!(state.skip && state.skip.length);
 }
 // After an edit made here: tell the others, a moment later so that typing sends one message. The edit takes the version
 // after the newest one anybody has, so the last edit made is the one every browser ends up with.
