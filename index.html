@@ -13,7 +13,7 @@
   color-scheme:dark;
   --bg:#0f1216; --card:#171b21; --row:#1c2128; --ink:#e6e9ed; --mute:#8b949e; --line:#262c35;
   --accent:#6c9cf0; --pos:#4cc27f; --neg:#ef6b5e;
-  --in:#199e70; --out:#d95926; --net:#3987e5;
+  --in:#199e70; --out:#d95926; --net:#3987e5; --warn:#e3b341;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box}
@@ -66,6 +66,9 @@ thead th{font-size:12px;color:var(--mute);font-weight:600;border-bottom:1px soli
 tbody td:first-child{background:var(--card)}
 tbody tr+tr td{border-top:1px solid var(--line)}
 tbody tr:hover td{background:var(--row)}
+/* the warning under a firm that has evals to buy: it stays in view when the table is scrolled sideways on a phone */
+tbody tr.warn td,tbody tr.warn:hover td{border-top:0;padding:0 12px 10px;white-space:normal;background:var(--card)}
+.w{position:sticky;left:12px;display:inline-block;max-width:min(100%,calc(100vw - 58px));color:var(--warn);font-size:13px;line-height:1.4;text-align:left}
 td.who{padding:0}
 .pick{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer}
 .pick input{flex:none;width:15px;height:15px;margin:0;accent-color:var(--accent);cursor:pointer}
@@ -1158,6 +1161,21 @@ function outcome(rr, all){
 // give a trader with no edge (see chanceRates; V2's funded trade has longer odds than G1's). The fleet's line above it
 // means its trades do better than chance, below it worse.
 function coinFlip(){ var cr = chanceRates(FLEET.key); return runAll(planFirms(cr), cr, WEEKS, seats()); }
+// What a day of waiting costs for n evals a size is to buy: an eval seat that stands empty for a day loses what an eval is
+// worth per day it lasts. An eval is worth what an account in profit books, as often as one comes of an eval, less its
+// price (perWinning); it holds its seat for as many days as an eval lasts on average.
+function waitCost(f, rr, n){
+  var x = boxed(clone(f), rr), w = perWinning(x, rr), days = evalOf(x, params(rr)).fresh.days;
+  return w && n > 0 && days > 0 ? Math.max(0, n * (w.net / w.evals) / days) : 0;
+}
+// The warning under a firm that has evals to buy (the owner, 12 Nov 2026: "if there is a warning ... appear it", "urgent"):
+// buy them today, and what every day of waiting costs. Nothing when there is nothing to buy or nothing to lose.
+function warnRow(f, rr, n, cols){
+  var lost = waitCost(f, rr, n); if (!(n > 0) || lost < 1) return '';
+  var one = n === 1, day = BUY_DAY === 'today' ? 'today' : 'on ' + BUY_DAY;
+  return '<tr class="warn"><td colspan="' + cols + '"><div class="w" role="note">⚠ Buy ' + (one ? 'this one ' : 'these ' + n + ' ') + day + '. The plan above counts on ' + (one ? 'it' : 'them') + ': every day ' + (one ? 'it waits' : 'they wait') + ', ' +
+    n + (one ? ' eval seat earns' : ' eval seats earn') + ' nothing and you lose ' + money(lost) + '.</div></td></tr>';
+}
 // what skipping does to the four totals, against buying at every firm
 function effect(res, all){
   var dBuy = res.buy - all.buy, dCost = res.cost - all.cost, dNeed = res.need - all.need, dNet = res.net - all.net, dRun = res.run - all.run, p = [];
@@ -1199,7 +1217,8 @@ function update(){
         run: gain(res.runs[i]) + quiet('/mo')
       };
       return '<tr' + (no ? ' class="off"' : '') + '><td class="who"><label class="pick" title="Untick to see the plan without buying evals here"><input type="checkbox" data-k="' + unitKey(f) + '"' + (no ? '' : ' checked') + ' aria-label="Buy evals at ' + name + '">' +
-        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' + slotsCell(state.firms, i) + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>';
+        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' + slotsCell(state.firms, i) + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
+        (no || !d0 ? '' : warnRow(f, rr, d0.buy, 9));
     }).join('') + '</tbody></table>';
   if (back){ var box = firmsEl.querySelector('[data-k="' + back + '"]'); if (box) box.focus(); }
   if (backS){ var sbox = firmsEl.querySelector('[data-s="' + backS + '"]'); if (sbox){ sbox.focus(); if (sbox.select) sbox.select(); } }
