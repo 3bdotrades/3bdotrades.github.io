@@ -1,13 +1,15 @@
 {
  "v": 2,
- "at": "7a69d50feb063fa875f27492274cbdc89062faa1",
- "built": "2026-11-11T01:07:02.000Z",
+ "at": "8eb24232bb95b76eb5dd54fdfac32357e2899526",
+ "built": "2026-11-11T04:57:00.000Z",
  "day": "Wed 11 Nov",
- "counts": {"pass":[31,115],"win":[11,33],"flip":[60,140],"flip25":[40,66]},
+ "counts": {"pass":[31,116],"win":[11,33],"flip":[60,140],"flip25":[40,66]},
  "flipDone": {"flip":[60,138],"flip25":[40,65]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"939ef825819d":[1,-1],"6dcd002486dc":[0,-1],"9a1c66562989":[0,-1]},
- "marks": [],
+ "marks": [
+  ["2026-11-11T04:57","wired","blueguardian|50"]
+ ],
  "acc": {
   "ed27ecd04c07": {"p":"e","f":"Topstep","gone":"2026-11-11","z":1,"u":1},
   "4d0abf093dc9": {"p":"e","f":"Topstep"},
@@ -27,7 +29,7 @@
   "a8432161ac22": {"p":"e","f":"FuturesElite"},
   "8f393002b945": {"p":"e","f":"FuturesElite"},
   "f5c1c22b31d9": {"p":"e","f":"FuturesElite"},
-  "afc10d3ef091": {"p":"e","f":"Blue Guardian"},
+  "afc10d3ef091": {"p":"e","f":"Blue Guardian","gone":"2026-11-11","z":1,"u":1},
   "b6227cc128b4": {"p":"e","f":"Blue Guardian"},
   "b322eeda9e5b": {"p":"e","f":"Blue Guardian"},
   "32feee04f224": {"p":"e","f":"Blue Guardian"},
@@ -48,12 +50,15 @@
   "9a1c66562989": {"p":"x","f":"Aqua"},
   "af73a4438004": {"p":"e","f":"Blue Guardian"},
   "8ed4795daaa6": {"p":"e","f":"Blue Guardian"},
-  "671bc9e4deff": {"p":"e","f":"Blue Guardian"}
+  "671bc9e4deff": {"p":"e","f":"Blue Guardian"},
+  "2845eecd0226": {"p":"f","f":"Blue Guardian","z":1}
  },
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
   "2026-11-10 20:57 eval left the dashboard without a pass: blown · Tradeify 17cb01",
   "2026-11-10 22:47 flip account back in the funded table: no first win to count · Topstep 9de325",
-  "2026-11-11 01:07 eval left the dashboard without a pass: blown · Topstep ed27ec"
+  "2026-11-11 01:07 eval left the dashboard without a pass: blown · Topstep ed27ec",
+  "2026-11-11 04:57 funded account listed with an older result: not counted · Blue Guardian 2845ee",
+  "2026-11-11 04:57 eval left the dashboard without a pass: blown · Blue Guardian afc10d"
  ]
 }
