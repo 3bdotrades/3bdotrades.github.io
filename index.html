@@ -140,7 +140,7 @@ function params(r){
   var D = Math.min(30, Math.max(1, Math.round(num(r.payDays, 5))));
   return { pass: clamp01(r.pass), win: clamp01(r.win), tries: Math.min(10, Math.max(1, Math.round(num(r.tries, 2)))), q: clamp01(r.flip),
     D: D, D1: Math.min(30, Math.max(1, Math.round(num(r.payDays1, D)))), L: Math.min(60, Math.max(1, Math.round(num(r.lossDays, 20)))),
-    wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))) };
+    wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), chance: !!r.chance };
 }
 // ----- the eval stage -----
 // An eval trades one day at a time. A winning day is worth just over half of its target, because no day may be more than 50%
@@ -150,6 +150,13 @@ function params(r){
 // target. So an eval lasts at least 2 days (Tradeify 3), and longer when losing days come in between.
 var EVAL_WIN = 1508 / 3000, EVAL_WIN_AT = { tradeify: 1198 / 3000 }, EVAL_LOSS = 0.345, EVAL_MAX = 16;
 function evalWin(firm){ return EVAL_WIN_AT[normFirm(firm)] || EVAL_WIN; }
+// Chance: with no edge a trade wins stop / (stop + target) of the time, counted on the price moves themselves (fees change
+// what a day books, not how often it wins). What the fleets' trades risk and aim for, from what they book on the dashboards:
+// an eval day risks $1,000 (EVAL_STOP; stops book $988 to $1,142 with fees and slippage) for $1,520, which books $1,508
+// after about $12 of fees (EVAL_FEE; Topstep, with lower fees, books $1,512): 39.7% a day. At Tradeify the target is $1,210
+// for its $1,198: 45.2% a day. A 25K eval is the same trade at half size.
+var EVAL_STOP = 1000 / 3000, EVAL_FEE = 12 / 3000;
+function evalOdds(firm){ return EVAL_STOP / (EVAL_STOP + evalWin(firm) + EVAL_FEE); }
 // The days an eval still has to go from a known point: `at` = its profit so far as a share of its target, `hurt` = it is
 // down to one losing day (the next one ends it). With a win rate of p a day: pass[j] = the chance it passes on its j-th day
 // from now, out[j] = the chance it is finished that day, passed or not; rate = the chance it passes at all; days = how long
@@ -183,9 +190,15 @@ function evalP(pass){
   }
   return EVAL_P[key];
 }
-// The eval numbers of one firm: what a winning day is worth, the win rate per day and the road of a new eval. At a firm that
-// needs three winning days the same win rate gives a lower pass rate (fresh.rate).
-function evalOf(f, P){ var win = evalWin(f.firm), p = evalP(P.pass); return { win: win, p: p, fresh: evalRoad(win, p, 0, false) }; }
+// The eval numbers of one firm: what a winning day is worth, its win rate per day and the road of a new eval (fresh.rate =
+// how often it passes). The fleet's eval pass rate gives the win rate per day of an eval that needs two winning days (evalP).
+// A firm whose winning day is smaller has a closer target and wins its day more often, by as much as chance says: Tradeify's
+// days win 45.2 / 39.7 times as often, and it still passes less often because it needs three of them.
+// On chance alone (P.chance) the win rate per day is the firm's odds themselves.
+function evalOf(f, P){
+  var win = evalWin(f.firm), odds = evalOdds(f.firm), p = P.chance ? odds : Math.min(1, evalP(P.pass) * odds / evalOdds(''));
+  return { win: win, p: p, fresh: evalRoad(win, p, 0, false) };
+}
 // ----- the flip stage -----
 // A flip account trades one day at a time. A losing day takes `loss` dollars of its room (the distance to the firm's floor),
 // a winning day adds `win`. The fleet's flip is 5 MNQ with a 15-point stop: $150 plus about $7.50 of fees lost; its target is
@@ -195,6 +208,11 @@ var DAY_LOSS = 157.5, DAY_LOSS_AT = { 'aqua|50': 215 }, DAY_WIN = 152.5, DAY_WIN
 var FIRM_ALIAS = { bg: 'blueguardian' }, FIRM_KEYS = ['lucid', 'topstep', 'aqua', 'blueguardian', 'futureselite', 'tradeify'];
 function dayLoss(firm, size){ return DAY_LOSS_AT[normFirm(firm) + '|' + sizeNum(size)] || DAY_LOSS; }
 function dayWin(firm, size){ return DAY_WIN_AT[normFirm(firm) + '|' + sizeNum(size)] || (sizeNum(size) === 25 ? DAY_WIN_25 : DAY_WIN); }
+// Chance (see evalOdds): a flip day risks its stop for its target, each without the fees (FLIP_FEE): $150 for $160 on a 50K,
+// 48.4%; $150 for $107.50 on a 25K, 58.3%. G1's funded trade risks $1,000 for $4,000 (it books $3,988; $500 for $2,000 on a
+// 25K): 20% a trade.
+var FLIP_FEE = 7.5, FUNDED_STOP = 1000, FUNDED_TARGET = 4000, FUNDED_ODDS = FUNDED_STOP / (FUNDED_STOP + FUNDED_TARGET);
+function flipOdds(firm, size){ var stop = dayLoss(firm, size) - FLIP_FEE; return stop / (stop + dayWin(firm, size) + FLIP_FEE); }
 // A payout is a request taken out of the room. The trader's share of a request is 90% (SPLIT), and 3.5% of that share goes in
 // fees on its way to the bank (PAY_FEE, the owner's number): a $2,000 request is a payout of $1,800 and books $1,737.
 // A request is at least $500, and an account keeps at least one losing day of room.
@@ -498,7 +516,7 @@ function perWinning(f, r){
 
 var WEEKS = 12;
 // two fleets on the same dashboard: G1 (default) and the V2 fleet (?fleet=v2); each keeps its own rates and last account counts.
-// ?fleet=sim is the simulation tab: no accounts, only the evals typed there, run with one fleet's rates and signals
+// ?fleet=sim is the simulation tab: no accounts, only the evals typed there, run on chance alone or with one fleet's rates and signals
 var FLEETS = { g1: { key: 'g1', label: 'G1', store: 'funded-slots-roadmap-v1' }, v2: { key: 'v2', label: 'V2 fleet', store: 'funded-slots-roadmap-v2fleet' },
                sim: { key: 'sim', label: 'Simulation', store: 'funded-slots-roadmap-sim' } };
 var FLEET = FLEETS[((/[?&]fleet=(v2|sim)(&|$)/i.exec((window.location && window.location.search) || '') || [])[1] || 'g1').toLowerCase()];
@@ -614,8 +632,10 @@ function liveRates(){ var c = liveCounts(), o = {}; RATE_KEYS.forEach(function(k
   var s = null; try { s = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
   if (!s || typeof s !== 'object') s = {};
   if (SIM){
-    // the simulation keeps: whose rates and signals, how many days, the evals typed per firm, the firms taken out, and the last signals and Lifetime counts read
-    state.base = s.base === 'v2' ? 'v2' : 'g1';
+    // the simulation keeps: whose rates (chance alone, or a fleet's with its signals), how many days, the evals typed per firm,
+    // the firms taken out, and the last signals and Lifetime counts read. It opens on Chance; a simulation kept before
+    // Chance existed (no v) does so once.
+    state.v = 2; state.base = s.v === 2 && (s.base === 'g1' || s.base === 'v2') ? s.base : 'chance';
     state.days = s.days >= 5 && s.days <= 364 ? Math.round(s.days) : 84;
     state.evals = {}; state.off = []; state.sig = {}; state.life = {};
     if (s.evals && typeof s.evals === 'object') Object.keys(s.evals).slice(0, 40).forEach(function(k){ if (k.length < 60 && s.evals[k] >= 0) state.evals[k] = Math.min(500, Math.round(s.evals[k])); });
@@ -633,16 +653,29 @@ function liveRates(){ var c = liveCounts(), o = {}; RATE_KEYS.forEach(function(k
   state.firms = firmRows(s.firms);
 })();
 function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+// The Simulation tab's own rates, "Chance": what the trade sizes give a trader with no edge (see evalOdds and flipOdds).
+// pass = how often a new eval that needs two winning days passes at those odds; win = the funded trade's odds; flip and
+// flip25 = a flip day's odds on a 50K and on a 25K. A run with them takes every firm's own odds (chance: true).
+function chanceRates(){
+  return { pass: evalRoad(EVAL_WIN, evalOdds(''), 0, false).rate, win: FUNDED_ODDS, flip: flipOdds('', '50K'), flip25: flipOdds('', '25K'), chance: true,
+    tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
+}
+function onChance(){ return SIM && state.base === 'chance'; }
 // The rates a run takes: the live ones, as the page shows them. Funded win becomes the chance per trade p:
 // an account with FIXED.tries trades at it reaches profit with 1 - (1 - p)^tries.
 function fracRates(){
+  if (onChance()) return chanceRates();
   var r = liveRates(), f = {};
   RATE_KEYS.forEach(function(k){ f[k] = r[k] / 100; });
   return { pass: f.pass, win: 1 - Math.pow(1 - clamp01(f.win), 1 / FIXED.tries), flip: f.flip, flip25: f.flip25,
     tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
 }
-// a 25K account flips the 25K box: its row takes that rate
-function boxed(f, rr){ if (sizeNum(f.size) === 25) f.flip = Math.max(1e-9, rr.flip25 * 100); return f; }
+// a 25K account flips the 25K box: its row takes that rate. On chance alone every row has the odds of its own flip day.
+function boxed(f, rr){
+  if (rr.chance) f.flip = 100 * flipOdds(f.firm, f.size);
+  else if (sizeNum(f.size) === 25) f.flip = Math.max(1e-9, rr.flip25 * 100);
+  return f;
+}
 
 // ---------- dates ----------
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -794,14 +827,32 @@ function withHistory(res){
 // ---------- the page: four totals, the firm table, the chart ----------
 var firmsEl = document.getElementById('firms'), skipEl = document.getElementById('skip');
 var RATE_WORDS = { pass: 'finished evals passed', win: 'funded accounts reached profit', flip: 'flip days won on 50K accounts', flip25: 'flip days won on 25K accounts' };
-// the four live rates; hovering one shows the count behind it. Eval pass also says what it comes to at Tradeify, where an
-// eval needs three winning days.
+// The four rates. Hovering one shows what is behind it: the fleet's count, or on Chance the trade sizes behind the odds.
+// Eval pass also says what it comes to at Tradeify, where an eval needs three winning days.
 function syncRates(){
-  var c = liveCounts(), r = liveRates(), three = evalRoad(EVAL_WIN_AT.tradeify, evalP(r.pass / 100), 0, false).rate;
+  var rr = fracRates(), three = (100 * evalOf({ firm: 'Tradeify' }, params(rr)).fresh.rate).toFixed(1) + '%';
+  document.getElementById('rates-h').textContent = rr.chance ? 'Chance rates' : 'Live rates';
+  if (rr.chance){
+    var usd = function(v){ return '$' + (Math.round(v * 100) % 100 ? v.toFixed(2) : Math.round(v).toLocaleString('en-US')); }, pc = function(x){ return (100 * x).toFixed(2) + '%'; };
+    var stop = DAY_LOSS - FLIP_FEE, shown = { pass: rr.pass, win: fundedToProfit(rr.win, rr.tries), flip: rr.flip, flip25: rr.flip25 };
+    var text = {
+      pass: 'an eval day risks ' + usd(3000 * EVAL_STOP) + ' for ' + usd(3000 * (EVAL_WIN + EVAL_FEE)) + ' and wins ' + pc(evalOdds('')) + ' of the time; two winning days before two losing days in a row = ' + pc(rr.pass) +
+            '. At Tradeify (' + usd(3000 * EVAL_STOP) + ' for ' + usd(3000 * (EVAL_WIN_AT.tradeify + EVAL_FEE)) + ', ' + pc(evalOdds('Tradeify')) + ' a day, 3 winning days): ' + three,
+      win: 'a funded trade risks ' + usd(FUNDED_STOP) + ' for ' + usd(FUNDED_TARGET) + ' and wins ' + pc(rr.win) + ' of the time; an account has ' + rr.tries + ' tries = ' + pc(shown.win),
+      flip: 'a flip day on a 50K risks ' + usd(stop) + ' for ' + usd(DAY_WIN + FLIP_FEE) + ' and wins ' + pc(rr.flip) + ' of the time',
+      flip25: 'a flip day on a 25K risks ' + usd(stop) + ' for ' + usd(DAY_WIN_25 + FLIP_FEE) + ' and wins ' + pc(rr.flip25) + ' of the time'
+    };
+    RATE_KEYS.forEach(function(k){
+      document.getElementById('r-' + k).textContent = Math.round(1000 * shown[k]) / 10;
+      document.getElementById('c-' + k).title = 'Chance: ' + text[k];
+    });
+    return;
+  }
+  var c = liveCounts(), r = liveRates();
   RATE_KEYS.forEach(function(k){
     document.getElementById('r-' + k).textContent = r[k];
     document.getElementById('c-' + k).title = 'Live: ' + c[k][0] + ' of ' + c[k][1] + ' ' + RATE_WORDS[k] + ' = ' + (100 * c[k][0] / c[k][1]).toFixed(2) + '%' +
-      (k === 'pass' ? '. At Tradeify, where an eval needs 3 winning days: ' + (100 * three).toFixed(1) + '%' : '');
+      (k === 'pass' ? '. At Tradeify, where an eval needs 3 winning days: ' + three : '');
   });
 }
 // the most evals the fleet keeps trading: the highest number of eval signals it had in a day (from the dashboard)
@@ -881,12 +932,14 @@ firmsEl.addEventListener('change', function(e){
   save(); update();
 });
 
-// ---------- simulation tab: start from zero with the evals typed here, in one fleet's rates and signals ----------
+// ---------- simulation tab: start from zero with the evals typed here, on chance alone or in one fleet's rates and signals ----------
 var tilesEl = document.getElementById('tiles'), simFirms = [], simDown = false;
+var BASES = ['chance', 'g1', 'v2'], BASE_NAMES = { chance: 'Chance', g1: FLEETS.g1.label, v2: FLEETS.v2.label };
 function simEvals(k){ return state.evals[k] === undefined ? 10 : state.evals[k]; }
-// the chosen fleet's firms with no accounts: a ticked one starts with its evals, bought on the first day, and buys none after that
+// the chosen fleet's firms (on Chance: G1's, the owner's own numbers) with no accounts: a ticked one starts with its evals,
+// bought on the first day, and buys none after that
 function simRows(){
-  return OWNER_SETS[state.base].map(function(o){
+  return OWNER_SETS[onChance() ? 'g1' : state.base].map(function(o){
     var f = clone(NEW_FIRM); f.firm = o.firm; f.size = o.size;
     OWNER_KEYS.forEach(function(k){ if (o[k] !== undefined) f[k] = o[k]; });
     f.idle = 0; f.skip = true; f.start = state.off.indexOf(unitKey(f)) >= 0 ? 0 : simEvals(unitKey(f));
@@ -927,11 +980,12 @@ function updateSim(){
   document.getElementById('s-in').textContent = money(res.totIn);
   document.getElementById('s-net-k').textContent = 'Net after ' + state.days + ' days';
   var net = document.getElementById('s-net'); net.textContent = signed(res.net); net.className = 'v ' + (res.net >= 0 ? 'pos' : 'neg');
-  // whose rates and signals, and what the signals mean for this many evals
-  g1El.innerHTML = 'Rates and signals of <span class="seg" role="group" aria-label="Fleet">' + ['g1', 'v2'].map(function(k){ return '<button type="button" id="base-' + k + '" aria-pressed="' + (state.base === k) + '">' + esc(FLEETS[k].label) + '</button>'; }).join('') + '</span>' +
-    (cap ? ': max ' + cap + ' eval signals a day' + (tot > cap ? ', so ' + cap + ' of the ' + tot + ' evals trade at once and the rest wait for a seat.' : '.')
-         : simDown ? ': the dashboard is not readable right now, so every eval trades from day one.' : ': reading the dashboard…');
-  ['g1', 'v2'].forEach(function(k){
+  // whose rates: chance alone, or a fleet's live ones with its eval signals, and what those signals mean for this many evals
+  g1El.innerHTML = 'Rates of <span class="seg" role="group" aria-label="Rates">' + BASES.map(function(k){ return '<button type="button" id="base-' + k + '" aria-pressed="' + (state.base === k) + '">' + esc(BASE_NAMES[k]) + '</button>'; }).join('') + '</span>' +
+    (onChance() ? ': no edge, only what the trade sizes give. Every eval trades from day one.'
+      : cap ? ': live, with max ' + cap + ' eval signals a day' + (tot > cap ? ', so ' + cap + ' of the ' + tot + ' evals trade at once and the rest wait for a seat.' : '.')
+      : simDown ? ': live. The dashboard is not readable right now, so every eval trades from day one.' : ': reading the dashboard…');
+  BASES.forEach(function(k){
     document.getElementById('base-' + k).onclick = function(){
       if (state.base === k) return;
       state.base = k;
