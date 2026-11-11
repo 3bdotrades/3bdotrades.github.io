@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "fe48da3f7f34af3eff37400f65a7c65f197f639b",
- "built": "2026-11-11T06:26:59.000Z",
+ "at": "f55cf157f7fb0d6fc61b90e1de41dc1d76bc4936",
+ "built": "2026-11-11T08:36:59.000Z",
  "day": "Wed 11 Nov",
- "counts": {"pass":[20,70],"win":[8,13],"flip":[17,44],"flip25":[15,28]},
+ "counts": {"pass":[20,71],"win":[8,13],"flip":[17,44],"flip25":[15,28]},
  "flipDone": {"flip":[12,38],"flip25":[13,25]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"6d5033218423":[0,-1],"808bd921c1fb":[0,1],"0375f3fcc515":[0,1],"3debf3957a49":[0,1],"38b9209a2597":[1,1],"b3bb30ebaeb4":[0,1],"8f43dd7465bf":[1,1],"93f31a30919c":[1,-1],"e0028132017c":[0,1]},
@@ -36,7 +36,7 @@
   "9df91786d5b7": {"p":"e","f":"Topstep"},
   "81ef2de33d4f": {"p":"e","f":"Topstep"},
   "e99b1e345b62": {"p":"e","f":"Topstep"},
-  "a54c1e7882d4": {"p":"e","f":"Tradeify"},
+  "a54c1e7882d4": {"p":"e","f":"Tradeify","gone":"2026-11-11","z":1,"u":1},
   "4c97b93e8f79": {"p":"e","f":"Tradeify"},
   "dab4ce6d8f9f": {"p":"e","f":"Tradeify"},
   "2994ee909327": {"p":"e","f":"Tradeify","z":1,"gone":"2026-11-11"},
@@ -58,6 +58,7 @@
   "2026-11-10 22:17 eval left the dashboard without a pass: blown · FuturesElite 9a7523",
   "2026-11-10 23:37 eval passed · Aqua 5860b6",
   "2026-11-11 00:57 funded account lost · Aqua a4bccb",
-  "2026-11-11 01:17 eval passed · Tradeify 2994ee"
+  "2026-11-11 01:17 eval passed · Tradeify 2994ee",
+  "2026-11-11 08:36 eval left the dashboard without a pass: blown · Tradeify a54c1e"
  ]
 }
