@@ -214,12 +214,14 @@ function dayWin(firm, size){ return DAY_WIN_AT[normFirm(firm) + '|' + sizeNum(si
 // 25K): 20% a trade. A new funded account has $2,000 of room (FUNDED_ROOM), $1,000 on a 25K.
 var FLIP_FEE = 7.5, FUNDED_STOP = 1000, FUNDED_TARGET = 4000, FUNDED_ODDS = FUNDED_STOP / (FUNDED_STOP + FUNDED_TARGET), FUNDED_ROOM = 2000, FUNDED_ROOM_25 = 1000;
 function flipOdds(firm, size){ var stop = dayLoss(firm, size) - FLIP_FEE; return stop / (stop + dayWin(firm, size) + FLIP_FEE); }
-// A payout is a request taken out of the room. The trader's share of a request is 90% (SPLIT), and 3.5% of that share goes in
-// fees on its way to the bank (PAY_FEE, the owner's number): a $2,000 request is a payout of $1,800 and books $1,737.
+// A payout is a request taken out of the room. The trader's share of a request is 90% (SPLIT). On its way to the bank that
+// share loses 1% in fees (PAY_FEE); at Topstep it loses a fixed $30 a payout instead, whatever its size (PAY_FIXED). The
+// owner's numbers of 11 Nov 2026 (3.5% at every firm before that). A $2,000 request is a payout of $1,800 and books $1,782,
+// at Topstep $1,770. A payout that is smaller than its fixed fee books nothing.
 // A payout is accepted once its winning days are in and the account has any room at all, even $1 (the owner, 11 Nov 2026):
 // it takes the size's usual request, or all the room there is when that is less, and the account is then at zero and done.
 // (TIE: two amounts closer than this count as equal.)
-var SPLIT = 0.9, PAY_FEE = 0.035, TIE = 1e-6;
+var SPLIT = 0.9, PAY_FEE = 0.01, PAY_FIXED = { topstep: 30 }, TIE = 1e-6;
 // After its second payout (the owner and Tondy, 11 Nov 2026):
 // - with $1,000 of room or more left (KEEP_ROOM; half of that on a 25K) the account flips on, and its next winning days bring
 //   a third payout that takes half of its room: about $1,000 of room is a $500 request and pays $450;
@@ -240,12 +242,13 @@ var NET_FIRMS = { tradeify: true }, NET_MIN = 1;
 var ROOM_MAX = 10000;
 // The flip numbers of one size: its flip win (its own when set, else the rates bar), what a day wins and loses, its room at
 // the start, its two requests (req1, req2: the payouts pay1 and pay2 are the trader's share of them), the winning days a payout
-// takes (D1 the first, D the later ones), and what it does after the second payout (keep, again, re: the chance its one
-// funded trade wins).
+// takes (D1 the first, D the later ones), what a payout loses in fees (cut: the share of it, or fee: the fixed amount where
+// the firm has one), and what it does after the second payout (keep, again, re: the chance its one funded trade wins).
 function flipOf(f, P){
-  var fq = num(f.flip, 0), s = dayLoss(f.firm, f.size), small = sizeNum(f.size) === 25;
+  var fq = num(f.flip, 0), s = dayLoss(f.firm, f.size), small = sizeNum(f.size) === 25, fixed = Math.max(0, num(PAY_FIXED[normFirm(f.firm)], 0));
   var F = { q: fq > 0 ? clamp01(fq / 100) : P.q, s: s, g: dayWin(f.firm, f.size), room: Math.min(ROOM_MAX, num(f.room, 0) > 0 ? num(f.room, 0) : P.L * s), D1: P.D1, D: P.D,
-            req1: Math.max(0, num(f.pay1, 0)) / SPLIT, req2: Math.max(0, num(f.pay2, 0)) / SPLIT, keep: small ? KEEP_ROOM_25 : KEEP_ROOM, again: small ? RE_WIN_25 : RE_WIN,
+            req1: Math.max(0, num(f.pay1, 0)) / SPLIT, req2: Math.max(0, num(f.pay2, 0)) / SPLIT, cut: fixed > 0 ? 0 : PAY_FEE, fee: fixed,
+            keep: small ? KEEP_ROOM_25 : KEEP_ROOM, again: small ? RE_WIN_25 : RE_WIN,
             net: NET_FIRMS[normFirm(f.firm)] === true, win: P.win, chance: P.chance };
   F.re = tryWin(F, small ? RE_TARGET_25 : RE_TARGET);
   return F;
@@ -266,7 +269,7 @@ function tryWin(F, target){
 // chance its day is won, win[i] and loss[i] = the state after a day won or lost (-1: the account is done, or lost),
 // pay[i] = what a day won books. A state is made after the states it leads to, so those always have a lower number.
 function lifeRoad(F){
-  var R = { F: F, S: 0, p: [], win: [], loss: [], pay: [], at: {}, V: [], runs: {} }, KEEP = SPLIT * (1 - PAY_FEE);
+  var R = { F: F, S: 0, p: [], win: [], loss: [], pay: [], at: {}, V: [], runs: {} }, KEEP = SPLIT * (1 - F.cut);
   function add(key, p, win, loss, pay){ var i = R.S++; R.p[i] = p; R.win[i] = win; R.loss[i] = loss; R.pay[i] = pay; R.at[key] = i; return i; }
   function rk(x){ return Math.round(x * 1e5); }
   // the payout of cycle k, with the room the account has once its last winning day is in: what it books and the state after it
@@ -275,7 +278,7 @@ function lifeRoad(F){
     if (k === 1){ if (F.req2 > 0 && left > TIE) next = flip(2, F.D, left, round, 0); }
     else if (k === 2 && left >= F.keep - TIE) next = flip(3, F.D, left, round, 0);
     else next = again(left, round);
-    return [KEEP * take, next];
+    return [Math.max(0, KEEP * take - F.fee), next];
   }
   // used again for one funded trade
   function again(room, round){
@@ -321,7 +324,7 @@ function lifeRoad(F){
 // One road per set of flip numbers, kept: the pages' sizes share them from run to run.
 var ROADS = {}, ROADS_N = 0;
 function roadFor(F){
-  var key = [F.q, F.s, F.g, F.D, F.req1, F.req2, F.keep, F.again, F.net ? 1 : 0, F.chance ? 'c' : F.win].join('|');
+  var key = [F.q, F.s, F.g, F.D, F.req1, F.req2, F.cut, F.fee, F.keep, F.again, F.net ? 1 : 0, F.chance ? 'c' : F.win].join('|');
   if (!ROADS[key]){ if (ROADS_N >= 16){ ROADS = {}; ROADS_N = 0; } ROADS[key] = lifeRoad(F); ROADS_N++; }
   return ROADS[key];
 }
@@ -622,7 +625,7 @@ var LIVE0 = { g1: { pass: [18, 67], win: [8, 12], flip: [12, 38], flip25: [13, 2
 // pay1, pay2: an account's first two payouts (what follows them: see KEEP_ROOM), the trader's share of each (11 Nov 2026): $1,800 then half of it on every 50K, $900
 // then $450 on every 25K. Tradeify pays more: its Select Flex accounts bought after 1 Sep 2026 may take out up to $2,500 a
 // payout on a 50K and $1,250 on a 25K (help.tradeify.co, article 12853966), so $2,250 and $1,125, then half. What is booked
-// is 3.5% less (PAY_FEE).
+// is 1% less (PAY_FEE), at Topstep $30 less (PAY_FIXED).
 // room: the room a flip account starts with, from the fleets' flip ledgers and dashboards (G1's Lucid 25K accounts start at
 // $1,896, V2's at $1,993; Aqua's at $3,989 in G1 and $3,912 in V2). A firm with no flip account yet starts like Lucid.
 // idle: funded accounts held that are not on the dashboard: the passes that had no funded account at the firm yet in G1's
