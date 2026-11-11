@@ -74,6 +74,7 @@ tr.off .pick{color:var(--mute)}
 .legend{display:inline-flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .legend i.line{width:14px;height:2px;border-radius:1px;vertical-align:3px}
+.legend i.dash,.tip i.dash{width:18px;height:2px;border-radius:0;vertical-align:3px;background:repeating-linear-gradient(90deg,var(--mute) 0 6px,transparent 6px 10px)}
 .chartcard{padding:12px 12px 6px}
 .chartbox{position:relative;min-width:0}
 .chartbox svg{display:block;width:100%;height:auto;overflow:visible}
@@ -125,7 +126,7 @@ tr.off .pick{color:var(--mute)}
   <div class="wrap" id="firms"></div>
   <p class="note after" id="skip" aria-live="polite" hidden></p>
 
-  <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span></span></h2>
+  <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span><span id="lg-coin" title="The same plan from today with every trade at the Chance rates of the Simulation tab instead of the live ones" hidden><i class="line dash"></i>Coin flip</span></span></h2>
   <div class="wrap chartcard"><div class="chartbox" id="chart" tabindex="0" role="img" aria-label="Weekly cash in and out with the running total. Use the left and right arrow keys to read each week."></div></div>
 </main>
 
@@ -905,8 +906,12 @@ function drawChart(rows){
   var W = Math.max(280, Math.floor(chartEl.clientWidth || 600)), narrow = W < 560;
   var H = narrow ? 220 : 250, m = { l: narrow ? 44 : 54, r: narrow ? 14 : 70, t: 14, b: 40 };
   var iw = W - m.l - m.r, ih = H - m.t - m.b, n = rows.length;
-  var hi = 1, lo = 0;
-  rows.forEach(function(r){ hi = Math.max(hi, r.inn, r.cum); lo = Math.min(lo, -r.out, r.cum); });
+  // c0 = the first week that has a coin-flip total (-1: the chart has no such line)
+  var hi = 1, lo = 0, c0 = -1;
+  rows.forEach(function(r, i){
+    hi = Math.max(hi, r.inn, r.cum); lo = Math.min(lo, -r.out, r.cum);
+    if (r.coin !== undefined){ hi = Math.max(hi, r.coin); lo = Math.min(lo, r.coin); if (c0 < 0) c0 = i; }
+  });
   var step = niceStep(hi - lo, narrow ? 4 : 5);
   var y0 = Math.floor(lo / step) * step, y1 = Math.ceil(hi / step) * step; if (y1 === y0) y1 = y0 + step;
   function y(v){ return m.t + ih - (v - y0) / (y1 - y0) * ih; }
@@ -933,11 +938,25 @@ function drawChart(rows){
       s += '<text x="' + cx + '" y="' + (H - m.b + 30) + '" text-anchor="middle">' + dShort(weekStart(r.t)) + '</text>';
     }
   });
+  var last = rows[n - 1], ya = y(last.cum) + 4, yb = ya;
+  // the coin-flip line: dashed, under the running total, leaving it at the last week of the history
+  if (c0 >= 0){
+    var dc = c0 > 0 ? 'M' + x(c0 - 1).toFixed(1) + ',' + y(rows[c0 - 1].cum).toFixed(1) : '';
+    for (var k = c0; k < n; k++) dc += (dc ? 'L' : 'M') + x(k).toFixed(1) + ',' + y(rows[k].coin).toFixed(1);
+    s += '<path id="coin" d="' + dc + '" fill="none" stroke="var(--mute)" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"/>';
+    s += '<circle cx="' + x(n - 1).toFixed(1) + '" cy="' + y(last.coin).toFixed(1) + '" r="4" fill="var(--mute)" stroke="var(--card)" stroke-width="2"/>';
+    // the two totals at the right end, kept a line apart when the lines end close together
+    yb = y(last.coin) + 4;
+    if (Math.abs(ya - yb) < 14){ var mid = (ya + yb) / 2, up = last.cum >= last.coin ? -1 : 1; ya = mid + 7 * up; yb = mid - 7 * up; }
+  }
   var d = rows.map(function(r, i){ return (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(r.cum).toFixed(1); }).join('');
   s += '<path d="' + d + '" fill="none" stroke="var(--net)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
   rows.forEach(function(r, i){ s += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(r.cum).toFixed(1) + '" r="' + (i === n - 1 ? 5 : 3.5) + '" fill="var(--net)" stroke="var(--card)" stroke-width="2"/>'; });
-  var last = rows[n - 1];
-  if (!narrow) s += '<text x="' + (x(n - 1) + 10) + '" y="' + (y(last.cum) + 4) + '" style="fill:var(--ink);font-weight:600">' + signed(last.cum) + '</text>';
+  if (!narrow){
+    s += '<text x="' + (x(n - 1) + 10) + '" y="' + ya + '" style="fill:var(--ink);font-weight:600">' + signed(last.cum) + '</text>';
+    if (c0 >= 0) s += '<text id="coin-v" x="' + (x(n - 1) + 10) + '" y="' + yb + '">' + signed(last.coin) + '</text>';
+  }
+  var lg = document.getElementById('lg-coin'); if (lg) lg.hidden = c0 < 0;
   s += '<line id="xhair" x1="0" x2="0" y1="' + m.t + '" y2="' + (m.t + ih) + '" stroke="var(--mute)" stroke-width="1" visibility="hidden"/>';
   s += '</svg>';
   chartEl.innerHTML = s;
@@ -953,6 +972,7 @@ function showTip(i){
     '<div class="r"><span><i style="background:var(--in)"></i>Payouts in</span><span class="num">' + money(r.inn) + '</span></div>' +
     '<div class="r"><span><i style="background:var(--out)"></i>' + (r.actual ? 'Fees paid' : 'Evals out') + '</span><span class="num">' + money(r.out) + '</span></div>' +
     '<div class="r"><span><i style="background:var(--net)"></i>Running total</span><span class="num">' + signed(r.cum) + '</span></div>' +
+    (r.coin !== undefined ? '<div class="r"><span><i class="dash"></i>Coin flip</span><span class="num">' + signed(r.coin) + '</span></div>' : '') +
     (r.actual ? '' : '<div class="r"><span>Evals to buy</span><span class="num">' + r.buy + '</span></div>') +
     (r.items && r.items.length ? '<div class="r"><span>' + r.items.map(function(e){ return esc(itemText(e)); }).join('<br>') + '</span></div>' : '');
   tipEl.hidden = false;
@@ -1003,7 +1023,9 @@ function cashNew(){
   return a;
 }
 function itemText(e){ return e.firm + (e.kind === 'payout' ? ' payout +' : ' fee −') + money(e.amt); }
-function withHistory(res){
+// The chart's rows: the weeks of the history, then the weeks of the run on top of the cash so far. coin = the same run at
+// Chance rates (see coinFlip): each week of the run also gets its running total, from the same cash so far.
+function withHistory(res, coin){
   var n = res.per.length, h = [], w0 = { out: 0, inn: 0, items: [] }, minT = 0, totOut = 0, totIn = 0;
   var ev = ACTUALS.concat(cashNew().rows).map(function(a){ var p = a[0].split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]); return { t: Math.floor(Math.round((d - START) / 864e5) / 7), firm: a[1], kind: a[2], amt: a[3] }; })
     .filter(function(e){ return e.t <= 0; });
@@ -1015,7 +1037,7 @@ function withHistory(res){
   // a fleet with no typed history starts from the cash totals on its dashboard
   var dc = !ACTUALS.length && state.g1 && state.g1.cash;
   if (dc){ base = dc.inn - dc.out; totOut = dc.out; totIn = dc.inn; }
-  var proj = res.rows.map(function(r, i){ var o = {}; for (var key in r) o[key] = r[key]; if (i === 0){ o.out += w0.out; o.inn += w0.inn; o.items = w0.items; } o.cum = r.cum + base; return o; });
+  var proj = res.rows.map(function(r, i){ var o = {}; for (var key in r) o[key] = r[key]; if (i === 0){ o.out += w0.out; o.inn += w0.inn; o.items = w0.items; } o.cum = r.cum + base; if (coin && coin.rows[i]) o.coin = coin.rows[i].cum + base; return o; });
   return { rows: h.concat(proj), past: h.length, base: base, totOut: totOut, totIn: totIn, first: minT, dash: !!dc };
 }
 
@@ -1052,13 +1074,19 @@ function syncRates(){
 }
 // the most evals the fleet keeps trading: the highest number of eval signals it had in a day (from the dashboard)
 function seats(){ if (SIM) return state.sig[state.base] > 0 ? state.sig[state.base] : undefined; var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
+// the fleet's firms as a run at these rates takes them; all = with no firm skipped
+function planFirms(rr, all){ return state.firms.map(function(f){ var x = boxed(clone(f), rr); x.idle = idleOf(f); if (!all && skipped(f)) x.skip = true; return x; }); }
 // 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
 function outcome(rr, all){
-  var firms = state.firms.map(function(f){ var x = boxed(clone(f), rr); x.idle = idleOf(f); if (!all && skipped(f)) x.skip = true; return x; }), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
+  var firms = planFirms(rr, all), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
   res.runs = monthlyUnits(firms, rr, cap); res.run = res.runs.reduce(function(a, b){ return a + b; }, 0);
   res.buy = 0; res.cost = 0; res.per.forEach(function(p){ if (p.days[0]){ res.buy += p.days[0].buy; res.cost += p.days[0].evalCost; } });
   return res;
 }
+// The chart's coin-flip line: the same 12 weeks from today (the accounts held, where each one stands, the eval seats, the
+// firms skipped) with every trade at Chance rates instead of the fleet's live ones: what the trade sizes alone give a trader
+// with no edge (see chanceRates). The fleet's line above it means its trades do better than chance, below it worse.
+function coinFlip(){ var cr = chanceRates(); return runAll(planFirms(cr), cr, WEEKS, seats()); }
 // what skipping does to the four totals, against buying at every firm
 function effect(res, all){
   var dBuy = res.buy - all.buy, dCost = res.cost - all.cost, dNeed = res.need - all.need, dNet = res.net - all.net, dRun = res.run - all.run, p = [];
@@ -1111,7 +1139,7 @@ function update(){
   } else skipEl.innerHTML = '';
   skipEl.hidden = !all;
 
-  drawChart(withHistory(res).rows);
+  drawChart(withHistory(res, coinFlip()).rows);
 }
 firmsEl.addEventListener('change', function(e){
   var box = e.target, k = box && box.getAttribute ? box.getAttribute('data-k') : null; if (!k) return;
