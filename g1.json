@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "25b306679108e46131d04b51f8a1f81c81802a5c",
- "built": "2026-11-12T14:37:26.000Z",
+ "at": "f2d67cdd998b3abdb06bf8694ac62de7848d84b0",
+ "built": "2026-11-12T15:27:05.000Z",
  "day": "Thu 12 Nov",
- "counts": {"pass":[21,79],"win":[8,15],"flip":[22,51],"flip25":[16,30]},
+ "counts": {"pass":[21,80],"win":[8,15],"flip":[22,51],"flip25":[16,30]},
  "flipDone": {"flip":[17,44],"flip25":[15,28]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"0818c51c6877":[0,1],"93f31a30919c":[1,1],"e0028132017c":[0,1],"6d5033218423":[0,-1],"808bd921c1fb":[0,1],"0375f3fcc515":[0,-1],"3debf3957a49":[0,1],"38b9209a2597":[1,-1],"b3bb30ebaeb4":[0,1]},
@@ -32,7 +32,7 @@
   "59226c3852d6": {"p":"e","f":"FuturesElite"},
   "9523ade11d83": {"p":"e","f":"Topstep"},
   "21b5871df64b": {"p":"e","f":"Topstep","gone":"2026-11-11","z":1,"u":1},
-  "1398b3377244": {"p":"e","f":"Topstep"},
+  "1398b3377244": {"p":"e","f":"Topstep","gone":"2026-11-12","z":1,"u":1},
   "38c84400cedb": {"p":"e","f":"Topstep"},
   "9df91786d5b7": {"p":"e","f":"Topstep"},
   "81ef2de33d4f": {"p":"e","f":"Topstep"},
@@ -70,6 +70,7 @@
   "2026-11-12 02:27 funded account lost · Aqua ef9e63",
   "2026-11-12 02:27 funded account lost · Tradeify d09ef4",
   "2026-11-12 09:27 eval left the dashboard without a pass: blown · Blue Guardian 72dc04",
-  "2026-11-12 14:37 eval passed · FuturesElite 761ca3"
+  "2026-11-12 14:37 eval passed · FuturesElite 761ca3",
+  "2026-11-12 15:26 eval left the dashboard without a pass: blown · Topstep 1398b3"
  ]
 }
