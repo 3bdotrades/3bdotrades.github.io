@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "1d2c17469f094265bb8af2fc2edf968694cadf24",
- "built": "2026-11-12T09:27:00.000Z",
+ "at": "25b306679108e46131d04b51f8a1f81c81802a5c",
+ "built": "2026-11-12T14:37:26.000Z",
  "day": "Thu 12 Nov",
- "counts": {"pass":[20,78],"win":[8,15],"flip":[22,51],"flip25":[16,30]},
+ "counts": {"pass":[21,79],"win":[8,15],"flip":[22,51],"flip25":[16,30]},
  "flipDone": {"flip":[17,44],"flip25":[15,28]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"0818c51c6877":[0,1],"93f31a30919c":[1,1],"e0028132017c":[0,1],"6d5033218423":[0,-1],"808bd921c1fb":[0,1],"0375f3fcc515":[0,-1],"3debf3957a49":[0,1],"38b9209a2597":[1,-1],"b3bb30ebaeb4":[0,1]},
@@ -11,7 +11,8 @@
   ["2026-11-10T23:37","pass","aqua|50"],
   ["2026-11-10T23:47","wired","aqua|50"],
   ["2026-11-11T01:17","pass","tradeify|50"],
-  ["2026-11-11T01:27","wired","tradeify|50"]
+  ["2026-11-11T01:27","wired","tradeify|50"],
+  ["2026-11-12T14:37","pass","futureselite|50"]
  ],
  "acc": {
   "5860b65ec8f7": {"p":"e","f":"Aqua","z":1,"gone":"2026-11-10"},
@@ -24,7 +25,7 @@
   "f84f1f803a61": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
   "bd926e162267": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
   "4040af924c0c": {"p":"e","f":"FuturesElite"},
-  "761ca3928af4": {"p":"e","f":"FuturesElite"},
+  "761ca3928af4": {"p":"e","f":"FuturesElite","z":1},
   "aa289bb5aa5b": {"p":"e","f":"FuturesElite"},
   "86ebbb3fea8d": {"p":"e","f":"FuturesElite"},
   "25042024a835": {"p":"e","f":"FuturesElite"},
@@ -68,6 +69,7 @@
   "2026-11-12 02:17 eval left the dashboard without a pass: blown · Tradeify dab4ce",
   "2026-11-12 02:27 funded account lost · Aqua ef9e63",
   "2026-11-12 02:27 funded account lost · Tradeify d09ef4",
-  "2026-11-12 09:27 eval left the dashboard without a pass: blown · Blue Guardian 72dc04"
+  "2026-11-12 09:27 eval left the dashboard without a pass: blown · Blue Guardian 72dc04",
+  "2026-11-12 14:37 eval passed · FuturesElite 761ca3"
  ]
 }
