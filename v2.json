@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "c97dc0177e310412bb04109161c3a09324895a7b",
- "built": "2026-11-12T00:17:02.000Z",
+ "at": "20c2c9f374dec426e6aacd4382e73925c6b78b98",
+ "built": "2026-11-12T02:07:00.000Z",
  "day": "Thu 12 Nov",
- "counts": {"pass":[32,126],"win":[11,35],"flip":[62,147],"flip25":[41,67]},
+ "counts": {"pass":[32,127],"win":[11,35],"flip":[62,147],"flip25":[41,67]},
  "flipDone": {"flip":[61,145],"flip25":[40,66]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"6dcd002486dc":[0,-1],"939ef825819d":[1,1],"9a1c66562989":[0,1]},
@@ -17,7 +17,7 @@
   "4d0abf093dc9": {"p":"e","f":"Topstep"},
   "3a56a55921a8": {"p":"e","f":"Topstep","gone":"2026-11-11","z":1,"u":1},
   "edbed5789edf": {"p":"e","f":"Topstep"},
-  "1291730a1cc5": {"p":"e","f":"Topstep"},
+  "1291730a1cc5": {"p":"e","f":"Topstep","gone":"2026-11-12","z":1,"u":1},
   "c662ea72f256": {"p":"e","f":"Lucid","z":1,"gone":"2026-11-10"},
   "5c9f576c5070": {"p":"e","f":"Aqua","z":1,"gone":"2026-11-11"},
   "33414b633c81": {"p":"e","f":"Aqua","z":1},
@@ -85,6 +85,7 @@
   "2026-11-11 18:47 eval passed · Aqua 5c9f57",
   "2026-11-11 19:07 eval blown · Aqua 33414b",
   "2026-11-11 20:07 eval left the dashboard without a pass: blown · Aqua 1955b8",
-  "2026-11-11 20:07 eval left the dashboard without a pass: blown · Aqua 4f0f9e"
+  "2026-11-11 20:07 eval left the dashboard without a pass: blown · Aqua 4f0f9e",
+  "2026-11-12 02:07 eval left the dashboard without a pass: blown · Topstep 129173"
  ]
 }
