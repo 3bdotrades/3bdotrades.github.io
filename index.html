@@ -1161,20 +1161,25 @@ function outcome(rr, all){
 // give a trader with no edge (see chanceRates; V2's funded trade has longer odds than G1's). The fleet's line above it
 // means its trades do better than chance, below it worse.
 function coinFlip(){ var cr = chanceRates(FLEET.key); return runAll(planFirms(cr), cr, WEEKS, seats()); }
-// What a day of waiting costs for n evals a size is to buy: an eval seat that stands empty for a day loses what an eval is
-// worth per day it lasts. An eval is worth what an account in profit books, as often as one comes of an eval, less its
-// price (perWinning); it holds its seat for as many days as an eval lasts on average.
-function waitCost(f, rr, n){
+// What the n evals a size is to buy are worth. cost = their price. pay = the payouts expected of them: an account in profit
+// comes of an eval as often as the pass rate and the funded win say, and books what perWinning says (the plan asks for no
+// more evals than the firm has places for, so each such account has its place). day = what their seats make a day while
+// those evals run: pay less cost, over the days an eval lasts. All three are expected values, like every number of the plan:
+// most single evals end with nothing, the money comes from the ones that go all the way.
+function evalWorth(f, rr, n){
   var x = boxed(clone(f), rr), w = perWinning(x, rr), days = evalOf(x, params(rr)).fresh.days;
-  return w && n > 0 && days > 0 ? Math.max(0, n * (w.net / w.evals) / days) : 0;
+  if (!w || !(n > 0) || !(days > 0)) return null;
+  return { cost: n * Math.max(0, num(f.evalPrice, 0)), pay: n * w.cash / w.evals, day: Math.max(0, n * (w.net / w.evals) / days) };
 }
-// The warning under a firm that has evals to buy (the owner, 12 Nov 2026: "if there is a warning ... appear it", "urgent"):
-// buy them today, and what every day of waiting costs. Nothing when there is nothing to buy or nothing to lose.
+// The warning under a firm that has evals to buy (the owner, 12 Nov 2026: "if there is a warning ... appear it", "urgent";
+// then, of its first wording "you lose $816": "what this means"): buy them today, what they cost and are expected to pay,
+// and what their seats make a day when they run, which is what a day with the seats empty does not make. It is profit not
+// made, not cash paid out. Nothing where there is nothing to buy or nothing to gain.
 function warnRow(f, rr, n, cols){
-  var lost = waitCost(f, rr, n); if (!(n > 0) || lost < 1) return '';
+  var v = evalWorth(f, rr, n); if (!v || v.day < 1) return '';
   var one = n === 1, day = BUY_DAY === 'today' ? 'today' : 'on ' + BUY_DAY;
-  return '<tr class="warn"><td colspan="' + cols + '"><div class="w" role="note">⚠ Buy ' + (one ? 'this one ' : 'these ' + n + ' ') + day + '. The plan above counts on ' + (one ? 'it' : 'them') + ': every day ' + (one ? 'it waits' : 'they wait') + ', ' +
-    n + (one ? ' eval seat earns' : ' eval seats earn') + ' nothing and you lose ' + money(lost) + '.</div></td></tr>';
+  return '<tr class="warn"><td colspan="' + cols + '"><div class="w" role="note">⚠ Buy ' + (one ? 'this one ' : 'these ' + n + ' ') + day + ': ' + money(v.cost) + ' for ' + money(v.pay) + ' of expected payouts. Every day you wait, ' +
+    (one ? 'this eval seat makes' : 'these ' + n + ' eval seats make') + ' nothing instead of ' + money(v.day) + '.</div></td></tr>';
 }
 // what skipping does to the four totals, against buying at every firm
 function effect(res, all){
