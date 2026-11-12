@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "81eafbc15e938e3844918a3605bc103286d57e87",
- "built": "2026-11-12T22:07:03.000Z",
+ "at": "5a63126708c89c9fa3f365a274ceb6aac596c0ef",
+ "built": "2026-11-12T22:37:03.000Z",
  "day": "Thu 12 Nov",
- "counts": {"pass":[22,81],"win":[8,15],"flip":[22,51],"flip25":[16,30]},
+ "counts": {"pass":[22,82],"win":[8,15],"flip":[22,51],"flip25":[16,30]},
  "flipDone": {"flip":[17,44],"flip25":[15,28]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"0818c51c6877":[0,1],"93f31a30919c":[1,1],"e0028132017c":[0,1],"6d5033218423":[0,-1],"808bd921c1fb":[0,1],"0375f3fcc515":[0,-1],"3debf3957a49":[0,1],"38b9209a2597":[1,-1],"b3bb30ebaeb4":[0,1]},
@@ -13,7 +13,8 @@
   ["2026-11-11T01:17","pass","tradeify|50"],
   ["2026-11-11T01:27","wired","tradeify|50"],
   ["2026-11-12T14:37","pass","futureselite|50"],
-  ["2026-11-12T15:47","pass","topstep|50"]
+  ["2026-11-12T15:47","pass","topstep|50"],
+  ["2026-11-12T22:17","wired","topstep|50"]
  ],
  "acc": {
   "5860b65ec8f7": {"p":"e","f":"Aqua","z":1,"gone":"2026-11-10"},
@@ -37,7 +38,7 @@
   "38c84400cedb": {"p":"e","f":"Topstep"},
   "9df91786d5b7": {"p":"e","f":"Topstep","z":1,"gone":"2026-11-12"},
   "81ef2de33d4f": {"p":"e","f":"Topstep"},
-  "e99b1e345b62": {"p":"e","f":"Topstep"},
+  "e99b1e345b62": {"p":"e","f":"Topstep","gone":"2026-11-12","z":1,"u":1},
   "a54c1e7882d4": {"p":"e","f":"Tradeify","gone":"2026-11-11","z":1,"u":1},
   "4c97b93e8f79": {"p":"e","f":"Tradeify"},
   "dab4ce6d8f9f": {"p":"e","f":"Tradeify","gone":"2026-11-12","z":1,"u":1},
@@ -54,7 +55,8 @@
   "0818c51c6877": {"p":"x","f":"Topstep"},
   "b3bb30ebaeb4": {"p":"x","f":"Topstep"},
   "ef9e63a5e7cd": {"p":"f","f":"Aqua","z":1},
-  "d09ef4efce0e": {"p":"f","f":"Tradeify","z":1}
+  "d09ef4efce0e": {"p":"f","f":"Tradeify","z":1},
+  "5d4ae4c8f7ff": {"p":"f","f":"Topstep"}
  },
  "log": [
   "2026-11-10 22:17 eval left the dashboard without a pass: blown · FuturesElite 9a7523",
@@ -73,6 +75,7 @@
   "2026-11-12 09:27 eval left the dashboard without a pass: blown · Blue Guardian 72dc04",
   "2026-11-12 14:37 eval passed · FuturesElite 761ca3",
   "2026-11-12 15:26 eval left the dashboard without a pass: blown · Topstep 1398b3",
-  "2026-11-12 15:47 eval passed · Topstep 9df917"
+  "2026-11-12 15:47 eval passed · Topstep 9df917",
+  "2026-11-12 22:17 eval left the dashboard without a pass: blown · Topstep e99b1e"
  ]
 }
