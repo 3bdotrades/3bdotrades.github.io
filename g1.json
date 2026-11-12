@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "6bec3f521280383c5041380748db57e1ca64448a",
- "built": "2026-11-12T23:37:11.000Z",
+ "at": "a63d3dabaab1a3d2724078a188017a91bda1f521",
+ "built": "2026-11-12T23:47:16.000Z",
  "day": "Fri 13 Nov",
  "counts": {"pass":[22,82],"win":[8,15],"flip":[22,51],"flip25":[17,31]},
  "flipDone": {"flip":[22,51],"flip25":[16,30]},
@@ -56,7 +56,8 @@
   "b3bb30ebaeb4": {"p":"x","f":"Topstep"},
   "ef9e63a5e7cd": {"p":"f","f":"Aqua","z":1,"gone":"2026-11-12"},
   "d09ef4efce0e": {"p":"f","f":"Tradeify","z":1,"gone":"2026-11-12"},
-  "5d4ae4c8f7ff": {"p":"f","f":"Topstep"}
+  "5d4ae4c8f7ff": {"p":"f","f":"Topstep"},
+  "dd90661b682f": {"p":"e","f":"Tradeify"}
  },
  "log": [
   "2026-11-10 22:17 eval left the dashboard without a pass: blown · FuturesElite 9a7523",
