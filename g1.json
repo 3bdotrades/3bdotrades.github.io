@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "ea308a280a59163aa0464f59f5e0a4674cdfbc1c",
- "built": "2026-11-13T15:27:08.000Z",
+ "at": "7629f1b3295e1da8237076627e3380b9b582cccb",
+ "built": "2026-11-13T22:17:02.000Z",
  "day": "Fri 13 Nov",
  "counts": {"pass":[22,85],"win":[8,15],"flip":[24,57],"flip25":[17,33]},
  "flipDone": {"flip":[22,51],"flip25":[16,30]},
@@ -14,7 +14,8 @@
   ["2026-11-11T01:27","wired","tradeify|50"],
   ["2026-11-12T14:37","pass","futureselite|50"],
   ["2026-11-12T15:47","pass","topstep|50"],
-  ["2026-11-12T22:17","wired","topstep|50"]
+  ["2026-11-12T22:17","wired","topstep|50"],
+  ["2026-11-13T22:17","wired","futureselite|50"]
  ],
  "acc": {
   "5860b65ec8f7": {"p":"e","f":"Aqua","z":1,"gone":"2026-11-10"},
@@ -27,7 +28,7 @@
   "f84f1f803a61": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
   "bd926e162267": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
   "4040af924c0c": {"p":"e","f":"FuturesElite"},
-  "761ca3928af4": {"p":"e","f":"FuturesElite","z":1,"gone":"2026-11-12"},
+  "761ca3928af4": {"p":"f","f":"FuturesElite"},
   "aa289bb5aa5b": {"p":"e","f":"FuturesElite","gone":"2026-11-13","z":1,"u":1},
   "86ebbb3fea8d": {"p":"e","f":"FuturesElite"},
   "25042024a835": {"p":"e","f":"FuturesElite"},
