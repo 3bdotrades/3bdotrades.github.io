@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "85d13902c4c94636c303a82f866db466576001aa",
- "built": "2026-11-13T13:37:03.000Z",
+ "at": "1df5b62a37ddf3f5fdc3167421afb2993a31f00c",
+ "built": "2026-11-13T13:57:01.000Z",
  "day": "Fri 13 Nov",
- "counts": {"pass":[34,136],"win":[11,37],"flip":[66,155],"flip25":[42,68]},
+ "counts": {"pass":[34,136],"win":[12,38],"flip":[66,155],"flip25":[42,68]},
  "flipDone": {"flip":[63,152],"flip25":[41,67]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"7fabe4d2615e":[0,1],"9a1c66562989":[0,1],"939ef825819d":[1,1],"6dcd002486dc":[0,1]},
@@ -71,7 +71,7 @@
   "fbbedfcb69fb": {"p":"e","f":"Blue Guardian","z":1},
   "4232c46cda92": {"p":"e","f":"Blue Guardian"},
   "ccf1f85d2d35": {"p":"e","f":"Blue Guardian"},
-  "0572e7116f7d": {"p":"f","f":"Aqua"},
+  "0572e7116f7d": {"p":"f","f":"Aqua","z":1},
   "97747fe74f77": {"p":"f","f":"Blue Guardian"},
   "e022252c50a0": {"p":"f","f":"Blue Guardian"}
  },
@@ -105,6 +105,7 @@
   "2026-11-13 08:27 funded account lost · Aqua 78f321",
   "2026-11-13 08:57 funded account lost · Aqua d54ece",
   "2026-11-13 09:17 eval passed · Blue Guardian b9b960",
-  "2026-11-13 10:52 eval passed · Blue Guardian fbbedf"
+  "2026-11-13 10:52 eval passed · Blue Guardian fbbedf",
+  "2026-11-13 13:57 funded account won · Aqua 0572e7"
  ]
 }
