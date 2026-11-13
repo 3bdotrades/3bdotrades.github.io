@@ -1,9 +1,9 @@
 'use strict';
-// Keeps for good what people change on the page: the firms unticked in a fleet's view, a firm's slots, and the Simulation
-// tab's set-up.
+// Keeps for good what people change on the page: the firms unticked in a fleet's view, a firm's slots, the Simulation
+// tab's set-up, and what is typed on the 5ers tab (its money, record, slots and accounts).
 //
 // The page sends every such edit to a public relay (ntfy.sh), and the relay forgets a message after 12 hours. This reads what
-// the relay holds right now and writes the newest version of each part (g1, v2, sim) into shared.json, next to the counts on
+// the relay holds right now and writes the newest version of each part (g1, v2, sim, 5ers) into shared.json, next to the counts on
 // the "track" branch. A page that opens reads that file too, so an edit is still there once the relay has forgotten it.
 // It runs with the counter (tools/track.js), every 10 minutes. No key and no sign-in anywhere: anyone with the page can
 // change these, so everything read here is checked and cut to size before it is kept.
@@ -13,7 +13,31 @@ const fs = require('fs'), path = require('path');
 
 const TOPIC = process.env.SHARE_TOPIC || 'funded-slots-roadmap-edits-7c41f9';
 const RELAY = 'https://ntfy.sh/' + TOPIC + '/json?poll=1&since=all';
-const PARTS = ['g1', 'v2', 'sim'], BASES = ['chance', 'g1', 'v2'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX = /^[a-z]{1,40}$/, SLOTS_MAX = 5;
+const PARTS = ['g1', 'v2', 'sim', '5ers'], BASES = ['chance', 'g1', 'v2'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX = /^[a-z]{1,40}$/, SLOTS_MAX = 5;
+
+// The 5ers tab's numbers, by the page's own rule (cleanFive in index.html): the money so far, the record's [won, finished]
+// of evals and of funded trades, the slots of the 50K and of the 25K, and five accounts a size: '' none, 'e' an eval, 'f' a
+// funded account, 'p2:DATE' / 'p1:DATE' a funded win with two payouts or one still due.
+const FIVE0 = { paid: 1685.19, out: 4425.1 }, FIVE_KEYS = ['50', '25'], FIVE_MAX = 5, ACC_RX = /^(?:e|f|p[12]:\d{4}-\d\d-\d\d)$/;
+function dateOf(s){
+  const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s)); if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return +m[1] >= 2020 && +m[1] <= 2100 && d.getFullYear() === +m[1] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[3] ? d : null;
+}
+function cleanFive(o){
+  o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  const cash = (v, d) => typeof v === 'number' && v >= 0 && v < 1e9 ? Math.round(v * 100) / 100 : d;
+  const whole = v => typeof v === 'number' && v >= 0 && v <= 1e6 ? Math.round(v) : 0;
+  const p = { paid: cash(o.paid, FIVE0.paid), out: cash(o.out, FIVE0.out), rec: {}, cap: [], acc: {} };
+  ['pass', 'win'].forEach(k => { const c = o.rec && Array.isArray(o.rec[k]) ? o.rec[k] : []; p.rec[k] = [whole(c[0]), whole(c[1])]; });
+  FIVE_KEYS.forEach((k, i) => {
+    const cap = Array.isArray(o.cap) ? o.cap[i] : undefined, a = o.acc && Array.isArray(o.acc[k]) ? o.acc[k] : [];
+    p.cap[i] = typeof cap === 'number' && cap >= 0 && cap <= FIVE_MAX ? Math.round(cap) : FIVE_MAX;
+    p.acc[k] = [];
+    for (let j = 0; j < FIVE_MAX; j++){ const x = a[j]; p.acc[k].push(typeof x === 'string' && ACC_RX.test(x) && (x.length < 3 || dateOf(x.slice(3))) ? x : ''); }
+  });
+  return p;
+}
 
 // the firms that have fewer slots than the usual 5: { firm: 0 to 4 }
 function cleanSlots(o){
@@ -42,7 +66,8 @@ function cleanPart(o, name){
     p.evals = {};
     if (o.evals && typeof o.evals === 'object' && !Array.isArray(o.evals)) Object.keys(o.evals).slice(0, 40).forEach(x => { const v = o.evals[x]; if (KEY_RX.test(x) && typeof v === 'number' && v >= 0) p.evals[x] = Math.min(500, Math.round(v)); });
     p.off = cleanKeys(o.off);
-  } else p.skip = cleanKeys(o.skip);
+  } else if (k === '5ers'){ p.five = cleanFive(o.five); return [k, p]; }
+  else p.skip = cleanKeys(o.skip);
   p.slots = cleanSlots(o.slots);
   return [k, p];
 }
@@ -99,4 +124,4 @@ if (require.main === module){
   if (!process.argv[2]){ console.error('usage: node tools/share.js <folder>'); process.exit(2); }
   pass(process.argv[2]).then(line => console.log(line), e => console.log('shared: ' + String(e && e.message || e).slice(0, 120)));
 }
-module.exports = { cleanKeys: cleanKeys, cleanSlots: cleanSlots, cleanVersion: cleanVersion, ahead: ahead, cleanPart: cleanPart, readKept: readKept, merge: merge, dump: dump, pass: pass, TOPIC: TOPIC };
+module.exports = { cleanKeys: cleanKeys, cleanSlots: cleanSlots, cleanFive: cleanFive, cleanVersion: cleanVersion, ahead: ahead, cleanPart: cleanPart, readKept: readKept, merge: merge, dump: dump, pass: pass, TOPIC: TOPIC };
