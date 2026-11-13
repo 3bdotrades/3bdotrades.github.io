@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "f653a5149a6cb3552f69966216f5810b0e5bae32",
- "built": "2026-11-13T10:37:00.000Z",
+ "at": "2cb81e098484d02bee167d5880a1fd5e0a83ec09",
+ "built": "2026-11-13T10:57:00.000Z",
  "day": "Fri 13 Nov",
  "counts": {"pass":[22,84],"win":[8,15],"flip":[24,57],"flip25":[17,33]},
  "flipDone": {"flip":[22,51],"flip25":[16,30]},
@@ -62,7 +62,12 @@
   "10bb273158b4": {"p":"e","f":"Blue Guardian"},
   "7536eb739fd5": {"p":"e","f":"Blue Guardian"},
   "a8c0b9cfda56": {"p":"e","f":"Blue Guardian"},
-  "fcf669cfc68c": {"p":"e","f":"Blue Guardian"}
+  "fcf669cfc68c": {"p":"e","f":"Blue Guardian"},
+  "d9eec6061f0c": {"p":"e","f":"Blue Guardian"},
+  "e6710585f030": {"p":"e","f":"Blue Guardian"},
+  "262b3468bc0c": {"p":"e","f":"Blue Guardian"},
+  "dc362976bc63": {"p":"e","f":"Blue Guardian"},
+  "30406ca976ec": {"p":"e","f":"Blue Guardian"}
  },
  "log": [
   "2026-11-10 22:17 eval left the dashboard without a pass: blown · FuturesElite 9a7523",
