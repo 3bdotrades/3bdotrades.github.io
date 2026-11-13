@@ -15,40 +15,69 @@ const TOPIC = process.env.SHARE_TOPIC || 'funded-slots-roadmap-edits-7c41f9';
 const RELAY = 'https://ntfy.sh/' + TOPIC + '/json?poll=1&since=all';
 const PARTS = ['g1', 'v2', 'sim', '5ers'], BASES = ['chance', 'g1', 'v2'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX = /^[a-z]{1,40}$/, SLOTS_MAX = 5;
 
-// The 5ers tab's numbers, by the page's own rule (cleanFive in index.html): the record's [won, finished] of evals and of
-// funded trades, the slots of the 50K and of the 25K, five accounts a size ('' none, 'e' an eval, 'f' a funded account,
-// 'p2:DATE' / 'p1:DATE' a funded win with two payouts or one still due), and the journal: a line for every account bought
-// and every payout received, 'DATE KIND AMOUNT' (KIND '50' / '25' an account bought, 'p' a payout, 'h' a payout taken as hub
-// credits), at most J_MAX of them, the oldest beyond that folded into paid and out, which hold what was paid and received
-// before the journal's lines. A part from before the journal (no j) gets the page's first lines.
-const FIVE0 = { paid: 1685.19, out: 4425.1 }, FIVE_KEYS = ['50', '25'], FIVE_MAX = 5, ACC_RX = /^(?:e|f|p[12]:\d{4}-\d\d-\d\d)$/;
-const J_MAX = 120, J_RX = /^(\d{4}-\d\d-\d\d) (p|h|50|25) (\d{1,7}(?:\.\d\d?)?)$/;
-const J_SEED = ['2026-10-14 h 600', '2026-10-28 p 579', '2026-10-29 p 579', '2026-10-29 p 579', '2026-11-11 p 758.1', '2026-11-12 p 965', '2026-11-12 p 965'];
-function jLine(x){
-  const m = typeof x === 'string' ? J_RX.exec(x) : null, a = m ? Math.round(Number(m[3]) * 100) / 100 : 0;
-  return m && dateOf(m[1]) && a > 0 ? { d: m[1], k: m[2], a: a, inn: m[2] === 'p' || m[2] === 'h', s: m[1] + ' ' + m[2] + ' ' + a } : null;
-}
+// The 5ers tab's numbers, by the page's own rule (cleanFive in index.html), v 2: the slots of the 50K and of the 25K; five
+// accounts a size ('' none, 'e' an eval, 'f' a funded account, 'p2:DATE' / 'p1:DATE' a funded win with two payouts or one
+// still due, ':AMOUNT' after the day when its payouts are not the usual ones); and the journal, a line 'DATE KIND N AMOUNT'
+// for everything done (DATE a day or '-' before the journal; KIND b50 / b25 evals bought, m paid for evals, s50 / s25 evals
+// passed, x50 / x25 evals lost, w / l funded trades won / lost, p / h payouts in cash / in hub credits), at most J_MAX dated
+// lines, the oldest beyond that folded into the '-' line of their kind. A part from before v 2 gets the owner's numbers of
+// 13 Nov 2026 with its own accounts, slots, paid and payouts.
+const FIVE0 = { paid: 1685.19, out: 4425.1 }, FIVE_SIZES = [{ k: '50', pay: 1158 }, { k: '25', pay: 579 }], FIVE_MAX = 5;
+const ACC_RX = /^(?:e|f|p[12]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
+const J_MAX = 100, J_RX = /^(\d{4}-\d\d-\d\d|-) (b50|b25|s50|s25|x50|x25|w|l|m|p|h) (\d{1,4}) (\d{1,7}(?:\.\d\d?)?)$/;
+const J_ORDER = ['b25', 'b50', 'm', 's25', 's50', 'x25', 'x50', 'w', 'l', 'p', 'h'], J_COUNTED = ['b50', 'b25', 's50', 's25', 'x50', 'x25', 'w', 'l'];
+const J_SEED = ['- b25 32 0', '- b50 10 0', '- m 0 1685.19', '- s25 7 0', '- s50 5 0', '- x25 24 0', '- x50 5 0', '- w 5 0', '- l 7 0',
+  '2026-10-14 h 0 600', '2026-10-28 p 0 579', '2026-10-29 p 0 579', '2026-10-29 p 0 579', '2026-11-11 p 0 758.1', '2026-11-12 p 0 965', '2026-11-12 p 0 965'];
+const ACC_SEED = { '50': ['', '', '', '', ''], '25': ['e', 'p1:2026-11-25:965', 'p1:2026-11-26:965', '', ''] };
+const J_V1 = /^(\d{4}-\d\d-\d\d) (p|h|50|25) (\d{1,7}(?:\.\d\d?)?)$/;
 function dateOf(s){
   const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s)); if (!m) return null;
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
   return +m[1] >= 2020 && +m[1] <= 2100 && d.getFullYear() === +m[1] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[3] ? d : null;
 }
+function jLine(x){
+  const m = typeof x === 'string' ? J_RX.exec(x) : null; if (!m) return null;
+  const d = m[1], k = m[2], n = Number(m[3]), a = Math.round(Number(m[4]) * 100) / 100, buy = k.charAt(0) === 'b';
+  if (d !== '-' && !dateOf(d)) return null;
+  if (J_COUNTED.indexOf(k) >= 0 ? !(n >= 1) : n !== 0) return null;
+  if (k === 'm' || k === 'p' || k === 'h' ? !(a > 0) : !buy && a !== 0) return null;
+  return { d: d, k: k, n: n, a: a, s: d + ' ' + k + ' ' + n + ' ' + a };
+}
+function accClean(x, z){
+  const m = typeof x === 'string' ? ACC_RX.exec(x) : null; if (!m) return '';
+  if (!m[1]) return x;
+  if (!dateOf(m[1])) return '';
+  const amt = m[2] === undefined ? 0 : Math.round(Number(m[2]) * 100) / 100;
+  if (m[2] !== undefined && !(amt > 0)) return '';
+  return x.slice(0, 13) + (amt > 0 && amt !== z.pay ? ':' + amt : '');
+}
+function fiveUpgrade(o){
+  const cash = (v, d) => typeof v === 'number' && v >= 0 && v < 1e9 ? Math.round(v * 100) / 100 : d;
+  const v1 = Array.isArray(o.j), j = J_SEED.filter(s => s.charAt(0) === '-' && s.indexOf('- m ') !== 0), acc = {};
+  const paid = cash(o.paid, FIVE0.paid), out = v1 ? cash(o.out, 0) : Math.max(0, Math.round((cash(o.out, FIVE0.out) - FIVE0.out) * 100) / 100);
+  if (paid > 0) j.push('- m 0 ' + paid);
+  if (out > 0) j.push('- p 0 ' + out);
+  if (v1) o.j.slice(0, 2000).forEach(x => { const m = typeof x === 'string' ? J_V1.exec(x) : null; if (m) j.push(m[1] + ' ' + (m[2] === 'p' || m[2] === 'h' ? m[2] + ' 0 ' : 'b' + m[2] + ' 1 ') + m[3]); });
+  else J_SEED.forEach(s => { if (s.charAt(0) !== '-') j.push(s); });
+  FIVE_SIZES.forEach(z => { const a = o.acc && Array.isArray(o.acc[z.k]) ? o.acc[z.k] : []; acc[z.k] = []; for (let i = 0; i < FIVE_MAX; i++) acc[z.k].push(accClean(a[i], z)); });
+  ACC_SEED['25'].forEach(x => { const at = acc['25'].indexOf(''); if (x.charAt(0) === 'p' && at >= 0) acc['25'][at] = x; });
+  return { v: 2, cap: o.cap, acc: acc, j: j };
+}
 function cleanFive(o){
   o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
-  const cash = (v, d) => typeof v === 'number' && v >= 0 && v < 1e9 ? Math.round(v * 100) / 100 : d;
-  const whole = v => typeof v === 'number' && v >= 0 && v <= 1e6 ? Math.round(v) : 0;
-  const old = !Array.isArray(o.j), lines = [];
-  const p = { paid: cash(o.paid, old ? FIVE0.paid : 0), out: old ? Math.max(0, Math.round((cash(o.out, FIVE0.out) - FIVE0.out) * 100) / 100) : cash(o.out, 0), rec: {}, cap: [], acc: {}, j: [] };
-  (old ? J_SEED : o.j.slice(0, 2000)).forEach(x => { const l = jLine(x); if (l) lines.push(l); });
+  if (o.v !== 2) o = Object.keys(o).length ? fiveUpgrade(o) : { v: 2, acc: ACC_SEED, j: J_SEED };
+  const pre = {}, lines = [], p = { v: 2, cap: [], acc: {}, j: [] };
+  const fold = l => { const q = pre[l.k] || (pre[l.k] = { n: 0, a: 0 }); q.n += l.n; q.a = Math.round((q.a + l.a) * 100) / 100; };
+  (Array.isArray(o.j) ? o.j.slice(0, 2000) : []).forEach(x => { const l = jLine(x); if (l){ if (l.d === '-') fold(l); else lines.push(l); } });
   lines.sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0);
-  while (lines.length > J_MAX){ const first = lines.shift(); if (first.inn) p.out = Math.round((p.out + first.a) * 100) / 100; else p.paid = Math.round((p.paid + first.a) * 100) / 100; }
-  p.j = lines.map(l => l.s);
-  ['pass', 'win'].forEach(k => { const c = o.rec && Array.isArray(o.rec[k]) ? o.rec[k] : []; p.rec[k] = [whole(c[0]), whole(c[1])]; });
-  FIVE_KEYS.forEach((k, i) => {
-    const cap = Array.isArray(o.cap) ? o.cap[i] : undefined, a = o.acc && Array.isArray(o.acc[k]) ? o.acc[k] : [];
+  while (lines.length > J_MAX) fold(lines.shift());
+  J_ORDER.forEach(k => { const q = pre[k], l = q && jLine('- ' + k + ' ' + Math.min(9999, q.n) + ' ' + Math.min(9999999.99, q.a)); if (l) p.j.push(l.s); });
+  lines.forEach(l => p.j.push(l.s));
+  FIVE_SIZES.forEach((z, i) => {
+    const cap = Array.isArray(o.cap) ? o.cap[i] : undefined, a = o.acc && Array.isArray(o.acc[z.k]) ? o.acc[z.k] : [];
     p.cap[i] = typeof cap === 'number' && cap >= 0 && cap <= FIVE_MAX ? Math.round(cap) : FIVE_MAX;
-    p.acc[k] = [];
-    for (let j = 0; j < FIVE_MAX; j++){ const x = a[j]; p.acc[k].push(typeof x === 'string' && ACC_RX.test(x) && (x.length < 3 || dateOf(x.slice(3))) ? x : ''); }
+    p.acc[z.k] = [];
+    for (let j = 0; j < FIVE_MAX; j++) p.acc[z.k].push(accClean(a[j], z));
   });
   return p;
 }
