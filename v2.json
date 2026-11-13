@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "2cb81e098484d02bee167d5880a1fd5e0a83ec09",
- "built": "2026-11-13T10:57:00.000Z",
+ "at": "b8ecfd235482a661427094c5e7e95e0d23237bd8",
+ "built": "2026-11-13T13:27:01.000Z",
  "day": "Fri 13 Nov",
  "counts": {"pass":[34,136],"win":[11,37],"flip":[66,155],"flip25":[42,68]},
  "flipDone": {"flip":[63,152],"flip25":[41,67]},
@@ -12,7 +12,8 @@
   ["2026-11-11T18:47","pass","aqua|50"],
   ["2026-11-11T22:07","wired","aqua|50"],
   ["2026-11-13T09:17","pass","blueguardian|50"],
-  ["2026-11-13T10:52","pass","blueguardian|50"]
+  ["2026-11-13T10:52","pass","blueguardian|50"],
+  ["2026-11-13T13:27","wired","aqua|50"]
  ],
  "acc": {
   "ed27ecd04c07": {"p":"e","f":"Topstep","gone":"2026-11-11","z":1,"u":1},
@@ -67,7 +68,8 @@
   "b9b9609abe17": {"p":"e","f":"Blue Guardian","z":1},
   "fbbedfcb69fb": {"p":"e","f":"Blue Guardian","z":1},
   "4232c46cda92": {"p":"e","f":"Blue Guardian"},
-  "ccf1f85d2d35": {"p":"e","f":"Blue Guardian"}
+  "ccf1f85d2d35": {"p":"e","f":"Blue Guardian"},
+  "0572e7116f7d": {"p":"f","f":"Aqua"}
  },
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
