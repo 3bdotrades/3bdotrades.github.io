@@ -15,10 +15,19 @@ const TOPIC = process.env.SHARE_TOPIC || 'funded-slots-roadmap-edits-7c41f9';
 const RELAY = 'https://ntfy.sh/' + TOPIC + '/json?poll=1&since=all';
 const PARTS = ['g1', 'v2', 'sim', '5ers'], BASES = ['chance', 'g1', 'v2'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX = /^[a-z]{1,40}$/, SLOTS_MAX = 5;
 
-// The 5ers tab's numbers, by the page's own rule (cleanFive in index.html): the money so far, the record's [won, finished]
-// of evals and of funded trades, the slots of the 50K and of the 25K, and five accounts a size: '' none, 'e' an eval, 'f' a
-// funded account, 'p2:DATE' / 'p1:DATE' a funded win with two payouts or one still due.
+// The 5ers tab's numbers, by the page's own rule (cleanFive in index.html): the record's [won, finished] of evals and of
+// funded trades, the slots of the 50K and of the 25K, five accounts a size ('' none, 'e' an eval, 'f' a funded account,
+// 'p2:DATE' / 'p1:DATE' a funded win with two payouts or one still due), and the journal: a line for every account bought
+// and every payout received, 'DATE KIND AMOUNT' (KIND '50' / '25' an account bought, 'p' a payout, 'h' a payout taken as hub
+// credits), at most J_MAX of them, the oldest beyond that folded into paid and out, which hold what was paid and received
+// before the journal's lines. A part from before the journal (no j) gets the page's first lines.
 const FIVE0 = { paid: 1685.19, out: 4425.1 }, FIVE_KEYS = ['50', '25'], FIVE_MAX = 5, ACC_RX = /^(?:e|f|p[12]:\d{4}-\d\d-\d\d)$/;
+const J_MAX = 120, J_RX = /^(\d{4}-\d\d-\d\d) (p|h|50|25) (\d{1,7}(?:\.\d\d?)?)$/;
+const J_SEED = ['2026-10-14 h 600', '2026-10-28 p 579', '2026-10-29 p 579', '2026-10-29 p 579', '2026-11-11 p 758.1', '2026-11-12 p 965', '2026-11-12 p 965'];
+function jLine(x){
+  const m = typeof x === 'string' ? J_RX.exec(x) : null, a = m ? Math.round(Number(m[3]) * 100) / 100 : 0;
+  return m && dateOf(m[1]) && a > 0 ? { d: m[1], k: m[2], a: a, inn: m[2] === 'p' || m[2] === 'h', s: m[1] + ' ' + m[2] + ' ' + a } : null;
+}
 function dateOf(s){
   const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s)); if (!m) return null;
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
@@ -28,7 +37,12 @@ function cleanFive(o){
   o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
   const cash = (v, d) => typeof v === 'number' && v >= 0 && v < 1e9 ? Math.round(v * 100) / 100 : d;
   const whole = v => typeof v === 'number' && v >= 0 && v <= 1e6 ? Math.round(v) : 0;
-  const p = { paid: cash(o.paid, FIVE0.paid), out: cash(o.out, FIVE0.out), rec: {}, cap: [], acc: {} };
+  const old = !Array.isArray(o.j), lines = [];
+  const p = { paid: cash(o.paid, old ? FIVE0.paid : 0), out: old ? Math.max(0, Math.round((cash(o.out, FIVE0.out) - FIVE0.out) * 100) / 100) : cash(o.out, 0), rec: {}, cap: [], acc: {}, j: [] };
+  (old ? J_SEED : o.j.slice(0, 2000)).forEach(x => { const l = jLine(x); if (l) lines.push(l); });
+  lines.sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0);
+  while (lines.length > J_MAX){ const first = lines.shift(); if (first.inn) p.out = Math.round((p.out + first.a) * 100) / 100; else p.paid = Math.round((p.paid + first.a) * 100) / 100; }
+  p.j = lines.map(l => l.s);
   ['pass', 'win'].forEach(k => { const c = o.rec && Array.isArray(o.rec[k]) ? o.rec[k] : []; p.rec[k] = [whole(c[0]), whole(c[1])]; });
   FIVE_KEYS.forEach((k, i) => {
     const cap = Array.isArray(o.cap) ? o.cap[i] : undefined, a = o.acc && Array.isArray(o.acc[k]) ? o.acc[k] : [];

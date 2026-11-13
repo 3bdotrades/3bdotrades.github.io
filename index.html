@@ -64,6 +64,14 @@ tbody tr+tr td.same{border-top-color:transparent}
 .accs>div+div{border-left:1px solid var(--line)}
 .accs th,.accs td{text-align:left}
 .accs td:first-child{width:4.4em;color:var(--mute)}
+/* 5ers: a button that reads as a link (Bought, Add, remove a line), the locked totals of the first line, the journal */
+.lnk{font:inherit;color:var(--accent);background:none;border:0;padding:0;cursor:pointer}
+.lnk:hover{text-decoration:underline}
+.note b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.jour{max-height:470px;overflow-y:auto}
+.jour th:nth-child(2),.jour td:nth-child(2){text-align:left}
+.jour td:first-child{color:var(--mute)}
+.jadd{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
 .seg{display:inline-flex;gap:12px;text-transform:none;letter-spacing:0}
 .seg button{font:600 13px/1.2 system-ui,"Segoe UI",sans-serif;color:var(--mute);background:none;border:0;padding:0;cursor:pointer}
 .seg button:hover{color:var(--ink)}
@@ -113,6 +121,8 @@ tr.off .pick{color:var(--mute)}
   .cells .cell:nth-child(3){border-left:0}
   .cells .cell:nth-child(n+3){border-top:1px solid var(--line)}
   .rates .cell.two+.cell.two{border-left:0;border-top:1px solid var(--line)}
+  .jour th,.jour td{padding:8px 6px;font-size:13px}
+  .jour td:first-child{white-space:normal}
 }
 </style>
 </head>
@@ -148,6 +158,8 @@ tr.off .pick{color:var(--mute)}
   <p class="note after" id="skip" aria-live="polite" hidden></p>
   <h2 id="accs-h" hidden>Accounts</h2>
   <div class="wrap" id="accs" hidden></div>
+  <h2 id="jour-h" hidden>Journal</h2>
+  <div class="wrap" id="jour" hidden></div>
 
   <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span><span id="lg-coin" title="The same plan from today with every trade at chance (what the fleet's trade sizes give with no edge) instead of its live rates" hidden><i class="line dash"></i>Coin flip</span></span></h2>
   <div class="wrap chartcard"><div class="chartbox" id="chart" tabindex="0" role="img" aria-label="Weekly cash in and out with the running total and, for the weeks ahead, the same plan at coin-flip rates. Use the left and right arrow keys to read each week."></div></div>
@@ -722,11 +734,32 @@ function clone(o){ return JSON.parse(JSON.stringify(o)); }
 // ended is replaced by a new eval (price) on the next trading day. Chance for every trade: risk / (risk + make) = 40%.
 var FIVE_SIZES = [{ k: '50', size: '50K', price: 80, pay: 1158, risk: 2000, make: 3000 }, { k: '25', size: '25K', price: 47.2, pay: 579, risk: 1000, make: 1500 }];
 var FIVE_MAX = 5, FIVE_WAIT = 14, FIVE_CHANCE = FIVE_SIZES[0].risk / (FIVE_SIZES[0].risk + FIVE_SIZES[0].make);
-// What is typed on the 5ers tab, checked. paid, out: the money so far (the owner's totals on 13 Nov 2026 until typed over).
+// What is typed on the 5ers tab, checked.
 // rec: the owner's own record, [won, finished] of evals and of funded trades. cap: the places of each size, 0 to 5.
 // acc: the accounts held, five places a size: '' none, 'e' an eval, 'f' a funded account, 'p2:DATE' or 'p1:DATE' a funded win
 // with two payouts or one still due, the next one on DATE.
+// j: the journal, a line for every account bought and every payout received, 'DATE KIND AMOUNT'. KIND: '50' / '25' an account
+// of that size bought, 'p' a payout received, 'h' a payout taken as hub credits. Paid and Received are counted from it
+// (fiveMoney) and cannot be typed (the owner, 13 Nov 2026: "locked and live count"). The lines of a day stay in the order
+// they were added. At most J_MAX lines are kept: the oldest beyond that fold into paid and out, so the totals stay.
+// paid, out: what was paid and received before the journal's lines. The owner's totals of 13 Nov 2026 were $1,685.19 paid
+// (kept as that one amount until he sends his purchases) and $4,425.10 withdrawn, which is the six payouts of 28 Oct to
+// 12 Nov in J_SEED; the seventh, $600 on 14 Oct, he took as hub credits. Something kept from before the journal (no j) had
+// those two totals typed: its paid stays, and of its out only what is above the six payouts.
 var FIVE0 = { paid: 1685.19, out: 4425.1 }, ACC_RX = /^(?:e|f|p[12]:\d{4}-\d\d-\d\d)$/;
+var J_MAX = 120, J_RX = /^(\d{4}-\d\d-\d\d) (p|h|50|25) (\d{1,7}(?:\.\d\d?)?)$/;
+var J_SEED = ['2026-10-14 h 600', '2026-10-28 p 579', '2026-10-29 p 579', '2026-10-29 p 579', '2026-11-11 p 758.1', '2026-11-12 p 965', '2026-11-12 p 965'];
+// a journal line read: its day, kind and amount, and the line as it is kept (s); null when it is not one
+function jLine(x){
+  var m = typeof x === 'string' ? J_RX.exec(x) : null, a = m ? Math.round(Number(m[3]) * 100) / 100 : 0;
+  return m && dateOf(m[1]) && a > 0 ? { d: m[1], k: m[2], a: a, inn: m[2] === 'p' || m[2] === 'h', s: m[1] + ' ' + m[2] + ' ' + a } : null;
+}
+// Paid and Received: what was before the journal plus its lines, to the cent
+function fiveMoney(f){
+  var paid = f.paid, out = f.out;
+  f.j.forEach(function(x){ var l = jLine(x); if (!l) return; if (l.inn) out += l.a; else paid += l.a; });
+  return { paid: Math.round(paid * 100) / 100, out: Math.round(out * 100) / 100 };
+}
 function dateOf(s){
   var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s)); if (!m) return null;
   var d = new Date(+m[1], +m[2] - 1, +m[3]);
@@ -736,7 +769,12 @@ function cleanFive(o){
   o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
   function cash(v, d){ return typeof v === 'number' && v >= 0 && v < 1e9 ? Math.round(v * 100) / 100 : d; }
   function whole(v){ return typeof v === 'number' && v >= 0 && v <= 1e6 ? Math.round(v) : 0; }
-  var p = { paid: cash(o.paid, FIVE0.paid), out: cash(o.out, FIVE0.out), rec: {}, cap: [], acc: {} };
+  var old = !Array.isArray(o.j), lines = [];
+  var p = { paid: cash(o.paid, old ? FIVE0.paid : 0), out: old ? Math.max(0, Math.round((cash(o.out, FIVE0.out) - FIVE0.out) * 100) / 100) : cash(o.out, 0), rec: {}, cap: [], acc: {}, j: [] };
+  (old ? J_SEED : o.j.slice(0, 2000)).forEach(function(x){ var l = jLine(x); if (l) lines.push(l); });
+  lines.sort(function(a, b){ return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
+  while (lines.length > J_MAX){ var first = lines.shift(); if (first.inn) p.out = Math.round((p.out + first.a) * 100) / 100; else p.paid = Math.round((p.paid + first.a) * 100) / 100; }
+  p.j = lines.map(function(l){ return l.s; });
   ['pass', 'win'].forEach(function(k){ var c = o.rec && Array.isArray(o.rec[k]) ? o.rec[k] : []; p.rec[k] = [whole(c[0]), whole(c[1])]; });
   FIVE_SIZES.forEach(function(z, i){
     var cap = Array.isArray(o.cap) ? o.cap[i] : undefined, a = o.acc && Array.isArray(o.acc[z.k]) ? o.acc[z.k] : [];
@@ -1563,29 +1601,101 @@ function buildAccs(){
       var st = accStage(a[j]), name = z.size + ' account ' + (j + 1);
       body += '<tr><td>' + (j + 1) + '</td><td><select class="sel" id="a' + z.k + '-' + j + '" data-a="' + z.k + '|' + j + '" aria-label="Stage of ' + name + '">' +
         FIVE_STAGES.map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === st ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td><td>' +
-        (st.charAt(0) === 'p' ? '<input class="sel" type="date" id="d' + z.k + '-' + j + '" data-d="' + z.k + '|' + j + '" value="' + a[j].slice(3) + '" aria-label="Next payout of ' + name + '">' : '') + '</td></tr>';
+        (st.charAt(0) === 'p' ? '<input class="sel" type="date" id="d' + z.k + '-' + j + '" data-d="' + z.k + '|' + j + '" value="' + a[j].slice(3) + '" aria-label="Next payout of ' + name + '">'
+          : st === '' ? '<button type="button" class="lnk" id="b' + z.k + '-' + j + '" data-b="' + z.k + '|' + j + '" title="Bought today: makes this place an Eval and adds ' + price(z.price) + ' to Paid in the journal">Bought ' + price(z.price) + '</button>' : '') + '</td></tr>';
     }
     return '<div><table aria-label="' + z.size + ' accounts"><thead><tr><th>' + z.size + '</th><th>Stage</th><th>Next payout</th></tr></thead><tbody>' + (body || '<tr><td colspan="3">No slots</td></tr>') + '</tbody></table></div>';
   }).join('') + '</div>';
   if (keep){ var again = document.getElementById(keep); if (again && again.focus) again.focus(); }
 }
-// the inputs: the money so far in the first line, the record's four counts, the accounts
+// The journal: a first row to add a line (its day, what it is, its amount), then the lines, the newest first, each with a
+// button that takes it out (asked once more before it does), then what was paid and received before the journal.
+var jourEl = document.getElementById('jour'), jArm = null, jDraft = { d: '', k: '50', a: '' };
+var J_KINDS = [['50', 'Bought 50K'], ['25', 'Bought 25K'], ['p', 'Payout'], ['h', 'Payout, hub credits']];
+function jUsual(k){ var z = FIVE_SIZES.filter(function(s){ return s.k === k; })[0]; return z ? String(z.price) : ''; }     // an account's price; a payout's amount is typed
+function longDate(s){ var d = dateOf(s); return d ? d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() : ''; }
+function buildJour(){
+  var f = state.five, at = document.activeElement, keep = at && at.id && jourEl.contains(at) ? at.id : '', rows = '';
+  if (!dateOf(jDraft.d)) jDraft.d = ymd(TODAY);
+  if (jDraft.a === '' && jUsual(jDraft.k) && !keep) jDraft.a = jUsual(jDraft.k);
+  function out(x, line){ var on = jArm && jArm.x === x && jArm.s === line; return '<button type="button" class="lnk" data-x="' + x + '" aria-label="Take this line out of the journal">' + (on ? 'Remove?' : '×') + '</button>'; }
+  for (var i = f.j.length - 1; i >= 0; i--){
+    var l = jLine(f.j[i]); if (!l) continue;
+    rows += '<tr><td>' + longDate(l.d) + '</td><td>' + J_KINDS.filter(function(k){ return k[0] === l.k; })[0][1] + '</td><td' + (l.inn ? ' class="pos">+' : '>−') + cents(l.a) + '</td><td>' + out(String(i), f.j[i]) + '</td></tr>';
+  }
+  if (f.paid > 0) rows += '<tr><td>Before the journal</td><td>Bought</td><td>−' + cents(f.paid) + '</td><td>' + out('paid', 'paid') + '</td></tr>';
+  if (f.out > 0) rows += '<tr><td>Before the journal</td><td>Payouts</td><td class="pos">+' + cents(f.out) + '</td><td>' + out('out', 'out') + '</td></tr>';
+  jourEl.innerHTML = '<div class="jour"><table aria-labelledby="jour-h"><thead><tr><th>Date</th><th>What</th><th>Amount</th><th></th></tr></thead><tbody>' +
+    '<tr><td colspan="4"><div class="jadd"><input class="sel" type="date" id="j-d" value="' + jDraft.d + '" aria-label="Day of the new line">' +
+    '<select class="sel" id="j-k" aria-label="What the new line is">' + J_KINDS.map(function(k){ return '<option value="' + k[0] + '"' + (k[0] === jDraft.k ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>' +
+    '<input class="box m" type="number" inputmode="decimal" min="0" step="0.01" id="j-a" value="' + esc(jDraft.a) + '" aria-label="Amount of the new line">' +
+    '<button type="button" class="lnk" id="j-add">Add</button></div></td></tr>' + rows + '</tbody></table></div>';
+  if (keep){ var again = document.getElementById(keep); if (again && again.focus) again.focus(); }
+}
+// a line goes into the journal: its day, kind and amount as they stand in the first row (no day or no amount: nothing)
+function jAdd(){
+  var d = document.getElementById('j-d'), k = document.getElementById('j-k'), a = document.getElementById('j-a');
+  var kind = k && J_KINDS.some(function(x){ return x[0] === String(k.value); }) ? String(k.value) : jDraft.k;
+  var l = jLine(String(d ? d.value : '') + ' ' + kind + ' ' + Math.round(num(a ? a.value : 0, 0) * 100) / 100);
+  if (!l) return;
+  state.five.j.push(l.s); state.five = cleanFive(state.five);
+  jArm = null; jDraft.d = l.d; jDraft.k = kind; jDraft.a = jUsual(kind);
+  save(); buildJour(); update(); shareEdit();
+}
+function jourClick(e){
+  var el = e.target || {}, f = state.five, x = el.getAttribute ? el.getAttribute('data-x') : null;
+  if (el.id === 'j-add'){ jAdd(); return; }
+  if (x === null) return;
+  var line = x === 'paid' || x === 'out' ? x : f.j[+x];
+  if (line === undefined) return;
+  // the first press asks, the second one on the same line takes it out
+  if (!jArm || jArm.x !== x || jArm.s !== line){ jArm = { x: x, s: line }; buildJour(); var b = jourEl.querySelector('[data-x="' + x + '"]'); if (b && b.focus) b.focus(); return; }
+  jArm = null;
+  if (x === 'paid') f.paid = 0; else if (x === 'out') f.out = 0; else f.j.splice(+x, 1);
+  save(); buildJour(); update(); shareEdit();
+}
+// what is being typed in the first row is remembered, so that making the journal again does not lose it
+function jourInput(e){
+  var el = e.target || {};
+  if (el.id === 'j-d') jDraft.d = String(el.value || ''); else if (el.id === 'j-a') jDraft.a = String(el.value === undefined ? '' : el.value); else return;
+  jArm = null;
+}
+function jourChange(e){
+  var el = e.target || {};
+  if (el.id === 'j-d'){ if (dateOf(el.value)) jDraft.d = String(el.value); else el.value = jDraft.d; }
+  else if (el.id === 'j-k' && J_KINDS.some(function(x){ return x[0] === String(el.value); })){
+    jDraft.k = String(el.value); jDraft.a = jUsual(jDraft.k);
+    var a = document.getElementById('j-a'); if (a) a.value = jDraft.a;
+  }
+}
+// "Bought" on an empty place: it is an Eval now, and its price is a line of today in the journal
+function accsClick(e){
+  var el = e.target || {}, b = el.getAttribute ? el.getAttribute('data-b') : null; if (!b) return;
+  var s = b.split('|'), z = FIVE_SIZES.filter(function(x){ return x.k === s[0]; })[0], list = z ? state.five.acc[z.k] : null, j = +s[1];
+  if (!list || list[j] !== '') return;
+  list[j] = 'e'; state.five.j.push(ymd(TODAY) + ' ' + z.k + ' ' + z.price); state.five = cleanFive(state.five);
+  jArm = null;
+  save(); buildAccs(); buildJour(); update(); shareEdit();
+  var sel = document.getElementById('a' + z.k + '-' + j); if (sel && sel.focus) sel.focus();
+}
+// the inputs: the record's four counts, the accounts, the journal; the first line has the money so far, counted from the journal
 function buildFive(){
-  var f = state.five, at = document.activeElement, keep = at && at.id && (g1El.contains(at) || ratesEl.contains(at)) ? at.id : '';
+  var f = state.five, at = document.activeElement, keep = at && at.id && ratesEl.contains(at) ? at.id : '';
   document.getElementById('sum-h').textContent = '5ers';
   document.getElementById('rates-h').textContent = 'My record';
   document.getElementById('firms-h').textContent = 'Per size';
   document.getElementById('accs-h').hidden = false; accsEl.hidden = false;
+  document.getElementById('jour-h').hidden = false; jourEl.hidden = false;
   document.getElementById('lg-coin').title = 'The same plan with every trade at chance (a trade that risks $2,000 to make $3,000 wins 40% of the time) instead of your record';
-  g1El.innerHTML = '<label for="f-paid">Paid</label> <input class="box m" id="f-paid" type="number" inputmode="decimal" min="0" step="0.01" value="' + f.paid.toFixed(2) + '"> ' +
-    '<label for="f-out">Withdrawn</label> <input class="box m" id="f-out" type="number" inputmode="decimal" min="0" step="0.01" value="' + f.out.toFixed(2) + '"> <span id="f-net"></span>';
+  g1El.innerHTML = 'Paid <b id="f-paid" title="Counted from the journal: every account bought, and what was paid before the journal"></b> · Received <b id="f-out" title="Counted from the journal: every payout, and what was received before the journal"></b> · <span id="f-net"></span>';
   ratesEl.innerHTML = [['pass', 'Eval pass', 'Evals'], ['win', 'Funded win', 'Funded trades']].map(function(x){
     var c = f.rec[x[0]];
     return '<div class="cell two" id="c5-' + x[0] + '"><span class="k">' + x[1] + '</span><span class="v"><input class="box" id="f-' + x[0] + '-w" type="number" inputmode="numeric" min="0" step="1" value="' + c[0] + '" aria-label="' + x[2] + ' won">' +
       '<small>of</small><input class="box" id="f-' + x[0] + '-n" type="number" inputmode="numeric" min="0" step="1" value="' + c[1] + '" aria-label="' + x[2] + ' finished"><small id="f-' + x[0] + '-r"></small></span></div>';
   }).join('');
   if (keep){ var again = document.getElementById(keep); if (again && again.focus) again.focus(); }
-  buildAccs();
+  jArm = null;
+  buildAccs(); buildJour();
 }
 function updateFive(){
   var f = state.five, rr = fiveRates(), res = fivePlan(rr, WEEKS), runs = fiveMonthly(rr), buy = 0, cost = 0, run = 0;
@@ -1595,7 +1705,10 @@ function updateFive(){
   document.getElementById('t-need').textContent = money(res.need);
   var tn = document.getElementById('t-net'); tn.textContent = signed(res.net); tn.className = 'v ' + (res.net >= 0 ? 'pos' : 'neg');
   var tr = document.getElementById('t-run'); tr.innerHTML = signed(run) + '<small>/mo</small>'; tr.className = 'v ' + (run >= 0 ? 'pos' : 'neg');
-  var base = f.out - f.paid;
+  // the money so far: counted from the journal, not typed
+  var m = fiveMoney(f), base = Math.round((m.out - m.paid) * 100) / 100;
+  document.getElementById('f-paid').textContent = cents(m.paid);
+  document.getElementById('f-out').textContent = cents(m.out);
   document.getElementById('f-net').innerHTML = 'So far <span class="' + (base >= 0 ? 'pos' : 'neg') + '">' + (base > 0 ? '+' : '') + cents(base) + '</span>';
   [['pass', 'evals passed'], ['win', 'funded trades won']].forEach(function(x){
     var c = f.rec[x[0]], el = document.getElementById('f-' + x[0] + '-r');
@@ -1624,12 +1737,7 @@ function updateFive(){
 function fiveInput(e){
   var el = e.target || {}, id = el.id || '', f = state.five, v = String(el.value === undefined ? '' : el.value).trim(), m, d = el.getAttribute ? el.getAttribute('data-d') : null;
   if (v === '') return;
-  if (id === 'f-paid' || id === 'f-out'){
-    var x = Math.round(num(v, -1) * 100) / 100, key = id === 'f-paid' ? 'paid' : 'out';
-    if (!(x >= 0 && x < 1e9) || x === f[key]) return;
-    f[key] = x;
-  }
-  else if ((m = /^f-(pass|win)-(w|n)$/.exec(id))){
+  if ((m = /^f-(pass|win)-(w|n)$/.exec(id))){
     var k = Math.round(num(v, -1)), at = m[2] === 'w' ? 0 : 1;
     if (!(k >= 0 && k <= 1e6) || k === f.rec[m[1]][at]) return;
     f.rec[m[1]][at] = k;
@@ -1662,9 +1770,7 @@ function fiveChange(e){
     var again = document.getElementById(id); if (again && again.focus) again.focus();
     return;
   }
-  if (id === 'f-paid') el.value = f.paid.toFixed(2);
-  else if (id === 'f-out') el.value = f.out.toFixed(2);
-  else if ((m = /^f-(pass|win)-(w|n)$/.exec(id))) el.value = f.rec[m[1]][m[2] === 'w' ? 0 : 1];
+  if ((m = /^f-(pass|win)-(w|n)$/.exec(id))) el.value = f.rec[m[1]][m[2] === 'w' ? 0 : 1];
   else if ((m = /^f-cap-(\d)$/.exec(id)) && FIVE_SIZES[+m[1]]) el.value = f.cap[+m[1]];
   else if (d){ var q = d.split('|'), x = f.acc[q[0]] && f.acc[q[0]][+q[1]]; if (x && x.charAt(0) === 'p') el.value = x.slice(3); }
 }
@@ -1839,7 +1945,10 @@ function syncG1(){
 
 if (SIM){ buildSim(); syncRates(); update(); syncSim(); setInterval(syncSim, 30 * 60 * 1000); }
 else if (FIVE){
-  [g1El, ratesEl, firmsEl, accsEl].forEach(function(el){ el.addEventListener('input', typed); el.addEventListener('input', fiveInput); el.addEventListener('change', fiveChange); });
+  [ratesEl, firmsEl, accsEl].forEach(function(el){ el.addEventListener('input', typed); el.addEventListener('input', fiveInput); el.addEventListener('change', fiveChange); });
+  accsEl.addEventListener('click', accsClick);
+  jourEl.addEventListener('input', typed); jourEl.addEventListener('input', jourInput); jourEl.addEventListener('change', jourChange); jourEl.addEventListener('click', jourClick);
+  jourEl.addEventListener('keydown', function(e){ var t = e.target || {}; if (e.key === 'Enter' && (t.id === 'j-a' || t.id === 'j-d')){ e.preventDefault(); jAdd(); } });
   buildFive(); update();
 }
 else { syncRates(); update(); drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000); }
