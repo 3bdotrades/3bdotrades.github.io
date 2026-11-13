@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "2cb81e098484d02bee167d5880a1fd5e0a83ec09",
- "built": "2026-11-13T10:57:00.000Z",
+ "at": "ea308a280a59163aa0464f59f5e0a4674cdfbc1c",
+ "built": "2026-11-13T15:27:08.000Z",
  "day": "Fri 13 Nov",
- "counts": {"pass":[22,84],"win":[8,15],"flip":[24,57],"flip25":[17,33]},
+ "counts": {"pass":[22,85],"win":[8,15],"flip":[24,57],"flip25":[17,33]},
  "flipDone": {"flip":[22,51],"flip25":[16,30]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"8f43dd7465bf":[1,1],"93f31a30919c":[1,-1],"e0028132017c":[0,-1],"6d5033218423":[0,-1],"808bd921c1fb":[0,1],"0375f3fcc515":[0,1],"38b9209a2597":[1,-1],"b3bb30ebaeb4":[0,-1],"0818c51c6877":[0,-1]},
@@ -37,7 +37,7 @@
   "1398b3377244": {"p":"e","f":"Topstep","gone":"2026-11-12","z":1,"u":1},
   "38c84400cedb": {"p":"e","f":"Topstep"},
   "9df91786d5b7": {"p":"e","f":"Topstep","z":1,"gone":"2026-11-12"},
-  "81ef2de33d4f": {"p":"e","f":"Topstep"},
+  "81ef2de33d4f": {"p":"e","f":"Topstep","gone":"2026-11-13","z":1,"u":1},
   "e99b1e345b62": {"p":"e","f":"Topstep","gone":"2026-11-12","z":1,"u":1},
   "a54c1e7882d4": {"p":"e","f":"Tradeify","gone":"2026-11-11","z":1,"u":1},
   "4c97b93e8f79": {"p":"e","f":"Tradeify"},
@@ -89,6 +89,7 @@
   "2026-11-12 15:47 eval passed · Topstep 9df917",
   "2026-11-12 22:17 eval left the dashboard without a pass: blown · Topstep e99b1e",
   "2026-11-13 01:17 eval left the dashboard without a pass: blown · Blue Guardian 9bbba5",
-  "2026-11-13 02:47 eval left the dashboard without a pass: blown · FuturesElite aa289b"
+  "2026-11-13 02:47 eval left the dashboard without a pass: blown · FuturesElite aa289b",
+  "2026-11-13 15:27 eval left the dashboard without a pass: blown · Topstep 81ef2d"
  ]
 }
