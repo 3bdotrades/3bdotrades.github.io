@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "7c833c7ce709d2225669cd65ba46466c31e48d25",
- "built": "2026-11-15T09:07:00.000Z",
+ "at": "35c81f032c76a34a745b3669ecb11340fd3a032f",
+ "built": "2026-11-15T21:27:21.000Z",
  "day": "Mon 16 Nov",
  "counts": {"pass":[34,137],"win":[12,38],"flip":[68,159],"flip25":[42,68]},
  "flipDone": {"flip":[68,159],"flip25":[42,68]},
@@ -15,7 +15,8 @@
   ["2026-11-13T10:52","pass","blueguardian|50"],
   ["2026-11-13T13:27","wired","aqua|50"],
   ["2026-11-13T13:37","wired","blueguardian|50"],
-  ["2026-11-13T13:37","wired","blueguardian|50"]
+  ["2026-11-13T13:37","wired","blueguardian|50"],
+  ["2026-11-15T21:27","wired","lucid|50"]
  ],
  "acc": {
   "ed27ecd04c07": {"p":"e","f":"Topstep","gone":"2026-11-11","z":1,"u":1},
@@ -73,7 +74,19 @@
   "ccf1f85d2d35": {"p":"e","f":"Blue Guardian"},
   "0572e7116f7d": {"p":"x","f":"Aqua"},
   "97747fe74f77": {"p":"f","f":"Blue Guardian"},
-  "e022252c50a0": {"p":"f","f":"Blue Guardian"}
+  "e022252c50a0": {"p":"f","f":"Blue Guardian"},
+  "a580edeefa5a": {"p":"e","f":"Topstep","z":1},
+  "70fec46d711d": {"p":"e","f":"Topstep","z":1},
+  "b8e9b5003385": {"p":"e","f":"Topstep","z":1},
+  "98657380366e": {"p":"e","f":"Topstep","z":1},
+  "f5aa17116e20": {"p":"e","f":"Lucid","z":1},
+  "59f6979d26b4": {"p":"e","f":"Lucid","z":1},
+  "24e8137ce13e": {"p":"e","f":"FuturesElite","z":1},
+  "c07f7db1f408": {"p":"e","f":"FuturesElite","z":1},
+  "918770959796": {"p":"e","f":"FuturesElite","z":1},
+  "8e2031792e63": {"p":"e","f":"FuturesElite","z":1},
+  "124446dcf1b6": {"p":"e","f":"FuturesElite","z":1},
+  "794b3256d815": {"p":"f","f":"Lucid","z":1}
  },
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
@@ -107,6 +120,18 @@
   "2026-11-13 09:17 eval passed · Blue Guardian b9b960",
   "2026-11-13 10:52 eval passed · Blue Guardian fbbedf",
   "2026-11-13 13:57 funded account won · Aqua 0572e7",
-  "2026-11-13 17:07 eval left the dashboard without a pass: blown · FuturesElite f5c1c2"
+  "2026-11-13 17:07 eval left the dashboard without a pass: blown · FuturesElite f5c1c2",
+  "2026-11-15 21:27 eval listed with an older result: not counted · Topstep a580ed",
+  "2026-11-15 21:27 eval listed with an older result: not counted · Topstep 70fec4",
+  "2026-11-15 21:27 eval listed with an older result: not counted · Topstep b8e9b5",
+  "2026-11-15 21:27 eval listed with an older result: not counted · Topstep 986573",
+  "2026-11-15 21:27 eval listed with an older result: not counted · Lucid f5aa17",
+  "2026-11-15 21:27 eval listed with an older result: not counted · Lucid 59f697",
+  "2026-11-15 21:27 eval listed with an older result: not counted · FuturesElite 24e813",
+  "2026-11-15 21:27 eval listed with an older result: not counted · FuturesElite c07f7d",
+  "2026-11-15 21:27 eval listed with an older result: not counted · FuturesElite 918770",
+  "2026-11-15 21:27 eval listed with an older result: not counted · FuturesElite 8e2031",
+  "2026-11-15 21:27 eval listed with an older result: not counted · FuturesElite 124446",
+  "2026-11-15 21:27 funded account listed with an older result: not counted · Lucid 794b32"
  ]
 }
