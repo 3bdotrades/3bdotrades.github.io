@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "7c2167642f9eb489558e961966562a2cda76dee8",
- "built": "2026-11-16T01:47:04.000Z",
+ "at": "9781604bc522e1bb6613c203fb545c88aaf29105",
+ "built": "2026-11-16T06:37:01.000Z",
  "day": "Mon 16 Nov",
- "counts": {"pass":[34,137],"win":[12,39],"flip":[71,162],"flip25":[43,69]},
+ "counts": {"pass":[34,138],"win":[12,39],"flip":[71,162],"flip25":[43,69]},
  "flipDone": {"flip":[68,159],"flip25":[42,68]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"6dcd002486dc":[0,1],"9a1c66562989":[0,1],"0572e7116f7d":[0,1],"939ef825819d":[1,1]},
@@ -64,7 +64,7 @@
   "b51ec5a0b235": {"p":"e","f":"Blue Guardian","gone":"2026-11-13","z":1,"u":1},
   "6d7927b05e7f": {"p":"e","f":"Blue Guardian","gone":"2026-11-13","z":1,"u":1},
   "5a32645fa5b3": {"p":"e","f":"Blue Guardian","gone":"2026-11-13","z":1,"u":1},
-  "47542f7969d9": {"p":"e","f":"Blue Guardian"},
+  "47542f7969d9": {"p":"e","f":"Blue Guardian","gone":"2026-11-16","z":1,"u":1},
   "ec4cfe132e74": {"p":"e","f":"Blue Guardian"},
   "254ae0359220": {"p":"e","f":"Blue Guardian"},
   "3ab5601545f6": {"p":"e","f":"Blue Guardian"},
@@ -135,6 +135,7 @@
   "2026-11-15 21:27 eval listed with an older result: not counted · FuturesElite 124446",
   "2026-11-15 21:27 funded account listed with an older result: not counted · Lucid 794b32",
   "2026-11-15 21:29 eval listed with an older result: not counted · Lucid fa9e96",
-  "2026-11-16 01:47 funded account lost · Blue Guardian 97747f"
+  "2026-11-16 01:47 funded account lost · Blue Guardian 97747f",
+  "2026-11-16 06:37 eval left the dashboard without a pass: blown · Blue Guardian 47542f"
  ]
 }
