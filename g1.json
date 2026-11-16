@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "b60cf50ec91fce6f13b4d141425326663e3489df",
- "built": "2026-11-16T09:47:12.000Z",
+ "at": "fdb19acb176a65d0a52ef501bf6b52dd003544e9",
+ "built": "2026-11-16T14:47:08.000Z",
  "day": "Mon 16 Nov",
- "counts": {"pass":[22,90],"win":[8,15],"flip":[27,62],"flip25":[18,36]},
+ "counts": {"pass":[23,91],"win":[8,15],"flip":[27,62],"flip25":[18,36]},
  "flipDone": {"flip":[24,57],"flip25":[17,33]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"6d5033218423":[0,1],"0375f3fcc515":[0,1],"38b9209a2597":[1,-1],"b3bb30ebaeb4":[0,-1],"0818c51c6877":[0,1],"8f43dd7465bf":[1,-1],"93f31a30919c":[1,1],"e0028132017c":[0,-1]},
@@ -15,7 +15,8 @@
   ["2026-11-12T14:37","pass","futureselite|50"],
   ["2026-11-12T15:47","pass","topstep|50"],
   ["2026-11-12T22:17","wired","topstep|50"],
-  ["2026-11-13T22:17","wired","futureselite|50"]
+  ["2026-11-13T22:17","wired","futureselite|50"],
+  ["2026-11-16T14:47","pass","futureselite|50"]
  ],
  "acc": {
   "5860b65ec8f7": {"p":"e","f":"Aqua","z":1,"gone":"2026-11-10"},
@@ -30,7 +31,7 @@
   "4040af924c0c": {"p":"e","f":"FuturesElite"},
   "761ca3928af4": {"p":"f","f":"FuturesElite"},
   "aa289bb5aa5b": {"p":"e","f":"FuturesElite","gone":"2026-11-13","z":1,"u":1},
-  "86ebbb3fea8d": {"p":"e","f":"FuturesElite"},
+  "86ebbb3fea8d": {"p":"e","f":"FuturesElite","z":1},
   "25042024a835": {"p":"e","f":"FuturesElite"},
   "59226c3852d6": {"p":"e","f":"FuturesElite"},
   "9523ade11d83": {"p":"e","f":"Topstep"},
@@ -96,6 +97,7 @@
   "2026-11-16 01:37 eval left the dashboard without a pass: blown · Blue Guardian fcf669",
   "2026-11-16 01:47 eval left the dashboard without a pass: blown · Blue Guardian d9eec6",
   "2026-11-16 02:07 eval left the dashboard without a pass: blown · Blue Guardian e67105",
-  "2026-11-16 09:47 eval left the dashboard without a pass: blown · Blue Guardian 30406c"
+  "2026-11-16 09:47 eval left the dashboard without a pass: blown · Blue Guardian 30406c",
+  "2026-11-16 14:47 eval passed · FuturesElite 86ebbb"
  ]
 }
