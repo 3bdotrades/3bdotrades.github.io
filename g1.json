@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "47151eb2a6c4e83fce62024222496a900338349d",
- "built": "2026-11-16T01:37:05.000Z",
+ "at": "7c2167642f9eb489558e961966562a2cda76dee8",
+ "built": "2026-11-16T01:47:04.000Z",
  "day": "Mon 16 Nov",
- "counts": {"pass":[22,87],"win":[8,15],"flip":[26,59],"flip25":[17,33]},
+ "counts": {"pass":[22,88],"win":[8,15],"flip":[26,59],"flip25":[17,33]},
  "flipDone": {"flip":[24,57],"flip25":[17,33]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"6d5033218423":[0,1],"0375f3fcc515":[0,1]},
@@ -64,7 +64,7 @@
   "7536eb739fd5": {"p":"e","f":"Blue Guardian"},
   "a8c0b9cfda56": {"p":"e","f":"Blue Guardian"},
   "fcf669cfc68c": {"p":"e","f":"Blue Guardian","gone":"2026-11-16","z":1,"u":1},
-  "d9eec6061f0c": {"p":"e","f":"Blue Guardian"},
+  "d9eec6061f0c": {"p":"e","f":"Blue Guardian","gone":"2026-11-16","z":1,"u":1},
   "e6710585f030": {"p":"e","f":"Blue Guardian"},
   "262b3468bc0c": {"p":"e","f":"Blue Guardian"},
   "dc362976bc63": {"p":"e","f":"Blue Guardian"},
@@ -93,6 +93,7 @@
   "2026-11-13 02:47 eval left the dashboard without a pass: blown · FuturesElite aa289b",
   "2026-11-13 15:27 eval left the dashboard without a pass: blown · Topstep 81ef2d",
   "2026-11-16 00:47 eval left the dashboard without a pass: blown · Blue Guardian 10bb27",
-  "2026-11-16 01:37 eval left the dashboard without a pass: blown · Blue Guardian fcf669"
+  "2026-11-16 01:37 eval left the dashboard without a pass: blown · Blue Guardian fcf669",
+  "2026-11-16 01:47 eval left the dashboard without a pass: blown · Blue Guardian d9eec6"
  ]
 }

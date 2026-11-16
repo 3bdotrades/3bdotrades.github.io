@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "616a8d3d3086ac8c409404b96bec161f0d7898a0",
- "built": "2026-11-16T00:17:01.000Z",
+ "at": "7c2167642f9eb489558e961966562a2cda76dee8",
+ "built": "2026-11-16T01:47:04.000Z",
  "day": "Mon 16 Nov",
- "counts": {"pass":[34,137],"win":[12,38],"flip":[71,162],"flip25":[43,69]},
+ "counts": {"pass":[34,137],"win":[12,39],"flip":[71,162],"flip25":[43,69]},
  "flipDone": {"flip":[68,159],"flip25":[42,68]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"6dcd002486dc":[0,1],"9a1c66562989":[0,1],"0572e7116f7d":[0,1],"939ef825819d":[1,1]},
@@ -73,7 +73,7 @@
   "4232c46cda92": {"p":"e","f":"Blue Guardian"},
   "ccf1f85d2d35": {"p":"e","f":"Blue Guardian"},
   "0572e7116f7d": {"p":"x","f":"Aqua"},
-  "97747fe74f77": {"p":"f","f":"Blue Guardian"},
+  "97747fe74f77": {"p":"f","f":"Blue Guardian","z":1},
   "e022252c50a0": {"p":"f","f":"Blue Guardian"},
   "a580edeefa5a": {"p":"e","f":"Topstep","z":1},
   "70fec46d711d": {"p":"e","f":"Topstep","z":1},
@@ -134,6 +134,7 @@
   "2026-11-15 21:27 eval listed with an older result: not counted · FuturesElite 8e2031",
   "2026-11-15 21:27 eval listed with an older result: not counted · FuturesElite 124446",
   "2026-11-15 21:27 funded account listed with an older result: not counted · Lucid 794b32",
-  "2026-11-15 21:29 eval listed with an older result: not counted · Lucid fa9e96"
+  "2026-11-15 21:29 eval listed with an older result: not counted · Lucid fa9e96",
+  "2026-11-16 01:47 funded account lost · Blue Guardian 97747f"
  ]
 }
