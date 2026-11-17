@@ -52,7 +52,6 @@ h2{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;align-
 td .box{width:4em;font-size:14px;line-height:1.5}
 td .box.s{width:2.8em;text-align:center}
 tbody tr+tr td.same{border-top-color:transparent}
-.box:disabled{opacity:.4}
 /* 5ers: the money boxes of its first line, the two counts of a rate, a stage picker and a date */
 .box.m{width:6.8em;font-size:14px;line-height:1.5}
 .rates .cell.two{grid-column:span 2}
@@ -72,10 +71,6 @@ tbody tr+tr td.same{border-top-color:transparent}
 .jour th:nth-child(2),.jour td:nth-child(2){text-align:left}
 .jour td:first-child{color:var(--mute)}
 .jadd{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
-.seg{display:inline-flex;gap:12px;text-transform:none;letter-spacing:0}
-.seg button{font:600 13px/1.2 system-ui,"Segoe UI",sans-serif;color:var(--mute);background:none;border:0;padding:0;cursor:pointer}
-.seg button:hover{color:var(--ink)}
-.seg button[aria-pressed="true"]{color:var(--ink);text-decoration:underline 2px var(--accent);text-underline-offset:5px}
 
 /* per firm */
 table{width:100%;border-collapse:collapse}
@@ -129,7 +124,7 @@ tr.off .pick{color:var(--mute)}
 <body>
 <main>
   <h1 class="sr">Funded Slots Roadmap</h1>
-  <nav class="tabs" aria-label="Fleet"><a class="tab" id="fleet-g1" href="?fleet=g1">G1</a><a class="tab" id="fleet-v2" href="?fleet=v2">V2 fleet</a><a class="tab" id="fleet-5ers" href="?fleet=5ers">5ers</a><a class="tab" id="fleet-sim" href="?fleet=sim">Simulation</a></nav>
+  <nav class="tabs" aria-label="Fleet"><a class="tab" id="fleet-g1" href="?fleet=g1">G1</a><a class="tab" id="fleet-v2" href="?fleet=v2">V2 fleet</a><a class="tab" id="fleet-5ers" href="?fleet=5ers">5ers</a></nav>
   <p class="note" id="g1"></p>
 
   <div class="top">
@@ -656,12 +651,12 @@ function perWinning(f, r){
 
 var WEEKS = 12;
 // two fleets on the same dashboard: G1 (default) and the V2 fleet (?fleet=v2); each keeps its own rates and last account counts.
-// ?fleet=sim is the simulation tab: no accounts, only the evals typed there, run on chance alone or with one fleet's rates and signals
 // ?fleet=5ers is one firm with rules of its own, not on the dashboard: its accounts, record and money are typed there (see FIVE_SIZES)
+// (The Simulation tab, ?fleet=sim, was taken off on 17 Nov 2026, the owner's word: an old link to it opens G1.)
 var FLEETS = { g1: { key: 'g1', label: 'G1', store: 'funded-slots-roadmap-v1' }, v2: { key: 'v2', label: 'V2 fleet', store: 'funded-slots-roadmap-v2fleet' },
-               '5ers': { key: '5ers', label: '5ers', store: 'funded-slots-roadmap-5ers' }, sim: { key: 'sim', label: 'Simulation', store: 'funded-slots-roadmap-sim' } };
-var FLEET = FLEETS[((/[?&]fleet=(v2|sim|5ers)(&|$)/i.exec((window.location && window.location.search) || '') || [])[1] || 'g1').toLowerCase()];
-var STORE = FLEET.store, SIM = FLEET.key === 'sim', FIVE = FLEET.key === '5ers';
+               '5ers': { key: '5ers', label: '5ers', store: 'funded-slots-roadmap-5ers' } };
+var FLEET = FLEETS[((/[?&]fleet=(v2|5ers)(&|$)/i.exec((window.location && window.location.search) || '') || [])[1] || 'g1').toLowerCase()];
+var STORE = FLEET.store, FIVE = FLEET.key === '5ers';
 document.getElementById('fleet-' + FLEET.key).setAttribute('aria-current', 'page');
 if (FLEET.key !== 'g1') document.title = 'Funded Slots Roadmap · ' + FLEET.label;
 // The four rates on the page are the fleet's own record and nothing else: the Lifetime table of the fleet dashboard when it
@@ -741,13 +736,15 @@ var FIVE_DISC = 0.8;
 var FIVE_SIZES = [{ k: '50', size: '50K', list: 100, credit: 10, price: 72, pay: 1158, risk: 2000, make: 3000 }, { k: '25', size: '25K', list: 59, credit: 5, price: 43.2, pay: 579, risk: 1000, make: 1500 }];
 var FIVE_MAX = 5, FIVE_WAIT = 14, FIVE_CHANCE = FIVE_SIZES[0].risk / (FIVE_SIZES[0].risk + FIVE_SIZES[0].make);
 function fivePrice(z, p){ return FIVE_DISC * (z.list - z.credit * (1 + clamp01(p))); }
-// What is typed on the 5ers tab, checked (cleanFive), v 2:
+// What is typed on the 5ers tab, checked (cleanFive), v 3 (FIVE_V). The tab started from scratch on 17 Nov 2026 (the owner:
+// "edit 5ers to start from scratch", then "Everything, all empty"): it opens empty, and what was kept before that (v 2 and
+// older, in a browser, on the relay or in shared.json) is never taken again.
 // cap: the slots of each size, 0 to 5.
 // acc: the accounts held, five places a size: '' none, 'e' an eval, 'f' a funded account, 'p2:DATE' or 'p1:DATE' a funded
 // win with two payouts or one still due, the next one on DATE; ':AMOUNT' after the day when its payouts are not the usual ones.
 // j: the journal, a line 'DATE KIND N AMOUNT' for everything done. DATE is a day, or '-' before the journal. KIND:
 //   b50 / b25   N evals of that size bought, AMOUNT what was paid for them (0 when it is paid in an 'm' line)
-//   m           AMOUNT paid for evals (before the journal: the owner's 42 evals, $1,685.19 in all)
+//   m           AMOUNT paid for evals (with no count)
 //   s50 / s25   N evals of that size passed            x50 / x25   N evals of that size lost
 //   w / l       N funded trades won / lost
 //   p / h       a payout of AMOUNT received in cash / taken as hub credits (counted as money, the owner's word)
@@ -755,15 +752,12 @@ function fivePrice(z, p){ return FIVE_DISC * (z.list - z.credit * (1 + clamp01(p
 // from it and cannot be typed (the owner, 13 Nov 2026: "locked and live count when i edit what done in journel"). Dated
 // lines are kept in the order of their day. At most J_MAX of them: the oldest beyond that fold into the '-' line of their
 // kind (one a kind), so every total and count stays.
-var FIVE0 = { paid: 1685.19, out: 4425.1 }, ACC_RX = /^(?:e|f|p[12]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
+var FIVE_V = 3, ACC_RX = /^(?:e|f|p[12]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
 var J_MAX = 100, J_RX = /^(\d{4}-\d\d-\d\d|-) (b50|b25|s50|s25|x50|x25|w|l|m|p|h) (\d{1,4}) (\d{1,7}(?:\.\d\d?)?)$/;
 var J_ORDER = ['b25', 'b50', 'm', 's25', 's50', 'x25', 'x50', 'w', 'l', 'p', 'h'], J_COUNTED = { b50: 1, b25: 1, s50: 1, s25: 1, x50: 1, x25: 1, w: 1, l: 1 };
-// The owner's numbers on 13 Nov 2026: 42 evals bought (32 × 25K, 10 × 50K) for $1,685.19 in all; 12 passed (7 × 25K,
-// 5 × 50K) and 29 lost (24 × 25K, 5 × 50K: his 25K account 1 is an eval still open); 5 funded trades won and 7 lost; the
-// seven payouts of his screenshots; and two 25K payouts of $965 (old style) due on 25 and 26 Nov.
-var J_SEED = ['- b25 32 0', '- b50 10 0', '- m 0 1685.19', '- s25 7 0', '- s50 5 0', '- x25 24 0', '- x50 5 0', '- w 5 0', '- l 7 0',
-  '2026-10-14 h 0 600', '2026-10-28 p 0 579', '2026-10-29 p 0 579', '2026-10-29 p 0 579', '2026-11-11 p 0 758.1', '2026-11-12 p 0 965', '2026-11-12 p 0 965'];
-var ACC_SEED = { '50': ['', '', '', '', ''], '25': ['e', 'p1:2026-11-25:965', 'p1:2026-11-26:965', '', ''] };
+// What the tab opens with: nothing (no line in the journal, no account held)
+var J_SEED = [];
+var ACC_SEED = { '50': ['', '', '', '', ''], '25': ['', '', '', '', ''] };
 // a journal line read: its day, kind, count and amount, and the line as it is kept (s); null when it is not one
 function jLine(x){
   var m = typeof x === 'string' ? J_RX.exec(x) : null; if (!m) return null;
@@ -799,26 +793,10 @@ function accClean(x, z){
   if (m[2] !== undefined && !(amt > 0)) return '';
   return x.slice(0, 13) + (amt > 0 && amt !== z.pay ? ':' + amt : '');
 }
-// Something kept before the journal had its lines (v 1: paid, out and its lines; before that only paid and out typed): its
-// accounts and slots stay, the owner's numbers of 13 Nov 2026 come in, its own paid and payouts with them, and the two 25K
-// payouts due go into its first empty 25K places.
-var J_V1 = /^(\d{4}-\d\d-\d\d) (p|h|50|25) (\d{1,7}(?:\.\d\d?)?)$/;
-function fiveUpgrade(o){
-  function cash(v, d){ return typeof v === 'number' && v >= 0 && v < 1e9 ? Math.round(v * 100) / 100 : d; }
-  var v1 = Array.isArray(o.j), j = J_SEED.filter(function(s){ return s.charAt(0) === '-' && s.indexOf('- m ') !== 0; }), acc = {};
-  var paid = cash(o.paid, FIVE0.paid), out = v1 ? cash(o.out, 0) : Math.max(0, Math.round((cash(o.out, FIVE0.out) - FIVE0.out) * 100) / 100);
-  if (paid > 0) j.push('- m 0 ' + paid);
-  if (out > 0) j.push('- p 0 ' + out);
-  if (v1) o.j.slice(0, 2000).forEach(function(x){ var m = typeof x === 'string' ? J_V1.exec(x) : null; if (m) j.push(m[1] + ' ' + (m[2] === 'p' || m[2] === 'h' ? m[2] + ' 0 ' : 'b' + m[2] + ' 1 ') + m[3]); });
-  else J_SEED.forEach(function(s){ if (s.charAt(0) !== '-') j.push(s); });
-  FIVE_SIZES.forEach(function(z){ var a = o.acc && Array.isArray(o.acc[z.k]) ? o.acc[z.k] : []; acc[z.k] = []; for (var i = 0; i < FIVE_MAX; i++) acc[z.k].push(accClean(a[i], z)); });
-  ACC_SEED['25'].forEach(function(x){ var at = acc['25'].indexOf(''); if (x.charAt(0) === 'p' && at >= 0) acc['25'][at] = x; });
-  return { v: 2, cap: o.cap, acc: acc, j: j };
-}
 function cleanFive(o){
   o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
-  if (o.v !== 2) o = Object.keys(o).length ? fiveUpgrade(o) : { v: 2, acc: ACC_SEED, j: J_SEED };
-  var pre = {}, lines = [], p = { v: 2, cap: [], acc: {}, j: [] };
+  if (o.v !== FIVE_V) o = { v: FIVE_V, acc: ACC_SEED, j: J_SEED };     // (from before the start from scratch: nothing kept)
+  var pre = {}, lines = [], p = { v: FIVE_V, cap: [], acc: {}, j: [] };
   function fold(l){ var q = pre[l.k] || (pre[l.k] = { n: 0, a: 0 }); q.n += l.n; q.a = Math.round((q.a + l.a) * 100) / 100; }
   (Array.isArray(o.j) ? o.j.slice(0, 2000) : []).forEach(function(x){ var l = jLine(x); if (l){ if (l.d === '-') fold(l); else lines.push(l); } });
   lines.sort(function(a, b){ return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
@@ -886,7 +864,7 @@ function cameOf(x){
   return o;
 }
 function liveCounts(){
-  var d = (SIM ? state.life[state.base] : state.g1 && state.g1.life) || {}, z = LIVE0[SIM ? state.base : FLEET.key], o = {};
+  var d = (state.g1 && state.g1.life) || {}, z = LIVE0[FLEET.key], o = {};
   RATE_KEYS.forEach(function(k){ o[k] = d[k] || z[k]; });
   return o;
 }
@@ -895,27 +873,15 @@ function liveRates(){ var c = liveCounts(), o = {}; RATE_KEYS.forEach(function(k
 (function(){
   var s = null; try { s = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
   if (!s || typeof s !== 'object') s = {};
-  if (SIM){
-    // the simulation keeps: whose rates (chance alone, or a fleet's with its signals), how many days, the evals typed per firm,
-    // the firms taken out, and the last signals and Lifetime counts read. It opens on Chance; a simulation kept before
-    // Chance existed (no v) does so once.
-    state.v = 2; state.base = s.v === 2 && (s.base === 'g1' || s.base === 'v2') ? s.base : 'chance';
-    state.days = s.days >= 5 && s.days <= 364 ? Math.round(s.days) : 84;
-    state.evals = {}; state.off = []; state.sig = {}; state.life = {};
-    if (s.evals && typeof s.evals === 'object') Object.keys(s.evals).slice(0, 40).forEach(function(k){ if (k.length < 60 && s.evals[k] >= 0) state.evals[k] = Math.min(500, Math.round(s.evals[k])); });
-    if (Array.isArray(s.off)) state.off = s.off.filter(function(k){ return typeof k === 'string' && k.length < 60; }).slice(0, 40);
-    ['g1', 'v2'].forEach(function(k){
-      if (s.sig && s.sig[k] > 0) state.sig[k] = Math.round(s.sig[k]);
-      if (s.life && s.life[k]) state.life[k] = lifeOf(s.life[k]);
-    });
-  }
-  else if (FIVE) state.five = cleanFive(s.five);
+  // the 5ers tab started from scratch on 17 Nov 2026 (FIVE_V): what a browser kept before that is dropped, with its version
+  var fresh = FIVE && !(s.five && s.five.v === FIVE_V);
+  if (FIVE) state.five = cleanFive(s.five);
   else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); }
   // for the edits shared by every browser (see shareEdit): a name for this browser, and the version of this view's part it holds
   state.dev = typeof s.dev === 'string' && /^[a-z0-9]{6,16}$/.test(s.dev) ? s.dev : (Math.random().toString(36) + '00000000').slice(2, 10);
-  var held = cleanVersion(s.sh); if (held) state.sh = held;
+  var held = cleanVersion(s.sh); if (held && !fresh) state.sh = held;
   state.slots = cleanSlots(s.slots);
-  if (SIM || FIVE){ delete state.firms; return; }
+  if (FIVE){ delete state.firms; return; }
   if (Array.isArray(s.skip)){ var sk = s.skip.filter(function(k){ return typeof k === 'string' && k.length < 60; }).slice(0, 40); if (sk.length) state.skip = sk; }
   if (Array.isArray(s.cashLog)) state.cashLog = s.cashLog;
   if (s.cashSeen && isFinite(s.cashSeen.inn) && isFinite(s.cashSeen.out)) state.cashSeen = s.cashSeen;
@@ -925,11 +891,11 @@ function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } cat
 
 // ---------- edits shared by every browser ----------
 // What a person changes on the page is the same in every browser that opens it, with no key and no sign-in: the firms
-// unticked in a fleet's view, and the Simulation tab's rates, days, evals and firms. Anyone with the page can change them.
+// unticked in a fleet's view, a firm's slots, and what is typed on the 5ers tab. Anyone with the page can change them.
 // An edit is sent to a public relay (ntfy.sh, which keeps a message for 12 hours). A page asks the relay when it opens, when
 // its tab is shown again and every two minutes. The counter's pass (tools/share.js) writes what the relay holds into
 // shared.json on the "track" branch, and a page reads that too when it opens: it is what is left once the relay has forgotten.
-// Each view's part (g1, v2, sim) has a version: n counts its edits; t (when) and by (which browser) settle a tie.
+// Each view's part (g1, v2, 5ers) has a version: n counts its edits; t (when) and by (which browser) settle a tie.
 // A copy of the page somewhere else (a preview on a PC) talks to a relay topic of its own.
 var LIVE_SITE = /^3bdotrades\.github\.io$/i.test(String((window.location && window.location.hostname) || ''));
 var SHARE_URL = 'https://ntfy.sh/funded-slots-roadmap-edits-7c41f9' + (LIVE_SITE ? '' : '-dev'), SHARE_KEY = FLEET.key;
@@ -947,14 +913,11 @@ function ahead(a, b){ return !!a && (!b || (a.n !== b.n ? a.n > b.n : a.t !== b.
 // this view's part as it came from somewhere else, with nothing in it but what the page understands; null when it is not one
 function cleanPart(o){
   var p = cleanVersion(o); if (!p || o.k !== SHARE_KEY) return null;
-  if (SIM){
-    p.base = BASES.indexOf(o.base) >= 0 ? o.base : 'chance';
-    p.days = typeof o.days === 'number' && o.days >= 5 && o.days <= 364 ? Math.round(o.days) : 84;
-    p.evals = {};
-    if (o.evals && typeof o.evals === 'object' && !Array.isArray(o.evals)) Object.keys(o.evals).slice(0, 40).forEach(function(k){ var v = o.evals[k]; if (KEY_RX.test(k) && typeof v === 'number' && v >= 0) p.evals[k] = Math.min(500, Math.round(v)); });
-    p.off = cleanKeys(o.off);
-  } else if (FIVE){ p.five = cleanFive(o.five); return p; }
-  else p.skip = cleanKeys(o.skip);
+  if (FIVE){                                          // (a 5ers part from before the start from scratch is not taken)
+    if (!o.five || typeof o.five !== 'object' || o.five.v !== FIVE_V) return null;
+    p.five = cleanFive(o.five); return p;
+  }
+  p.skip = cleanKeys(o.skip);
   p.slots = cleanSlots(o.slots);
   return p;
 }
@@ -962,20 +925,18 @@ function cleanPart(o){
 function myPart(){
   var o = { k: SHARE_KEY, n: state.sh.n, t: state.sh.t, by: state.sh.by };
   if (FIVE){ o.five = cleanFive(state.five); return o; }
-  if (SIM){ o.base = state.base; o.days = state.days; o.evals = state.evals; o.off = state.off; } else o.skip = cleanKeys(state.skip);
+  o.skip = cleanKeys(state.skip);
   o.slots = cleanSlots(state.slots);
   return o;
 }
 function takePart(p){
   if (FIVE) state.five = p.five;
   else {
-    if (SIM){ state.base = p.base; state.days = p.days; state.evals = p.evals; state.off = p.off; }
-    else if (p.skip.length) state.skip = p.skip; else delete state.skip;
+    if (p.skip.length) state.skip = p.skip; else delete state.skip;
     state.slots = p.slots;
   }
   state.sh = { n: p.n, t: p.t, by: p.by };
   save();
-  if (SIM){ syncRates(); buildSim(); }
   if (FIVE) buildFive();
   update();
 }
@@ -1005,7 +966,7 @@ function sendPart(){
   return fetch(SHARE_URL, { method: 'POST', body: JSON.stringify(myPart()) }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); });
 }
 var shareSeq = 0, shareBusy = false, shareTimer = 0, keptSeen = null, typedAt = 0, TYPING_MS = 5000;
-// A number box (a firm's slots, the Simulation tab's evals and days, the 5ers tab's numbers; a date there counts as one) is
+// A number box (a firm's slots, the 5ers tab's numbers; a date there counts as one) is
 // being typed in: it has the cursor and a key went into it in the last few seconds. Nothing is put in its place meanwhile.
 // A box that only keeps the cursor holds nothing back.
 function isNumberBox(el){ var t = el && el.tagName === 'INPUT' && el.getAttribute ? el.getAttribute('type') : ''; return t === 'number' || t === 'date'; }
@@ -1029,7 +990,7 @@ function pullShared(first){
 function ownChoices(){
   if (FIVE) return JSON.stringify(cleanFive(state.five)) !== JSON.stringify(cleanFive(null));
   if (Object.keys(state.slots || {}).length > 0) return true;
-  return SIM ? state.base !== 'chance' || state.days !== 84 || Object.keys(state.evals).length > 0 || state.off.length > 0 : !!(state.skip && state.skip.length);
+  return !!(state.skip && state.skip.length);
 }
 // After an edit made here: tell the others, a moment later so that typing sends one message. The edit takes the version
 // after the newest one anybody has, so the last edit made is the one every browser ends up with.
@@ -1046,24 +1007,23 @@ function shareEdit(){
   }, 1200);
 }
 
-// The Simulation tab's own rates, "Chance": what the trade sizes give a trader with no edge (see evalOdds and flipOdds).
+// The rates of chance, "Chance": what the trade sizes give a trader with no edge (see evalOdds and flipOdds), for the chart's
+// coin-flip line (coinFlip).
 // pass = how often a new eval that needs two winning days passes at those odds; win = the funded trade's odds; flip and
 // flip25 = a flip day's odds on a 50K and on a 25K. A run with them takes every firm's own odds (chance: true).
-// fleet: whose funded trade (see fundedOdds). The Simulation tab's Chance is G1's, the owner's own numbers.
+// fleet: whose funded trade (see fundedOdds).
 function chanceRates(fleet){
   var odds = fundedOdds(fleet);
   return { pass: evalRoad(EVAL_WIN, evalOdds(''), 0, false).rate, win: odds, odds: odds, flip: flipOdds('', '50K'), flip25: flipOdds('', '25K'), chance: true,
     tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
 }
-function onChance(){ return SIM && state.base === 'chance'; }
 // The rates a run takes: the live ones, as the page shows them. Funded win becomes the chance per trade p:
 // an account with FIXED.tries trades at it reaches profit with 1 - (1 - p)^tries. odds = the odds of the funded trade that
 // rate was earned on.
 function fracRates(){
-  if (onChance()) return chanceRates(SIM ? 'g1' : FLEET.key);
   var r = liveRates(), f = {};
   RATE_KEYS.forEach(function(k){ f[k] = r[k] / 100; });
-  return { pass: f.pass, win: 1 - Math.pow(1 - clamp01(f.win), 1 / FIXED.tries), odds: fundedOdds(SIM ? state.base : FLEET.key), flip: f.flip, flip25: f.flip25,
+  return { pass: f.pass, win: 1 - Math.pow(1 - clamp01(f.win), 1 / FIXED.tries), odds: fundedOdds(FLEET.key), flip: f.flip, flip25: f.flip25,
     tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
 }
 // a 25K account flips the 25K box: its row takes that rate. On chance alone every row has the odds of its own flip day.
@@ -1263,28 +1223,12 @@ function withHistory(res, coin){
 // ---------- the page: four totals, the firm table, the chart ----------
 var firmsEl = document.getElementById('firms'), skipEl = document.getElementById('skip');
 var RATE_WORDS = { pass: 'finished evals passed', win: 'funded accounts reached profit', flip: 'flip days won on 50K accounts', flip25: 'flip days won on 25K accounts' };
-// The four rates. Hovering one shows what is behind it: the fleet's count, or on Chance the trade sizes behind the odds.
+// The four rates. Hovering one shows what is behind it: the fleet's count.
 // Eval pass also says what it comes to at Tradeify, where an eval needs three winning days.
 function syncRates(){
   if (FIVE) return;                                    // the 5ers tab has its own two rates (see buildFive)
   var rr = fracRates(), three = (100 * evalOf({ firm: 'Tradeify' }, params(rr)).fresh.rate).toFixed(1) + '%';
-  document.getElementById('rates-h').textContent = rr.chance ? 'Chance rates' : 'Live rates';
-  if (rr.chance){
-    var usd = function(v){ return '$' + (Math.round(v * 100) % 100 ? v.toFixed(2) : Math.round(v).toLocaleString('en-US')); }, pc = function(x){ return (100 * x).toFixed(2) + '%'; };
-    var stop = DAY_LOSS - FLIP_FEE, shown = { pass: rr.pass, win: fundedToProfit(rr.win, rr.tries), flip: rr.flip, flip25: rr.flip25 };
-    var text = {
-      pass: 'an eval day risks ' + usd(3000 * EVAL_STOP) + ' for ' + usd(3000 * (EVAL_WIN + EVAL_FEE)) + ' and wins ' + pc(evalOdds('')) + ' of the time; two winning days before two losing days in a row = ' + pc(rr.pass) +
-            '. At Tradeify (' + usd(3000 * EVAL_STOP) + ' for ' + usd(3000 * (EVAL_WIN_AT.tradeify + EVAL_FEE)) + ', ' + pc(evalOdds('Tradeify')) + ' a day, 3 winning days): ' + three,
-      win: 'a funded trade risks ' + usd(FUNDED_STOP) + ' for ' + usd(FUNDED_STOP * (1 / rr.win - 1)) + ' and wins ' + pc(rr.win) + ' of the time; an account has ' + rr.tries + ' tries = ' + pc(shown.win),
-      flip: 'a flip day on a 50K risks ' + usd(stop) + ' for ' + usd(DAY_WIN + FLIP_FEE) + ' and wins ' + pc(rr.flip) + ' of the time',
-      flip25: 'a flip day on a 25K risks ' + usd(stop) + ' for ' + usd(DAY_WIN_25 + FLIP_FEE) + ' and wins ' + pc(rr.flip25) + ' of the time'
-    };
-    RATE_KEYS.forEach(function(k){
-      document.getElementById('r-' + k).textContent = Math.round(1000 * shown[k]) / 10;
-      document.getElementById('c-' + k).title = 'Chance: ' + text[k];
-    });
-    return;
-  }
+  document.getElementById('rates-h').textContent = 'Live rates';
   var c = liveCounts(), r = liveRates();
   RATE_KEYS.forEach(function(k){
     document.getElementById('r-' + k).textContent = r[k];
@@ -1293,7 +1237,7 @@ function syncRates(){
   });
 }
 // the most evals the fleet keeps trading: the highest number of eval signals it had in a day (from the dashboard)
-function seats(){ if (SIM) return state.sig[state.base] > 0 ? state.sig[state.base] : undefined; var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
+function seats(){ var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
 // the fleet's firms as a run at these rates takes them; all = with no firm skipped
 function planFirms(rr, all){
   var on = dayOn(), late = on ? lateShare() : 0;
@@ -1347,7 +1291,6 @@ function quiet(s){ return '<span class="mute">' + s + '</span>'; }
 function count(v){ return v > 0 ? acc(v) : quiet('0'); }
 function gain(v){ return Math.abs(v) <= 0.5 ? quiet('$0') : '<span class="' + (v > 0 ? 'pos' : 'neg') + '">' + signed(v) + '</span>'; }
 function update(){
-  if (SIM) return updateSim();
   if (FIVE) return updateFive();
   var rr = fracRates(), res = outcome(rr), off = state.firms.filter(skipped), all = off.length ? outcome(rr, true) : null;
   document.getElementById('t-buy-k').textContent = BUY_K;
@@ -1411,124 +1354,13 @@ firmsEl.addEventListener('change', function(e){
 });
 firmsEl.addEventListener('change', function(e){
   var box = e.target, k = box && box.getAttribute ? box.getAttribute('data-k') : null; if (!k) return;
-  if (SIM){
-    // in or out of the simulation
-    state.off = state.off.filter(function(x){ return x !== k; }); if (!box.checked) state.off.push(k);
-    save(); buildSim(); update(); shareEdit();
-    var again = firmsEl.querySelector('[data-k="' + k + '"]'); if (again) again.focus();
-    return;
-  }
   var list = state.firms.filter(function(f){ return unitKey(f) === k ? !box.checked : skipped(f); }).map(unitKey);
   if (list.length) state.skip = list; else delete state.skip;
   save(); update(); shareEdit();
 });
 
-// ---------- simulation tab: start from zero with the evals typed here, on chance alone or in one fleet's rates and signals ----------
-var tilesEl = document.getElementById('tiles'), simFirms = [], simDown = false;
-firmsEl.addEventListener('input', typed); tilesEl.addEventListener('input', typed);
-var BASES = ['chance', 'g1', 'v2'], BASE_NAMES = { chance: 'Chance', g1: FLEETS.g1.label, v2: FLEETS.v2.label };
-function simEvals(k){ return state.evals[k] === undefined ? 10 : state.evals[k]; }
-// the chosen fleet's firms (on Chance: G1's, the owner's own numbers) with no accounts: a ticked one starts with its evals,
-// bought on the first day, and buys none after that
-function simRows(){
-  return OWNER_SETS[onChance() ? 'g1' : state.base].map(function(o){
-    var f = clone(NEW_FIRM); f.firm = o.firm; f.size = o.size;
-    OWNER_KEYS.forEach(function(k){ if (o[k] !== undefined) f[k] = o[k]; });
-    f.idle = 0; f.skip = true; f.start = state.off.indexOf(unitKey(f)) >= 0 ? 0 : simEvals(unitKey(f));
-    return slotted(f);
-  });
-}
-// the inputs: total evals and days in the strip, a tick box and an evals box per firm
-function buildSim(){
-  // the box that has the cursor gets it back once the inputs are made again
-  var at = document.activeElement, mine = at && at.getAttribute && (tilesEl.contains(at) || firmsEl.contains(at));
-  var keep = !mine ? '' : at.id ? '#' + at.id : at.getAttribute('data-s') ? '[data-s="' + at.getAttribute('data-s') + '"]' : '';
-  simFirms = simRows();
-  tilesEl.innerHTML = '<div class="cell"><label for="s-total">Evals</label><span class="v"><input class="box" id="s-total" type="number" inputmode="numeric" min="0" max="4000" step="1" title="Type a total to split it evenly over the ticked firms"><small id="s-cost"></small></span></div>' +
-    '<div class="cell"><label for="s-days">Days</label><span class="v"><input class="box" id="s-days" type="number" inputmode="numeric" min="5" max="364" step="1" title="Calendar days from today"></span></div>' +
-    '<div class="cell"><span class="k">Payouts</span><span class="v" id="s-in">–</span></div>' +
-    '<div class="cell"><span class="k" id="s-net-k">Net</span><span class="v" id="s-net">–</span></div>';
-  document.getElementById('s-days').value = state.days;
-  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Slots</th><th>Evals</th><th>Cost</th><th>Payouts</th><th>Net</th></tr></thead><tbody>' +
-    simFirms.map(function(f, i){
-      var k = unitKey(f), no = state.off.indexOf(k) >= 0, name = esc((f.firm + ' ' + f.size).trim());
-      return '<tr' + (no ? ' class="off"' : '') + '><td class="who"><label class="pick"><input type="checkbox" data-k="' + k + '"' + (no ? '' : ' checked') + ' aria-label="' + name + ' in the simulation">' +
-        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' + slotsCell(simFirms, i) +
-        '<td><input class="box" id="s' + i + '-n" data-n="' + i + '" type="number" inputmode="numeric" min="0" max="500" step="1" value="' + simEvals(k) + '"' + (no ? ' disabled' : '') + ' aria-label="Evals at ' + name + '"></td>' +
-        '<td id="s' + i + '-cost"></td><td id="s' + i + '-in"></td><td id="s' + i + '-net"></td></tr>';
-    }).join('') + '</tbody></table>';
-  if (keep){ var again = document.querySelector(keep); if (again && again.focus) again.focus(); }
-}
-function updateSim(){
-  // calendar days to trading days; the weeks drawn are the ones those days reach into
-  var rr = fracRates(), cap = seats(), T = Math.max(1, Math.round(state.days * 5 / 7)), W = Math.ceil((WD0 + T) / 5), tot = 0;
-  simFirms = simRows();
-  var res = runAll(simFirms.map(function(f){ return boxed(clone(f), rr); }), rr, W, cap, T);
-  simFirms.forEach(function(f, i){
-    var inn = 0, out = 0; res.per[i].rows.forEach(function(x){ inn += x.inn; out += x.out; });
-    tot += f.start;
-    document.getElementById('s' + i + '-cost').innerHTML = out > 0.5 ? money(out) : quiet('$0');
-    document.getElementById('s' + i + '-in').innerHTML = inn > 0.5 ? money(inn) : quiet('$0');
-    document.getElementById('s' + i + '-net').innerHTML = gain(inn - out);
-  });
-  var total = document.getElementById('s-total'); if (document.activeElement !== total) total.value = tot;
-  document.getElementById('s-cost').textContent = tot > 0 ? money(res.totOut) : '';
-  document.getElementById('s-in').textContent = money(res.totIn);
-  document.getElementById('s-net-k').textContent = 'Net after ' + state.days + ' days';
-  var net = document.getElementById('s-net'); net.textContent = signed(res.net); net.className = 'v ' + (res.net >= 0 ? 'pos' : 'neg');
-  // whose rates: chance alone, or a fleet's live ones with its eval signals, and what those signals mean for this many evals
-  g1El.innerHTML = 'Rates of <span class="seg" role="group" aria-label="Rates">' + BASES.map(function(k){ return '<button type="button" id="base-' + k + '" aria-pressed="' + (state.base === k) + '">' + esc(BASE_NAMES[k]) + '</button>'; }).join('') + '</span>' +
-    (onChance() ? ': no edge, only what the trade sizes give. Every eval trades from day one.'
-      : cap ? ': live, with max ' + cap + ' eval signals a day' + (tot > cap ? ', so ' + cap + ' of the ' + tot + ' evals trade at once and the rest wait for a seat.' : '.')
-      : simDown ? ': live. The dashboard is not readable right now, so every eval trades from day one.' : ': reading the dashboard…');
-  BASES.forEach(function(k){
-    document.getElementById('base-' + k).onclick = function(){
-      if (state.base === k) return;
-      state.base = k;
-      save(); syncRates(); buildSim(); update(); shareEdit();
-    };
-  });
-  drawChart(res.rows);
-}
-if (SIM){
-  firmsEl.addEventListener('input', function(e){
-    var i = e.target && e.target.getAttribute ? e.target.getAttribute('data-n') : null; if (i === null || !simFirms[i]) return;
-    state.evals[unitKey(simFirms[i])] = Math.min(500, Math.max(0, Math.round(num(e.target.value, 0))));
-    save(); update(); shareEdit();
-  });
-  tilesEl.addEventListener('input', function(e){
-    var el = e.target || {}, v = Math.round(num(el.value, 0));
-    if (el.id === 's-days') state.days = v > 0 ? Math.min(364, Math.max(5, v)) : 84;
-    else if (el.id === 's-total'){
-      // a typed total is split evenly over the ticked firms
-      var on = simFirms.filter(function(f){ return state.off.indexOf(unitKey(f)) < 0; }), n = Math.min(500 * on.length, Math.max(0, v));
-      on.forEach(function(f, j){ state.evals[unitKey(f)] = Math.floor(n / on.length) + (j < n % on.length ? 1 : 0); });
-      simFirms.forEach(function(f, i){ document.getElementById('s' + i + '-n').value = simEvals(unitKey(f)); });
-      if (n !== v) el.value = n;
-    }
-    else return;
-    save(); update(); shareEdit();
-  });
-}
-// the eval signals and the Lifetime counts of both fleets, from the dashboard
-function syncSim(){
-  var kept = { g1: counted('g1'), v2: counted('v2') };
-  fetch(G1_URL + '?t=' + Date.now(), { cache: 'no-store' })
-    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-    .then(function(html){
-      var any = false;
-      ['g1', 'v2'].forEach(function(k){
-        var g = parseG1(html, k); if (!g) return;
-        if (g.sig && g.sig.max > 0){ state.sig[k] = g.sig.max; any = true; }
-        if (g.life) state.life[k] = g.life;
-        else kept[k].then(function(c){ if (!c) return; state.life[k] = c.life; save(); syncRates(); update(); });
-      });
-      if (!any) throw new Error('signals not readable');
-      simDown = false;
-      save(); syncRates(); update();
-    })
-    .catch(function(){ simDown = true; update(); });
-}
+// a number box being typed in (a firm's slots): see typing()
+firmsEl.addEventListener('input', typed);
 
 // ---------- 5ers tab: one firm, its accounts, record and money typed here (rules: see FIVE_SIZES) ----------
 var accsEl = document.getElementById('accs'), ratesEl = document.getElementById('rates');
@@ -2028,8 +1860,7 @@ function syncG1(){
     .catch(function(){ drawG1(true); });
 }
 
-if (SIM){ buildSim(); syncRates(); update(); syncSim(); setInterval(syncSim, 30 * 60 * 1000); }
-else if (FIVE){
+if (FIVE){
   [ratesEl, firmsEl, accsEl].forEach(function(el){ el.addEventListener('input', typed); el.addEventListener('input', fiveInput); el.addEventListener('change', fiveChange); });
   accsEl.addEventListener('click', accsClick);
   jourEl.addEventListener('input', typed); jourEl.addEventListener('input', jourInput); jourEl.addEventListener('change', jourChange); jourEl.addEventListener('click', jourClick);
