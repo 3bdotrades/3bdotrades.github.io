@@ -743,6 +743,12 @@ var FIVE_MAX = 5, FIVE_WAIT = 14, FIVE_PAYS = 3, FIVE_CHANCE = FIVE_SIZES[0].ris
 var FIVE_FCHANCE = Math.round(10000 * FIVE_SIZES[0].risk / (FIVE_SIZES[0].risk + FIVE_SIZES[0].fmake)) / 10000;
 // what the hover of each rate and the dashed line's legend say about chance
 var FIVE_CHANCE_SAYS = { pass: "an eval's trade that risks $2,000 to make $3,000 wins 40% of the time", win: 'a funded trade that risks $2,000 to make $4,500 wins 30.77% of the time' };
+// The real rates (the owner, 18 Nov 2026: "can i also get the real winrate across one year not in wins at chance", then "Use
+// real rates"): every G1 and V2 GO from 13 Jul to 13 Nov 2026 (the GO history starts 13 Jul 2026), traded the bot's way on
+// whole NQ: an eval's trade (25-point stop, 37.50-point target) won 1,051 of 2,659 = 39.53%, a funded one (25 / 56.25)
+// 788 of 2,653 = 29.70%. The plan runs at them while My record has no line of that kind; chance stays the dashed line.
+var FIVE_REAL = { pass: 0.3953, win: 0.297 };
+var FIVE_REAL_SAYS = { pass: "every G1 and V2 GO from 13 Jul to 13 Nov 2026, traded the bot's way: an eval's trade (25-point stop, 37.50-point target) won 1,051 of 2,659 = 39.53%", win: "every G1 and V2 GO from 13 Jul to 13 Nov 2026, traded the bot's way: a funded trade (25-point stop, 56.25-point target) won 788 of 2,653 = 29.70%" };
 function fivePrice(z, p){ return FIVE_DISC * (z.list - z.credit * (1 + clamp01(p))); }
 // What is typed on the 5ers tab, checked (cleanFive), v 4 (FIVE_V). The tab started from scratch on 17 Nov 2026 (v 3: the
 // owner, "edit 5ers to start from scratch") and again that evening with his accounts and the evals he holds (v 4, J_SEED and
@@ -1439,11 +1445,11 @@ function fiveDay(z, p, q){
   var den = (1 - q) + p * ((1 - q) * (1 - q) + q * ((10 * FIVE_PAYS + 1) * (1 - q) + 1 + (10 * FIVE_PAYS - 1) * q));
   return den > 0 ? (FIVE_PAYS * p * q * z.pay - z.price * (1 - q)) / den : 0;
 }
-// the two rates of a run: My record as the page shows it (a percentage to one decimal), or chance while it has nothing (40%
-// for the eval pass, 30.77% for the funded win)
+// the two rates of a run: My record as the page shows it (a percentage to one decimal), or the real rates while it has
+// nothing of that kind (FIVE_REAL: 39.53% for the eval pass, 29.70% for the funded win)
 function fiveRates(){
   var r = fiveRecord(state.five);
-  return { pass: r.pass + r.lost > 0 ? Math.round(1000 * r.pass / (r.pass + r.lost)) / 1000 : FIVE_CHANCE, win: r.won + r.flost > 0 ? Math.round(1000 * r.won / (r.won + r.flost)) / 1000 : FIVE_FCHANCE };
+  return { pass: r.pass + r.lost > 0 ? Math.round(1000 * r.pass / (r.pass + r.lost)) / 1000 : FIVE_REAL.pass, win: r.won + r.flost > 0 ? Math.round(1000 * r.won / (r.won + r.flost)) / 1000 : FIVE_REAL.win };
 }
 function dayOffset(s){ var d = dateOf(s); return d ? Math.round((d - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5) : 0; }
 // A size's accounts as a run takes them: the ones typed, the first `cap` of them keeping their place, and a new eval for
@@ -1626,7 +1632,7 @@ function buildFive(){
   document.getElementById('firms-h').textContent = 'Per size';
   document.getElementById('accs-h').hidden = false; accsEl.hidden = false;
   document.getElementById('jour-h').hidden = false; jourEl.hidden = false;
-  document.getElementById('lg-coin').title = 'The same plan with every trade at chance (' + FIVE_CHANCE_SAYS.pass + ', ' + FIVE_CHANCE_SAYS.win + ') instead of your record';
+  document.getElementById('lg-coin').title = 'The same plan with every trade at chance (' + FIVE_CHANCE_SAYS.pass + ', ' + FIVE_CHANCE_SAYS.win + ') instead of the rates My record shows';
   g1El.innerHTML = 'Paid <b id="f-paid" title="Counted from the journal: evals bought"></b> · Received <b id="f-out" title="Counted from the journal: payouts, in cash and in hub credits"></b> · <span id="f-net"></span>';
   ratesEl.innerHTML = [['pass', 'Eval pass'], ['win', 'Funded win']].map(function(x){
     return '<div class="cell two" id="c5-' + x[0] + '"><span class="k">' + x[1] + '</span><span class="v"><span id="f-' + x[0] + '-r"></span><small id="f-' + x[0] + '-c"></small></span></div>';
@@ -1652,9 +1658,9 @@ function updateFive(){
   [['pass', rec.pass, rec.lost, 'evals passed', 'lost'], ['win', rec.won, rec.flost, 'funded trades won', 'lost']].forEach(function(x){
     var done = x[1] + x[2];
     document.getElementById('f-' + x[0] + '-r').textContent = (Math.round(10000 * rr[x[0]]) / 100) + '%';
-    document.getElementById('f-' + x[0] + '-c').textContent = done > 0 ? x[1] + ' of ' + done : 'chance';
+    document.getElementById('f-' + x[0] + '-c').textContent = done > 0 ? x[1] + ' of ' + done : 'real';
     document.getElementById('c5-' + x[0]).title = done > 0 ? 'From the journal: ' + x[1] + ' ' + x[3] + ', ' + x[2] + ' ' + x[4] + ' = ' + (100 * x[1] / done).toFixed(2) + '%'
-      : 'Nothing in the journal yet. Chance: ' + FIVE_CHANCE_SAYS[x[0]];
+      : 'Nothing in the journal yet. Real: ' + FIVE_REAL_SAYS[x[0]];
   });
 
   var at = document.activeElement, back = at && at.id && firmsEl.contains(at) ? at.id : '';
@@ -1669,7 +1675,8 @@ function updateFive(){
     }).join('') + '</tbody></table>';
   if (back){ var box = document.getElementById(back); if (box && box.focus){ box.focus(); if (box.select) box.select(); } }
 
-  // the dashed line: the same accounts with every trade at chance, drawn when the record says something else
+  // the dashed line: the same accounts with every trade at chance, drawn when the plan's rates are not chance (always while
+  // the real rates stand in for an empty record)
   var coin = rr.pass !== FIVE_CHANCE || rr.win !== FIVE_FCHANCE ? fivePlan({ pass: FIVE_CHANCE, win: FIVE_FCHANCE }, WEEKS) : null;
   drawChart(res.rows.map(function(r, i){ var o = { t: r.t, inn: r.inn, out: r.out, cum: r.cum + base }; if (coin) o.coin = coin.rows[i].cum + base; return o; }));
 }
