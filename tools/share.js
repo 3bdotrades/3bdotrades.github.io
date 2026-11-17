@@ -16,19 +16,21 @@ const RELAY = 'https://ntfy.sh/' + TOPIC + '/json?poll=1&since=all';
 // (The Simulation tab's part, sim, went with the tab on 17 Nov 2026: it is no longer read or kept.)
 const PARTS = ['g1', 'v2', '5ers'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX = /^[a-z]{1,40}$/, SLOTS_MAX = 5;
 
-// The 5ers tab's numbers, by the page's own rule (cleanFive in index.html), v 3 (FIVE_V): the slots of the 50K and of the 25K; five
-// accounts a size ('' none, 'e' an eval, 'f' a funded account, 'p2:DATE' / 'p1:DATE' a funded win with two payouts or one
-// still due, ':AMOUNT' after the day when its payouts are not the usual ones); and the journal, a line 'DATE KIND N AMOUNT'
-// for everything done (DATE a day or '-' before the journal; KIND b50 / b25 evals bought, m paid for evals, s50 / s25 evals
-// passed, x50 / x25 evals lost, w / l funded trades won / lost, p / h payouts in cash / in hub credits), at most J_MAX dated
-// lines, the oldest beyond that folded into the '-' line of their kind. The tab started from scratch on 17 Nov 2026 (the
-// owner's word): a part of v 2 or older is never read or kept again, and the tab opens empty.
-const FIVE_V = 3, FIVE_SIZES = [{ k: '50', pay: 1158 }, { k: '25', pay: 579 }], FIVE_MAX = 5;
-const ACC_RX = /^(?:e|f|p[12]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
+// The 5ers tab's numbers, by the page's own rule (cleanFive in index.html), v 4 (FIVE_V): the slots of the 50K and of the 25K; five
+// accounts a size ('' none, 'e' an eval, 'f' a funded account, 'p3:DATE' / 'p2:DATE' / 'p1:DATE' a funded win with three,
+// two or one payouts still due, ':AMOUNT' after the day when its payouts are not the usual ones); and the journal, a line
+// 'DATE KIND N AMOUNT' for everything done (DATE a day or '-' before the journal; KIND b50 / b25 evals bought, m paid for
+// evals, s50 / s25 evals passed, x50 / x25 evals lost, w / l funded trades won / lost, p / h payouts in cash / in hub
+// credits), at most J_MAX dated lines, the oldest beyond that folded into the '-' line of their kind. The tab started from
+// scratch on 17 Nov 2026 (v 3) and again that evening with the owner's accounts and the 8 evals he holds (v 4, the owner's
+// word): a part of v 3 or older is never read or kept again, and the tab opens with his state (J_SEED and ACC_SEED, as on
+// the page).
+const FIVE_V = 4, FIVE_SIZES = [{ k: '50', pay: 1158 }, { k: '25', pay: 579 }], FIVE_MAX = 5;
+const ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
 const J_MAX = 100, J_RX = /^(\d{4}-\d\d-\d\d|-) (b50|b25|s50|s25|x50|x25|w|l|m|p|h) (\d{1,4}) (\d{1,7}(?:\.\d\d?)?)$/;
 const J_ORDER = ['b25', 'b50', 'm', 's25', 's50', 'x25', 'x50', 'w', 'l', 'p', 'h'], J_COUNTED = ['b50', 'b25', 's50', 's25', 'x50', 'x25', 'w', 'l'];
-const J_SEED = [];
-const ACC_SEED = { '50': ['', '', '', '', ''], '25': ['', '', '', '', ''] };
+const J_SEED = ['2026-11-17 b50 5 400', '2026-11-17 b25 3 141.6'];
+const ACC_SEED = { '50': ['e', 'e', 'e', 'e', 'e'], '25': ['p1:2026-11-26:965', 'p3:2026-12-01:578', 'e', 'e', 'e'] };
 function dateOf(s){
   const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s)); if (!m) return null;
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
@@ -52,7 +54,7 @@ function accClean(x, z){
 }
 function cleanFive(o){
   o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
-  if (o.v !== FIVE_V) o = { v: FIVE_V, acc: ACC_SEED, j: J_SEED };     // (from before the start from scratch: nothing kept)
+  if (o.v !== FIVE_V) o = { v: FIVE_V, acc: ACC_SEED, j: J_SEED };     // (from before v 4: nothing kept, the owner's state)
   const pre = {}, lines = [], p = { v: FIVE_V, cap: [], acc: {}, j: [] };
   const fold = l => { const q = pre[l.k] || (pre[l.k] = { n: 0, a: 0 }); q.n += l.n; q.a = Math.round((q.a + l.a) * 100) / 100; };
   (Array.isArray(o.j) ? o.j.slice(0, 2000) : []).forEach(x => { const l = jLine(x); if (l){ if (l.d === '-') fold(l); else lines.push(l); } });
@@ -90,7 +92,7 @@ function ahead(a, b){ return !!a && (!b || (a.n !== b.n ? a.n > b.n : a.t !== b.
 function cleanPart(o, name){
   const p = cleanVersion(o), k = name || (o && o.k);
   if (!p || PARTS.indexOf(k) < 0) return null;
-  if (k === '5ers'){                                 // (a 5ers part from before the start from scratch is not taken)
+  if (k === '5ers'){                                 // (a 5ers part of before v 4 is not taken)
     if (!o.five || typeof o.five !== 'object' || o.five.v !== FIVE_V) return null;
     p.five = cleanFive(o.five); return [k, p];
   }
@@ -135,8 +137,8 @@ async function relayText(){
   throw last;
 }
 // One pass over a folder; returns the line to print. The file is written when a part got a newer version, and when a file
-// that reads as a kept file holds something that is no longer kept (a part of the Simulation tab, a 5ers part from before
-// its start from scratch: 17 Nov 2026), so those leave it at the next pass. A file that cannot be read is replaced only once
+// that reads as a kept file holds something that is no longer kept (a part of the Simulation tab, a 5ers part of before v 4,
+// the owner's state of 17 Nov 2026 evening), so those leave it at the next pass. A file that cannot be read is replaced only once
 // there is an edit to keep; a relay that does not answer leaves any file as it is. The first pass makes the file even with
 // nothing shared yet, so that a page asking for it finds one.
 async function pass(dir, read){
