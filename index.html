@@ -71,6 +71,7 @@ tbody tr+tr td.same{border-top-color:transparent}
 .jour th:nth-child(2),.jour td:nth-child(2){text-align:left}
 .jour td:first-child{color:var(--mute)}
 .jadd{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.due{color:var(--mute);font-size:12px;margin-top:4px}
 
 /* per firm */
 table{width:100%;border-collapse:collapse}
@@ -1494,8 +1495,16 @@ function cents(v){ return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('e
 function price(v){ return Math.abs(v - Math.round(v)) < 0.005 ? money(v) : cents(v); }
 function accStage(x){ return x === 'e' || x === 'f' ? x : x ? x.slice(0, 2) : ''; }
 var FIVE_STAGES = [['', 'Empty'], ['e', 'Eval'], ['f', 'Funded'], ['p3', '3 payouts due'], ['p2', '2 payouts due'], ['p1', '1 payout due']];
+// the days the n payouts still due of a funded win come in as a run counts them (fiveFlow): the next one on its day s (today
+// when that day has passed) and each later one FIVE_WAIT days after the one before (the owner, 17 Nov 2026: "why 3 payouts
+// due not shown dates")
+function dueDays(s, n){
+  var c = Math.max(0, dayOffset(s)), out = [];
+  for (var k = 0; k < n; k++){ var t = c + k * FIVE_WAIT; out.push(t === 0 ? 'today' : dShort(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + t))); }
+  return out.join(' · ');
+}
 // the accounts: a row for each place of a size (and for an account held beyond them), its stage and, for a funded win, the
-// day of its next payout and what each payout still due brings
+// day of its next payout, what each payout still due brings and the days they all come in
 function buildAccs(){
   var f = state.five, at = document.activeElement, keep = at && at.id && accsEl.contains(at) ? at.id : '';
   accsEl.innerHTML = '<div class="accs">' + FIVE_SIZES.map(function(z, i){
@@ -1506,10 +1515,10 @@ function buildAccs(){
       body += '<tr><td>' + (j + 1) + '</td><td><select class="sel" id="a' + z.k + '-' + j + '" data-a="' + key + '" aria-label="Stage of ' + name + '">' +
         FIVE_STAGES.map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === st ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td><td>' +
         (st.charAt(0) === 'p' ? '<div class="jadd"><input class="sel" type="date" id="d' + z.k + '-' + j + '" data-d="' + key + '" value="' + m[1] + '" aria-label="Next payout of ' + name + '">' +
-            '<input class="box m" type="number" inputmode="decimal" min="0" step="0.01" id="m' + z.k + '-' + j + '" data-m="' + key + '" value="' + (m[2] === undefined ? z.pay : Number(m[2])) + '" aria-label="Each payout still due of ' + name + '" title="What each payout still due brings"></div>'
+            '<input class="box m" type="number" inputmode="decimal" min="0" step="0.01" id="m' + z.k + '-' + j + '" data-m="' + key + '" value="' + (m[2] === undefined ? z.pay : Number(m[2])) + '" aria-label="Each payout still due of ' + name + '" title="What each payout still due brings"></div>' + '<div class="due" id="u' + z.k + '-' + j + '">' + dueDays(m[1], +st.charAt(1)) + '</div>'
           : st === '' ? '<button type="button" class="lnk" id="b' + z.k + '-' + j + '" data-b="' + key + '" title="Bought today: makes this place an Eval and adds ' + price(z.price) + ' to Paid in the journal ($' + z.list + ' less the $' + z.credit + ' of hub credits a buy earns, then 20% off)">Bought ' + price(z.price) + '</button>' : '') + '</td></tr>';
     }
-    return '<div><table aria-label="' + z.size + ' accounts"><thead><tr><th>' + z.size + '</th><th>Stage</th><th>Next payout</th></tr></thead><tbody>' + (body || '<tr><td colspan="3">No slots</td></tr>') + '</tbody></table></div>';
+    return '<div><table aria-label="' + z.size + ' accounts"><thead><tr><th>' + z.size + '</th><th>Stage</th><th>Payouts due</th></tr></thead><tbody>' + (body || '<tr><td colspan="3">No slots</td></tr>') + '</tbody></table></div>';
   }).join('') + '</div>';
   if (keep){ var again = document.getElementById(keep); if (again && again.focus) again.focus(); }
 }
@@ -1688,6 +1697,7 @@ function fiveInput(e){
     var s = d.split('|'), a = f.acc[s[0]], old = a && a[+s[1]];
     if (!old || old.charAt(0) !== 'p' || !dateOf(v) || old.slice(3, 13) === v) return;
     a[+s[1]] = old.slice(0, 3) + v + old.slice(13);
+    var u = document.getElementById('u' + s[0] + '-' + s[1]); if (u) u.textContent = dueDays(v, +old.charAt(1));
   }
   else return;
   save(); update(); shareEdit();
