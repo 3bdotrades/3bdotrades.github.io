@@ -24,7 +24,10 @@ const PARTS = ['g1', 'v2', '5ers'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX =
 // credits), at most J_MAX dated lines, the oldest beyond that folded into the '-' line of their kind. The tab started from
 // scratch on 17 Nov 2026 (v 3) and again that evening with the owner's accounts and the 8 evals he holds (v 4, the owner's
 // word): a part of v 3 or older is never read or kept again, and the tab opens with his state (J_SEED and ACC_SEED, as on
-// the page).
+// the page). cr: the hub credits held (left out when none); fed: the time of the last result of his bot that is in the part
+// (tools/five.js puts them in), left out when none.
+const CR_MAX = 9999.99, FED_RX = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$/;
+const cent2 = v => Math.round(v * 100) / 100;
 const FIVE_V = 4, FIVE_SIZES = [{ k: '50', pay: 1158 }, { k: '25', pay: 579 }], FIVE_MAX = 5;
 const ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
 const J_MAX = 100, J_RX = /^(\d{4}-\d\d-\d\d|-) (b50|b25|s50|s25|x50|x25|w|l|m|p|h) (\d{1,4}) (\d{1,7}(?:\.\d\d?)?)$/;
@@ -68,6 +71,8 @@ function cleanFive(o){
     p.acc[z.k] = [];
     for (let j = 0; j < FIVE_MAX; j++) p.acc[z.k].push(accClean(a[j], z));
   });
+  if (typeof o.cr === 'number' && o.cr > 0 && o.cr <= CR_MAX && cent2(o.cr) > 0) p.cr = cent2(o.cr);
+  if (typeof o.fed === 'string' && FED_RX.test(o.fed) && isFinite(Date.parse(o.fed))) p.fed = o.fed;
   return p;
 }
 
@@ -156,4 +161,4 @@ if (require.main === module){
   if (!process.argv[2]){ console.error('usage: node tools/share.js <folder>'); process.exit(2); }
   pass(process.argv[2]).then(line => console.log(line), e => console.log('shared: ' + String(e && e.message || e).slice(0, 120)));
 }
-module.exports = { cleanKeys: cleanKeys, cleanSlots: cleanSlots, cleanFive: cleanFive, cleanVersion: cleanVersion, ahead: ahead, cleanPart: cleanPart, readKept: readKept, merge: merge, dump: dump, pass: pass, TOPIC: TOPIC };
+module.exports = { relayText: relayText, jLine: jLine, cleanKeys: cleanKeys, cleanSlots: cleanSlots, cleanFive: cleanFive, cleanVersion: cleanVersion, ahead: ahead, cleanPart: cleanPart, readKept: readKept, merge: merge, dump: dump, pass: pass, TOPIC: TOPIC };

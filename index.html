@@ -72,6 +72,11 @@ tbody tr+tr td.same{border-top-color:transparent}
 .jour td:first-child{color:var(--mute)}
 .jadd{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
 .due{color:var(--mute);font-size:12px;margin-top:4px}
+.hold th:nth-child(2),.hold td:nth-child(2){text-align:left}
+.hold td:first-child{color:var(--mute)}
+.hold tfoot td{font-weight:600;border-top:1px solid var(--line)}
+.note .box{margin-left:6px}
+.nb{white-space:nowrap}
 
 /* per firm */
 table{width:100%;border-collapse:collapse}
@@ -154,6 +159,8 @@ tr.off .pick{color:var(--mute)}
   <p class="note after" id="skip" aria-live="polite" hidden></p>
   <h2 id="accs-h" hidden>Accounts</h2>
   <div class="wrap" id="accs" hidden></div>
+  <h2 id="hold-h" hidden>Payouts on hold</h2>
+  <div class="wrap" id="hold" hidden></div>
   <h2 id="jour-h" hidden>Journal</h2>
   <div class="wrap" id="jour" hidden></div>
 
@@ -737,6 +744,10 @@ function clone(o){ return JSON.parse(JSON.stringify(o)); }
 // bought. So `price`, what one costs with the credits of one buy, is the amount of the "Bought" button, and a run takes each
 // eval at its list price less the credits of its buy and of its pass (as often as an eval passes), then 20% off (fivePrice).
 // Credits are not real money: they lower what evals cost and are not counted as paid or received.
+// The credits he holds are a number of the tab (`cr`; the owner, 18 Nov 2026: "rn i have 50 hub credits", "use them, count
+// them so evaul 100 - 50 = 50 * 0.80"): an eval bought costs 0.8 x (its list price less the credits held, as far as they
+// go), the balance goes down by what was used and up by what a buy and a pass earn (fiveCost, fiveEarn), and the evals a run
+// buys today cost that much less (fivePlan).
 var FIVE_DISC = 0.8;
 var FIVE_SIZES = [{ k: '50', size: '50K', list: 100, credit: 10, price: 72, pay: 1158, risk: 2000, make: 3000, fmake: 4500 }, { k: '25', size: '25K', list: 59, credit: 5, price: 43.2, pay: 579, risk: 1000, make: 1500, fmake: 2250 }];
 var FIVE_MAX = 5, FIVE_WAIT = 14, FIVE_PAYS = 3, FIVE_CHANCE = FIVE_SIZES[0].risk / (FIVE_SIZES[0].risk + FIVE_SIZES[0].make);
@@ -750,6 +761,14 @@ var FIVE_CHANCE_SAYS = { pass: "an eval's trade that risks $2,000 to make $3,000
 var FIVE_REAL = { pass: 0.3953, win: 0.297 };
 var FIVE_REAL_SAYS = { pass: "every G1 and V2 GO from 13 Jul to 13 Nov 2026, traded the bot's way: an eval's trade (25-point stop, 37.50-point target) won 1,051 of 2,659 = 39.53%", win: "every G1 and V2 GO from 13 Jul to 13 Nov 2026, traded the bot's way: a funded trade (25-point stop, 56.25-point target) won 788 of 2,653 = 29.70%" };
 function fivePrice(z, p){ return FIVE_DISC * (z.list - z.credit * (1 + clamp01(p))); }
+function cent2(v){ return Math.round(v * 100) / 100; }
+// n evals of a size bought with cr hub credits held: the credits used and what is paid
+function fiveCost(z, n, cr){ var used = Math.min(Math.max(0, num(cr, 0)), n * z.list); return { used: cent2(used), paid: cent2(FIVE_DISC * (n * z.list - used)) }; }
+// the credits held after n evals of a size were bought (used: the credits that went into them) or passed
+function fiveEarn(f, z, n, used){ f.cr = Math.min(CR_MAX, Math.max(0, cent2(num(f.cr, 0) - num(used, 0) + n * z.credit))); }
+// My record's rate of a kind is the plan's once it has this many results (the owner, 18 Nov 2026, asked at 3 evals passed of
+// 9 and 1 funded trade won of 1: "Real rates until 20 results"); with fewer the plan keeps the real rate.
+var FIVE_MIN = 20, CR_MAX = 9999.99;
 // What is typed on the 5ers tab, checked (cleanFive), v 4 (FIVE_V). The tab started from scratch on 17 Nov 2026 (v 3: the
 // owner, "edit 5ers to start from scratch") and again that evening with his accounts and the evals he holds (v 4, J_SEED and
 // ACC_SEED below): it opens with them, and what was kept before (v 3 and older, in a browser, on the relay or in shared.json)
@@ -768,7 +787,11 @@ function fivePrice(z, p){ return FIVE_DISC * (z.list - z.credit * (1 + clamp01(p
 // from it and cannot be typed (the owner, 13 Nov 2026: "locked and live count when i edit what done in journel"). Dated
 // lines are kept in the order of their day. At most J_MAX of them: the oldest beyond that fold into the '-' line of their
 // kind (one a kind), so every total and count stays.
+// cr: the hub credits held (left out when none). fed: the time of the last result of his bot that is in here (left out when
+// none): tools/five.js, run on his PC with the counter, puts the bot's results in (evals bought, passed and lost, funded
+// trades won and lost) and starts after it the next time.
 var FIVE_V = 4, ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
+var FED_RX = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$/;
 var J_MAX = 100, J_RX = /^(\d{4}-\d\d-\d\d|-) (b50|b25|s50|s25|x50|x25|w|l|m|p|h) (\d{1,4}) (\d{1,7}(?:\.\d\d?)?)$/;
 var J_ORDER = ['b25', 'b50', 'm', 's25', 's50', 'x25', 'x50', 'w', 'l', 'p', 'h'], J_COUNTED = { b50: 1, b25: 1, s50: 1, s25: 1, x50: 1, x25: 1, w: 1, l: 1 };
 // What the tab opens with (v 4), the owner's state on 17 Nov 2026 evening: "consider 2 * 25k at payout one pay 965 and other
@@ -831,6 +854,8 @@ function cleanFive(o){
     p.acc[z.k] = [];
     for (var j = 0; j < FIVE_MAX; j++) p.acc[z.k].push(accClean(a[j], z));
   });
+  if (typeof o.cr === 'number' && o.cr > 0 && o.cr <= CR_MAX && cent2(o.cr) > 0) p.cr = cent2(o.cr);
+  if (typeof o.fed === 'string' && FED_RX.test(o.fed) && isFinite(Date.parse(o.fed))) p.fed = o.fed;
   return p;
 }
 function sameUnit(f, firm, size){ return normFirm(f.firm) === normFirm(firm) && sizeNum(f.size) === sizeNum(size); }
@@ -1445,11 +1470,11 @@ function fiveDay(z, p, q){
   var den = (1 - q) + p * ((1 - q) * (1 - q) + q * ((10 * FIVE_PAYS + 1) * (1 - q) + 1 + (10 * FIVE_PAYS - 1) * q));
   return den > 0 ? (FIVE_PAYS * p * q * z.pay - z.price * (1 - q)) / den : 0;
 }
-// the two rates of a run: My record as the page shows it (a percentage to one decimal), or the real rates while it has
-// nothing of that kind (FIVE_REAL: 39.53% for the eval pass, 29.70% for the funded win)
+// the two rates of a run: My record as the page shows it (a percentage to one decimal) once it has FIVE_MIN results of that
+// kind, the real rates until then (FIVE_REAL: 39.53% for the eval pass, 29.70% for the funded win)
 function fiveRates(){
   var r = fiveRecord(state.five);
-  return { pass: r.pass + r.lost > 0 ? Math.round(1000 * r.pass / (r.pass + r.lost)) / 1000 : FIVE_REAL.pass, win: r.won + r.flost > 0 ? Math.round(1000 * r.won / (r.won + r.flost)) / 1000 : FIVE_REAL.win };
+  return { pass: r.pass + r.lost >= FIVE_MIN ? Math.round(1000 * r.pass / (r.pass + r.lost)) / 1000 : FIVE_REAL.pass, win: r.won + r.flost >= FIVE_MIN ? Math.round(1000 * r.won / (r.won + r.flost)) / 1000 : FIVE_REAL.win };
 }
 function dayOffset(s){ var d = dateOf(s); return d ? Math.round((d - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5) : 0; }
 // A size's accounts as a run takes them: the ones typed, the first `cap` of them keeping their place, and a new eval for
@@ -1466,17 +1491,20 @@ function fiveSeats(z, i){
   return held;
 }
 // `weeks` weeks from this week's Monday at rates rr, as runAll gives a fleet's: a row a week, and each size's own. A size
-// takes its evals at fivePrice for the pass rate of the run (z: the size as the run takes it).
+// takes its evals at fivePrice for the pass rate of the run (z: the size as the run takes it). The hub credits held go into
+// the evals bought today, the 50K first: they cost 0.8 x the credits less, as far as their cost goes.
 function fivePlan(rr, weeks){
-  var dow0 = (TODAY.getDay() + 6) % 7, H = 7 * weeks - dow0 - 1, rows = [], per = [], t;
+  var dow0 = (TODAY.getDay() + 6) % 7, H = 7 * weeks - dow0 - 1, rows = [], per = [], t, crLeft = Math.max(0, num(state.five.cr, 0)), b0 = dow0 < 5 ? 0 : 7 - dow0;
   for (t = 0; t < weeks; t++) rows.push({ t: t, out: 0, inn: 0 });
   FIVE_SIZES.forEach(function(z0, i){
     var z = { k: z0.k, size: z0.size, price: fivePrice(z0, rr.pass), pay: z0.pay };
     var seats = fiveSeats(z0, i), f = fiveFlow(seats, rr.pass, rr.win, z, H, dow0, FIVE_LATE), pr = [], n = 0;
+    seats.forEach(function(a){ if (a.s === 'n') n++; });
+    var save = b0 <= H ? Math.min(FIVE_DISC * crLeft, n * z.price) : 0;
+    if (save > 0){ f.out[b0] -= save; crLeft -= save / FIVE_DISC; }
     for (t = 0; t < weeks; t++) pr.push({ t: t, out: 0, inn: 0 });
     for (var c = 0; c <= H; c++){ var w = Math.floor((dow0 + c) / 7); pr[w].out += f.out[c]; pr[w].inn += f.inn[c]; rows[w].out += f.out[c]; rows[w].inn += f.inn[c]; }
-    seats.forEach(function(a){ if (a.s === 'n') n++; });
-    per.push({ rows: pr, buy: n, cost: n * z.price, seats: seats, z: z });
+    per.push({ rows: pr, buy: n, cost: n * z.price - save, seats: seats, z: z });
   });
   var cum = 0, low = 0, totOut = 0, totIn = 0;
   rows.forEach(function(r){ cum += r.inn - r.out; r.cum = cum; if (cum < low) low = cum; totOut += r.out; totIn += r.inn; });
@@ -1490,10 +1518,10 @@ function fiveMonthly(rr){
 // The warning under a size that has evals to buy, as warnRow: what they cost, the payouts expected of the accounts they
 // become (every win of a funded account, with no end when it wins every time: then that part is left out), and what their
 // places make a day in the long run (fiveDay), which is what a day with them empty does not make.
-function fiveWarn(z, rr, n, cols){
+function fiveWarn(z, rr, n, cols, cost){
   var day = n * fiveDay(z, rr.pass, rr.win); if (!(n > 0) || !(day >= 1)) return '';
   var one = n === 1, when = BUY_DAY === 'today' ? 'today' : 'on ' + BUY_DAY, pay = rr.win < 1 ? n * rr.pass * FIVE_PAYS * z.pay * rr.win / (1 - rr.win) : 0;
-  return '<tr class="warn"><td colspan="' + cols + '"><div class="w" role="note">⚠ Buy ' + (one ? 'this one ' : 'these ' + n + ' ') + when + ': ' + price(n * z.price) + (pay > 0 ? ' for ' + money(pay) + ' of expected payouts' : '') +
+  return '<tr class="warn"><td colspan="' + cols + '"><div class="w" role="note">⚠ Buy ' + (one ? 'this one ' : 'these ' + n + ' ') + when + ': ' + price(cost) + (pay > 0 ? ' for ' + money(pay) + ' of expected payouts' : '') +
     '. Every day you wait, ' + (one ? 'this place makes' : 'these ' + n + ' places make') + ' nothing instead of ' + money(day) + '.</div></td></tr>';
 }
 function cents(v){ return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -1509,6 +1537,29 @@ function dueDays(s, n){
   for (var k = 0; k < n; k++){ var t = c + k * FIVE_WAIT; out.push(t === 0 ? 'today' : dShort(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + t))); }
   return out.join(' · ');
 }
+// Payouts on hold (the owner, 18 Nov 2026: "added section for payout in hold"): every payout still due of the funded wins
+// in the accounts, a row each, in the order of their days as a run counts them (dueDays), and what they come to. Nothing is
+// typed here: it is the accounts' payouts due, so none is counted twice.
+var holdEl = document.getElementById('hold');
+function fiveHold(f){
+  var rows = [];
+  FIVE_SIZES.forEach(function(z){
+    f.acc[z.k].forEach(function(x, j){
+      var m = ACC_RX.exec(x); if (!m || !m[1]) return;
+      var c = Math.max(0, dayOffset(m[1])), amt = m[2] === undefined ? z.pay : Number(m[2]);
+      for (var k = 0; k < +x.charAt(1); k++) rows.push({ t: c + k * FIVE_WAIT, what: z.size + ' account ' + (j + 1), a: amt });
+    });
+  });
+  rows.sort(function(a, b){ return a.t - b.t; });
+  return rows;
+}
+function buildHold(){
+  var rows = fiveHold(state.five), sum = 0;
+  rows.forEach(function(r){ sum = cent2(sum + r.a); });
+  holdEl.innerHTML = '<div class="hold"><table aria-labelledby="hold-h"><thead><tr><th>Day</th><th>Account</th><th>Amount</th></tr></thead><tbody>' +
+    (rows.map(function(r){ return '<tr><td>' + (r.t === 0 ? 'today' : dShort(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + r.t))) + '</td><td>' + r.what + '</td><td>' + cents(r.a) + '</td></tr>'; }).join('') || '<tr><td colspan="3">None</td></tr>') +
+    '</tbody>' + (rows.length ? '<tfoot><tr><td>' + rows.length + '</td><td>On hold</td><td id="hold-sum">' + cents(sum) + '</td></tr></tfoot>' : '') + '</table></div>';
+}
 // the accounts: a row for each place of a size (and for an account held beyond them), its stage and, for a funded win, the
 // day of its next payout, what each payout still due brings and the days they all come in
 function buildAccs(){
@@ -1522,7 +1573,7 @@ function buildAccs(){
         FIVE_STAGES.map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === st ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td><td>' +
         (st.charAt(0) === 'p' ? '<div class="jadd"><input class="sel" type="date" id="d' + z.k + '-' + j + '" data-d="' + key + '" value="' + m[1] + '" aria-label="Next payout of ' + name + '">' +
             '<input class="box m" type="number" inputmode="decimal" min="0" step="0.01" id="m' + z.k + '-' + j + '" data-m="' + key + '" value="' + (m[2] === undefined ? z.pay : Number(m[2])) + '" aria-label="Each payout still due of ' + name + '" title="What each payout still due brings"></div>' + '<div class="due" id="u' + z.k + '-' + j + '">' + dueDays(m[1], +st.charAt(1)) + '</div>'
-          : st === '' ? '<button type="button" class="lnk" id="b' + z.k + '-' + j + '" data-b="' + key + '" title="Bought today: makes this place an Eval and adds ' + price(z.price) + ' to Paid in the journal ($' + z.list + ' less the $' + z.credit + ' of hub credits a buy earns, then 20% off)">Bought ' + price(z.price) + '</button>' : '') + '</td></tr>';
+          : st === '' ? '<button type="button" class="lnk" id="b' + z.k + '-' + j + '" data-b="' + key + '" title="Bought today: makes this place an Eval and adds ' + price(fiveCost(z, 1, f.cr).paid) + ' to Paid in the journal ($' + z.list + ' less the hub credits held, then 20% off; the buy earns $' + z.credit + ' of them)">Bought ' + price(fiveCost(z, 1, f.cr).paid) + '</button>' : '') + '</td></tr>';
     }
     return '<div><table aria-label="' + z.size + ' accounts"><thead><tr><th>' + z.size + '</th><th>Stage</th><th>Payouts due</th></tr></thead><tbody>' + (body || '<tr><td colspan="3">No slots</td></tr>') + '</tbody></table></div>';
   }).join('') + '</div>';
@@ -1537,8 +1588,8 @@ function jSize(k){ return FIVE_SIZES.filter(function(z){ return k.slice(1) === z
 // what the first row asks for: how many (evals bought, passed or lost, funded trades won or lost) and an amount (bought, payouts)
 function jCounts(k){ return ownOf(J_COUNTED, k) === 1; }
 function jMoney(k){ return k.charAt(0) === 'b' || k === 'p' || k === 'h'; }
-// the usual amount: n evals at the price of the "Bought" button; a payout's amount is typed
-function jUsual(k, n){ var z = k.charAt(0) === 'b' ? jSize(k) : null; return z ? String(Math.round(Math.max(1, Math.round(num(n, 1))) * z.price * 100) / 100) : ''; }
+// the usual amount: n evals as the "Bought" button prices them (the hub credits held go in); a payout's amount is typed
+function jUsual(k, n){ var z = k.charAt(0) === 'b' ? jSize(k) : null; return z ? String(fiveCost(z, Math.max(1, Math.round(num(n, 1))), state.five.cr).paid) : ''; }
 function longDate(s){ var d = dateOf(s); return d ? d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() : ''; }
 function jWhat(l){
   var z = jSize(l.k), many = l.n > 1, c = l.k.charAt(0);
@@ -1577,9 +1628,13 @@ function jAdd(){
   if (jMoney(kind) && !(a >= 0 && a <= 999999.99)) return;
   var l = jLine(String(d ? d.value : '') + ' ' + kind + ' ' + n + ' ' + a);
   if (!l) return;
+  // evals bought or passed move the hub credits: a buy uses what its amount is under 20% off the list price (as far as the
+  // credits held go) and earns its own, a pass earns its own
+  var zz = kind.charAt(0) === 'b' || kind.charAt(0) === 's' ? jSize(kind) : null;
+  if (zz) fiveEarn(state.five, zz, l.n, kind.charAt(0) === 'b' ? Math.min(Math.max(0, num(state.five.cr, 0)), Math.max(0, cent2(l.n * zz.list - l.a / FIVE_DISC))) : 0);
   state.five.j.push(l.s); state.five = cleanFive(state.five);
   jArm = null; jDraft.d = l.d; jDraft.k = kind; jDraft.n = '1'; jDraft.a = jUsual(kind, 1);
-  save(); buildJour(); update(); shareEdit();
+  save(); buildFive(); update(); shareEdit();
 }
 function jourClick(e){
   var el = e.target || {}, f = state.five, x = el.getAttribute ? el.getAttribute('data-x') : null;
@@ -1620,9 +1675,10 @@ function accsClick(e){
   var el = e.target || {}, b = el.getAttribute ? el.getAttribute('data-b') : null; if (!b) return;
   var s = b.split('|'), z = FIVE_SIZES.filter(function(x){ return x.k === s[0]; })[0], list = z ? state.five.acc[z.k] : null, j = +s[1];
   if (!list || list[j] !== '') return;
-  list[j] = 'e'; state.five.j.push(ymd(TODAY) + ' b' + z.k + ' 1 ' + z.price); state.five = cleanFive(state.five);
-  jArm = null;
-  save(); buildAccs(); buildJour(); update(); shareEdit();
+  var cost = fiveCost(z, 1, state.five.cr);
+  list[j] = 'e'; state.five.j.push(ymd(TODAY) + ' b' + z.k + ' 1 ' + cost.paid); fiveEarn(state.five, z, 1, cost.used); state.five = cleanFive(state.five);
+  jArm = null; jDraft.a = jUsual(jDraft.k, jDraft.n);
+  save(); buildFive(); update(); shareEdit();
   var sel = document.getElementById('a' + z.k + '-' + j); if (sel && sel.focus) sel.focus();
 }
 // the accounts and the journal; the first line has the money so far and My record its two rates, both counted from the journal
@@ -1632,13 +1688,14 @@ function buildFive(){
   document.getElementById('firms-h').textContent = 'Per size';
   document.getElementById('accs-h').hidden = false; accsEl.hidden = false;
   document.getElementById('jour-h').hidden = false; jourEl.hidden = false;
+  document.getElementById('hold-h').hidden = false; holdEl.hidden = false;
   document.getElementById('lg-coin').title = 'The same plan with every trade at chance (' + FIVE_CHANCE_SAYS.pass + ', ' + FIVE_CHANCE_SAYS.win + ') instead of the rates My record shows';
-  g1El.innerHTML = 'Paid <b id="f-paid" title="Counted from the journal: evals bought"></b> · Received <b id="f-out" title="Counted from the journal: payouts, in cash and in hub credits"></b> · <span id="f-net"></span>';
+  g1El.innerHTML = 'Paid <b id="f-paid" title="Counted from the journal: evals bought"></b> · Received <b id="f-out" title="Counted from the journal: payouts, in cash and in hub credits"></b> · <span id="f-net"></span> · <span class="nb">Hub credits <input class="box m" type="number" inputmode="decimal" min="0" max="' + CR_MAX + '" step="0.01" id="f-cr" value="' + num(state.five.cr, 0) + '" aria-label="Hub credits held" title="Hub credits held: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K"></span>';
   ratesEl.innerHTML = [['pass', 'Eval pass'], ['win', 'Funded win']].map(function(x){
     return '<div class="cell two" id="c5-' + x[0] + '"><span class="k">' + x[1] + '</span><span class="v"><span id="f-' + x[0] + '-r"></span><small id="f-' + x[0] + '-c"></small></span></div>';
   }).join('');
   jArm = null;
-  buildAccs(); buildJour();
+  buildAccs(); buildHold(); buildJour();
 }
 function updateFive(){
   var f = state.five, rr = fiveRates(), res = fivePlan(rr, WEEKS), runs = fiveMonthly(rr), buy = 0, cost = 0, run = 0;
@@ -1657,10 +1714,11 @@ function updateFive(){
   var rec = fiveRecord(f);
   [['pass', rec.pass, rec.lost, 'evals passed', 'lost'], ['win', rec.won, rec.flost, 'funded trades won', 'lost']].forEach(function(x){
     var done = x[1] + x[2];
-    document.getElementById('f-' + x[0] + '-r').textContent = (Math.round(10000 * rr[x[0]]) / 100) + '%';
-    document.getElementById('f-' + x[0] + '-c').textContent = done > 0 ? x[1] + ' of ' + done : 'real';
-    document.getElementById('c5-' + x[0]).title = done > 0 ? 'From the journal: ' + x[1] + ' ' + x[3] + ', ' + x[2] + ' ' + x[4] + ' = ' + (100 * x[1] / done).toFixed(2) + '%'
-      : 'Nothing in the journal yet. Real: ' + FIVE_REAL_SAYS[x[0]];
+    // his own rate once there is a result; until there are FIVE_MIN of them the plan's rate, the real one, stands next to it
+    document.getElementById('f-' + x[0] + '-r').textContent = (done > 0 ? Math.round(1000 * x[1] / done) / 10 : Math.round(10000 * rr[x[0]]) / 100) + '%';
+    document.getElementById('f-' + x[0] + '-c').textContent = done >= FIVE_MIN ? x[1] + ' of ' + done : done > 0 ? x[1] + ' of ' + done + ' · plan ' + (Math.round(10000 * rr[x[0]]) / 100) + '%' : 'real';
+    document.getElementById('c5-' + x[0]).title = (done > 0 ? 'From the journal: ' + x[1] + ' ' + x[3] + ', ' + x[2] + ' ' + x[4] + ' = ' + (100 * x[1] / done).toFixed(2) + '%' : 'Nothing in the journal yet') +
+      (done >= FIVE_MIN ? '' : '. The plan runs at the real rate until there are ' + FIVE_MIN + ' results. Real: ' + FIVE_REAL_SAYS[x[0]]);
   });
 
   var at = document.activeElement, back = at && at.id && firmsEl.contains(at) ? at.id : '';
@@ -1671,7 +1729,7 @@ function updateFive(){
       p.seats.forEach(function(a){ if (n[a.s] !== undefined) n[a.s]++; });
       return '<tr><td>5ers ' + quiet(z.size) + '</td><td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + FIVE_MAX + '" step="1" value="' + f.cap[i] + '" id="f-cap-' + i + '" aria-label="Slots for ' + z.size + ' accounts" title="' + z.size + ' accounts at once: 0 to ' + FIVE_MAX + '"></td>' +
         '<td id="c' + i + '-buy" title="An eval at ' + cents(p.z.price) + ': $' + z.list + ' less the hub credits of its buy ($' + z.credit + ') and of its pass ($' + z.credit + ', ' + (Math.round(1000 * rr.pass) / 10) + '% of the time), then 20% off">' + (p.buy > 0 ? '<b>' + p.buy + '</b> ' + quiet(price(p.cost)) : quiet('0')) + '</td><td id="c' + i + '-ev">' + count(n.e) + '</td><td id="c' + i + '-fu">' + count(n.f) + '</td><td id="c' + i + '-pa">' + count(n.p) + '</td>' +
-        '<td id="c' + i + '-w12">' + gain(inn - out) + '</td><td id="c' + i + '-run">' + gain(runs[i]) + quiet('/mo') + '</td></tr>' + fiveWarn(p.z, rr, p.buy, 8);
+        '<td id="c' + i + '-w12">' + gain(inn - out) + '</td><td id="c' + i + '-run">' + gain(runs[i]) + quiet('/mo') + '</td></tr>' + fiveWarn(p.z, rr, p.buy, 8, p.cost);
     }).join('') + '</tbody></table>';
   if (back){ var box = document.getElementById(back); if (box && box.focus){ box.focus(); if (box.select) box.select(); } }
 
@@ -1692,6 +1750,14 @@ function fiveInput(e){
     if (next === list[+q[1]]) return;
     list[+q[1]] = next;
   }
+  else if (id === 'f-cr'){
+    var cr = cent2(num(v, -1));
+    if (!(cr >= 0 && cr <= CR_MAX) || cr === num(f.cr, 0)) return;
+    if (cr > 0) f.cr = cr; else delete f.cr;
+    jDraft.a = jUsual(jDraft.k, jDraft.n);
+    save(); buildAccs(); buildJour(); update(); shareEdit();
+    return;
+  }
   else if ((m = /^f-cap-(\d)$/.exec(id)) && FIVE_SIZES[+m[1]]){
     var c = Math.min(FIVE_MAX, Math.max(0, Math.round(num(v, FIVE_MAX))));
     if (String(c) !== v) el.value = c;
@@ -1707,7 +1773,7 @@ function fiveInput(e){
     var u = document.getElementById('u' + s[0] + '-' + s[1]); if (u) u.textContent = dueDays(v, +old.charAt(1));
   }
   else return;
-  save(); update(); shareEdit();
+  save(); buildHold(); update(); shareEdit();
 }
 // an account's stage picked; a box left with something that was not taken shows what is kept
 function fiveChange(e){
@@ -1718,12 +1784,13 @@ function fiveChange(e){
     // a funded win starts with its next payout 14 days from today and the usual payouts, until they are typed; it keeps them
     // from one stage of payouts due to another (3, 2 or 1)
     list[j] = v === 'p1' || v === 'p2' || v === 'p3' ? v + (old.charAt(0) === 'p' ? old.slice(2) : ':' + ymd(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + FIVE_WAIT))) : v === 'e' || v === 'f' ? v : '';
-    save(); buildAccs(); update(); shareEdit();
+    save(); buildAccs(); buildHold(); update(); shareEdit();
     var again = document.getElementById(id); if (again && again.focus) again.focus();
     return;
   }
   var ma = el.getAttribute ? el.getAttribute('data-m') : null;
   if ((m = /^f-cap-(\d)$/.exec(id)) && FIVE_SIZES[+m[1]]) el.value = f.cap[+m[1]];
+  else if (id === 'f-cr') el.value = num(f.cr, 0);
   else if (d){ var q = d.split('|'), x = f.acc[q[0]] && f.acc[q[0]][+q[1]]; if (x && x.charAt(0) === 'p') el.value = x.slice(3, 13); }
   else if (ma){ var r = ma.split('|'), zz = FIVE_SIZES.filter(function(s){ return s.k === r[0]; })[0], y = zz ? ACC_RX.exec(f.acc[zz.k][+r[1]]) : null; if (y && y[1]) el.value = y[2] === undefined ? zz.pay : Number(y[2]); }
 }
@@ -1897,7 +1964,7 @@ function syncG1(){
 }
 
 if (FIVE){
-  [ratesEl, firmsEl, accsEl].forEach(function(el){ el.addEventListener('input', typed); el.addEventListener('input', fiveInput); el.addEventListener('change', fiveChange); });
+  [ratesEl, firmsEl, accsEl, g1El].forEach(function(el){ el.addEventListener('input', typed); el.addEventListener('input', fiveInput); el.addEventListener('change', fiveChange); });
   accsEl.addEventListener('click', accsClick);
   jourEl.addEventListener('input', typed); jourEl.addEventListener('input', jourInput); jourEl.addEventListener('change', jourChange); jourEl.addEventListener('click', jourClick);
   jourEl.addEventListener('keydown', function(e){ var t = e.target || {}; if (e.key === 'Enter' && (t.id === 'j-a' || t.id === 'j-d' || t.id === 'j-n')){ e.preventDefault(); jAdd(); } });
@@ -1914,7 +1981,8 @@ function newDay(){
   try { if (window.location && typeof window.location.reload === 'function'){ window.location.reload(); return true; } } catch (e) {}
   return false;
 }
-setInterval(function(){ if (document.visibilityState !== 'hidden' && !newDay()) pullShared(false); }, 2 * 60 * 1000);
+// (the 5ers tab every half minute: his bot's results come in through the same relay, see tools/five.js)
+setInterval(function(){ if (document.visibilityState !== 'hidden' && !newDay()) pullShared(false); }, FIVE ? 30 * 1000 : 2 * 60 * 1000);
 if (document.addEventListener) document.addEventListener('visibilitychange', function(){ if (document.visibilityState !== 'hidden' && !newDay()) pullShared(false); });
 })();
 
