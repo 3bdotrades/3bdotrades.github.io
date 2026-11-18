@@ -1581,7 +1581,7 @@ function buildAccs(){
 }
 // The journal: a first row to add a line (its day, what it is, how many, its amount), then the lines, the newest first, each
 // with a button that takes it out (asked once more before it does), then what was before the journal.
-var jourEl = document.getElementById('jour'), jArm = null, jDraft = { d: '', k: 'b25', n: '1', a: '' };
+var jourEl = document.getElementById('jour'), jArm = null, jDraft = { d: '', k: 'b25', n: '1', a: '', auto: true };
 var J_KINDS = [['b25', 'Bought 25K'], ['b50', 'Bought 50K'], ['s25', 'Passed 25K'], ['s50', 'Passed 50K'], ['x25', 'Eval lost 25K'], ['x50', 'Eval lost 50K'],
   ['w', 'Funded won'], ['l', 'Funded lost'], ['p', 'Payout'], ['h', 'Payout, hub credits']];
 function jSize(k){ return FIVE_SIZES.filter(function(z){ return k.slice(1) === z.k; })[0]; }
@@ -1602,7 +1602,8 @@ function jWhat(l){
 function buildJour(){
   var f = state.five, at = document.activeElement, keep = at && at.id && jourEl.contains(at) ? at.id : '', rows = '', pre = '';
   if (!dateOf(jDraft.d)) jDraft.d = ymd(TODAY);
-  if (jDraft.a === '' && jDraft.k.charAt(0) === 'b' && !keep) jDraft.a = jUsual(jDraft.k, jDraft.n);
+  // the usual amount of evals bought, until another one is typed: it follows the hub credits held
+  if (jDraft.k.charAt(0) === 'b' && (jDraft.auto || (jDraft.a === '' && !keep))){ jDraft.a = jUsual(jDraft.k, jDraft.n); jDraft.auto = true; }
   function out(x, line){ var on = jArm && jArm.x === x && jArm.s === line; return '<button type="button" class="lnk" data-x="' + x + '" aria-label="Take this line out of the journal">' + (on ? 'Remove?' : '×') + '</button>'; }
   for (var i = f.j.length - 1; i >= 0; i--){
     var l = jLine(f.j[i]); if (!l) continue;
@@ -1633,7 +1634,7 @@ function jAdd(){
   var zz = kind.charAt(0) === 'b' || kind.charAt(0) === 's' ? jSize(kind) : null;
   if (zz) fiveEarn(state.five, zz, l.n, kind.charAt(0) === 'b' ? Math.min(Math.max(0, num(state.five.cr, 0)), Math.max(0, cent2(l.n * zz.list - l.a / FIVE_DISC))) : 0);
   state.five.j.push(l.s); state.five = cleanFive(state.five);
-  jArm = null; jDraft.d = l.d; jDraft.k = kind; jDraft.n = '1'; jDraft.a = jUsual(kind, 1);
+  jArm = null; jDraft.d = l.d; jDraft.k = kind; jDraft.n = '1'; jDraft.a = jUsual(kind, 1); jDraft.auto = true;
   save(); buildFive(); update(); shareEdit();
 }
 function jourClick(e){
@@ -1653,10 +1654,10 @@ function jourClick(e){
 function jourInput(e){
   var el = e.target || {};
   if (el.id === 'j-d') jDraft.d = String(el.value || '');
-  else if (el.id === 'j-a') jDraft.a = String(el.value === undefined ? '' : el.value);
+  else if (el.id === 'j-a'){ jDraft.a = String(el.value === undefined ? '' : el.value); jDraft.auto = false; }
   else if (el.id === 'j-n'){
     jDraft.n = String(el.value === undefined ? '' : el.value);
-    if (jDraft.k.charAt(0) === 'b' && Math.round(num(jDraft.n, 0)) >= 1){ jDraft.a = jUsual(jDraft.k, jDraft.n); var a = document.getElementById('j-a'); if (a) a.value = jDraft.a; }
+    if (jDraft.k.charAt(0) === 'b' && Math.round(num(jDraft.n, 0)) >= 1){ jDraft.a = jUsual(jDraft.k, jDraft.n); jDraft.auto = true; var a = document.getElementById('j-a'); if (a) a.value = jDraft.a; }
   }
   else return;
   jArm = null;
@@ -1665,7 +1666,7 @@ function jourChange(e){
   var el = e.target || {};
   if (el.id === 'j-d'){ if (dateOf(el.value)) jDraft.d = String(el.value); else el.value = jDraft.d; }
   else if (el.id === 'j-k' && J_KINDS.some(function(x){ return x[0] === String(el.value); })){
-    jDraft.k = String(el.value); jDraft.n = '1'; jDraft.a = jUsual(jDraft.k, 1);
+    jDraft.k = String(el.value); jDraft.n = '1'; jDraft.a = jUsual(jDraft.k, 1); jDraft.auto = true;
     var keep = el.id; jArm = null; buildJour();
     var again = document.getElementById(keep); if (again && again.focus) again.focus();
   }
@@ -1677,7 +1678,7 @@ function accsClick(e){
   if (!list || list[j] !== '') return;
   var cost = fiveCost(z, 1, state.five.cr);
   list[j] = 'e'; state.five.j.push(ymd(TODAY) + ' b' + z.k + ' 1 ' + cost.paid); fiveEarn(state.five, z, 1, cost.used); state.five = cleanFive(state.five);
-  jArm = null; jDraft.a = jUsual(jDraft.k, jDraft.n);
+  jArm = null;
   save(); buildFive(); update(); shareEdit();
   var sel = document.getElementById('a' + z.k + '-' + j); if (sel && sel.focus) sel.focus();
 }
@@ -1754,7 +1755,6 @@ function fiveInput(e){
     var cr = cent2(num(v, -1));
     if (!(cr >= 0 && cr <= CR_MAX) || cr === num(f.cr, 0)) return;
     if (cr > 0) f.cr = cr; else delete f.cr;
-    jDraft.a = jUsual(jDraft.k, jDraft.n);
     save(); buildAccs(); buildJour(); update(); shareEdit();
     return;
   }
