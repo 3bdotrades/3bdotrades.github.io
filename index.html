@@ -790,7 +790,13 @@ var FIVE_MIN = 20, CR_MAX = 9999.99;
 // cr: the hub credits held (left out when none). fed: the time of the last result of his bot that is in here (left out when
 // none): tools/five.js, run on his PC with the counter, puts the bot's results in (evals bought, passed and lost, funded
 // trades won and lost) and starts after it the next time.
+// pre: the evals recorded here as bought that his bot has not seen yet, 'DATE:SIZE' each (left out when none): the "Bought"
+// button and a Bought line of the journal add them, taking that line out takes them back, and when the bot then sees a new
+// eval account of that size within a few days, tools/five.js takes one off instead of counting the purchase again (the
+// owner, 19 Nov 2026: "add to 5ers expense 40$", for an eval his bot had not seen yet).
 var FIVE_V = 4, ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
+var PRE_RX = /^\d{4}-\d\d-\d\d:(?:50|25)$/, PRE_MAX = 20;
+function fivePre(f, day, k, n){ var a = Array.isArray(f.pre) ? f.pre : []; for (var i = 0; i < Math.min(n, PRE_MAX); i++) a.push(day + ':' + k); f.pre = a; }
 var FED_RX = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$/;
 var J_MAX = 100, J_RX = /^(\d{4}-\d\d-\d\d|-) (b50|b25|s50|s25|x50|x25|w|l|m|p|h) (\d{1,4}) (\d{1,7}(?:\.\d\d?)?)$/;
 var J_ORDER = ['b25', 'b50', 'm', 's25', 's50', 'x25', 'x50', 'w', 'l', 'p', 'h'], J_COUNTED = { b50: 1, b25: 1, s50: 1, s25: 1, x50: 1, x25: 1, w: 1, l: 1 };
@@ -856,6 +862,8 @@ function cleanFive(o){
   });
   if (typeof o.cr === 'number' && o.cr > 0 && o.cr <= CR_MAX && cent2(o.cr) > 0) p.cr = cent2(o.cr);
   if (typeof o.fed === 'string' && FED_RX.test(o.fed) && isFinite(Date.parse(o.fed))) p.fed = o.fed;
+  var wait = (Array.isArray(o.pre) ? o.pre : []).filter(function(x){ return typeof x === 'string' && PRE_RX.test(x) && !!dateOf(x.slice(0, 10)); }).sort().slice(-PRE_MAX);
+  if (wait.length) p.pre = wait;
   return p;
 }
 function sameUnit(f, firm, size){ return normFirm(f.firm) === normFirm(firm) && sizeNum(f.size) === sizeNum(size); }
@@ -1633,6 +1641,7 @@ function jAdd(){
   // credits held go) and earns its own, a pass earns its own
   var zz = kind.charAt(0) === 'b' || kind.charAt(0) === 's' ? jSize(kind) : null;
   if (zz) fiveEarn(state.five, zz, l.n, kind.charAt(0) === 'b' ? Math.min(Math.max(0, num(state.five.cr, 0)), Math.max(0, cent2(l.n * zz.list - l.a / FIVE_DISC))) : 0);
+  if (zz && kind.charAt(0) === 'b') fivePre(state.five, l.d, zz.k, l.n);
   state.five.j.push(l.s); state.five = cleanFive(state.five);
   jArm = null; jDraft.d = l.d; jDraft.k = kind; jDraft.n = '1'; jDraft.a = jUsual(kind, 1); jDraft.auto = true;
   save(); buildFive(); update(); shareEdit();
@@ -1647,6 +1656,9 @@ function jourClick(e){
   if (!jArm || jArm.x !== x || jArm.s !== line){ jArm = { x: x, s: line }; buildJour(); var b = jourEl.querySelector('[data-x="' + x + '"]'); if (b && b.focus) b.focus(); return; }
   jArm = null;
   f.j.splice(+x, 1);
+  // a Bought line taken out: its evals are no longer waiting for the bot to see them
+  var gone = jLine(line);
+  if (gone && gone.k.charAt(0) === 'b' && Array.isArray(f.pre)){ for (var g = 0; g < gone.n; g++){ var at = f.pre.indexOf(gone.d + ':' + gone.k.slice(1)); if (at < 0) break; f.pre.splice(at, 1); } state.five = cleanFive(f); }
   save(); buildJour(); update(); shareEdit();
 }
 // what is being typed in the first row is remembered, so that making the journal again does not lose it; a count typed for
@@ -1677,7 +1689,7 @@ function accsClick(e){
   var s = b.split('|'), z = FIVE_SIZES.filter(function(x){ return x.k === s[0]; })[0], list = z ? state.five.acc[z.k] : null, j = +s[1];
   if (!list || list[j] !== '') return;
   var cost = fiveCost(z, 1, state.five.cr);
-  list[j] = 'e'; state.five.j.push(ymd(TODAY) + ' b' + z.k + ' 1 ' + cost.paid); fiveEarn(state.five, z, 1, cost.used); state.five = cleanFive(state.five);
+  list[j] = 'e'; state.five.j.push(ymd(TODAY) + ' b' + z.k + ' 1 ' + cost.paid); fiveEarn(state.five, z, 1, cost.used); fivePre(state.five, ymd(TODAY), z.k, 1); state.five = cleanFive(state.five);
   jArm = null;
   save(); buildFive(); update(); shareEdit();
   var sel = document.getElementById('a' + z.k + '-' + j); if (sel && sel.focus) sel.focus();

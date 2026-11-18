@@ -26,6 +26,8 @@ const PARTS = ['g1', 'v2', '5ers'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX =
 // word): a part of v 3 or older is never read or kept again, and the tab opens with his state (J_SEED and ACC_SEED, as on
 // the page). cr: the hub credits held (left out when none); fed: the time of the last result of his bot that is in the part
 // (tools/five.js puts them in), left out when none.
+// pre: the evals recorded as bought that the bot has not seen yet, 'DATE:SIZE' each, the newest 20 (left out when none).
+const PRE_RX = /^\d{4}-\d\d-\d\d:(?:50|25)$/, PRE_MAX = 20;
 const CR_MAX = 9999.99, FED_RX = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$/;
 const cent2 = v => Math.round(v * 100) / 100;
 const FIVE_V = 4, FIVE_SIZES = [{ k: '50', pay: 1158 }, { k: '25', pay: 579 }], FIVE_MAX = 5;
@@ -73,6 +75,8 @@ function cleanFive(o){
   });
   if (typeof o.cr === 'number' && o.cr > 0 && o.cr <= CR_MAX && cent2(o.cr) > 0) p.cr = cent2(o.cr);
   if (typeof o.fed === 'string' && FED_RX.test(o.fed) && isFinite(Date.parse(o.fed))) p.fed = o.fed;
+  const wait = (Array.isArray(o.pre) ? o.pre : []).filter(x => typeof x === 'string' && PRE_RX.test(x) && !!dateOf(x.slice(0, 10))).sort().slice(-PRE_MAX);
+  if (wait.length) p.pre = wait;
   return p;
 }
 
