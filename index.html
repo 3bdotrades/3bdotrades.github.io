@@ -696,18 +696,18 @@ var FIVE = FLEET.key === '5ers';
 // 5ers2). A frame tells the page around it how tall it is and its money, for the line that adds the two up.
 var TWO_ON = true;
 // The system's signals a trading day when it takes one trade at a time (the owner, 19 Nov 2026: "put the avg signals for
-// system we use None trade at the same time stats ... under my record a stats record"): every G1 and V2 GO from 13 Jul to
-// 13 Nov 2026 (2,662 signals on 87 trading days), a signal counted only when it fills 60 seconds or more after the trade
-// counted before it has ended (a trade to the funded target). 1,657 of them count: 19.05 a day on average, median 18, the
-// fewest 5 (7 Sep, a US holiday), the most 43. Measured once for that period; not counted live.
-var FIVE_SIG = { period: '13 Jul – 13 Nov 2026 · 87 days', last: '2026-11-13', avg: 19.05, med: 18, min: 5, max: 43, minDay: '7 Sep 2026', maxDay: '6 Nov 2026',
-  says: 'One trade at a time: of the 2,662 G1 and V2 signals from 13 Jul to 13 Nov 2026, the 1,657 that fill 60 seconds or more after the trade before them has ended. All signals: 30.6 a day.' };
-// The record grows by a day each trading day (the owner, 20 Nov 2026: "Yes, extend it"): his PC counts every day that has
-// ended and publishes the summary as signals.json next to the counts (tools/signals.js). The page shows the newest it has:
-// that file, else the last one this browser saw, else the measured numbers above. Each says its own period.
+// system we use None trade at the same time stats ... under my record a stats record"): every G1 and V2 GO from 13 Jul 2026,
+// each walked to the bot's funded target (a 25-point stop and a 57-point target, the bot's since 18 Nov 2026), counted only
+// when it fills 60 seconds or more after the trade counted before it has ended. The record grows by a day each trading day
+// (the owner, 20 Nov 2026: "Yes, extend it"): his PC counts every day that has ended and publishes the summary as
+// signals.json next to the counts (tools/signals.js). The page shows the newest it has: that file, else the last one this
+// browser saw, else the one below (through 19 Nov 2026: 1,783 of 2,859 signals on 91 trading days, 19.59 a day, median 19,
+// the fewest 5 on 7 Sep, a US holiday, the most 43 on 6 Nov). Each says its own period.
+var FIVE_SIG0 = { v: 1, first: '2026-07-13', last: '2026-11-19', days: 91, signals: 2859, counted: 1783,
+  none: { mean: 19.59, median: 19, min: 5, min_day: '2026-09-07', max: 43, max_day: '2026-11-06' }, all: { mean: 31.42 } };
 var SIG_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/signals.json', SIG_KEY = 'funded-slots-roadmap-signals';
 var SIG_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-var SIG = FIVE_SIG;
+var SIG = sigOf(FIVE_SIG0);
 // a day 'YYYY-MM-DD' as '13 Jul', with its year when asked ('13 Jul 2026'); '' when it is not a day
 function sigDay(s, year){
   var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s)); if (!m) return '';
@@ -1833,7 +1833,7 @@ function buildFive(){
     return '<div class="cell two" id="c5-' + x[0] + '"><span class="k">' + x[1] + '</span><span class="v"><span id="f-' + x[0] + '-r"></span><small id="f-' + x[0] + '-c"></small></span></div>';
   }).join('');
   if (PROFILE){ var ph = document.getElementById('prof-h'); ph.textContent = 'Profile ' + PROFILE; ph.hidden = false; }
-  // the system's signals a day, one trade at a time (FIVE_SIG), on a profile opened alone; side by side the page around shows it once
+  // the system's signals a day, one trade at a time (SIG), on a profile opened alone; side by side the page around shows it once
   drawSig();
   jArm = null;
   buildAccs(); buildHold(); buildJour();
