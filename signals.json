@@ -15,5 +15,25 @@
  },
  "all": {
   "mean": 31.42
+ },
+ "bt": {
+  "eval": {
+   "stop": 25,
+   "target": 38.25,
+   "won": 1105,
+   "lost": 1751,
+   "flat": 3,
+   "rate": 38.69,
+   "chance": 39.53
+  },
+  "funded": {
+   "stop": 25,
+   "target": 57,
+   "won": 841,
+   "lost": 2009,
+   "flat": 9,
+   "rate": 29.51,
+   "chance": 30.49
+  }
  }
 }
