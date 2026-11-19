@@ -4,7 +4,8 @@
 // has ended (every G1 and V2 GO from 13 Jul 2026 walked to the funded target, counted when it fills 60 seconds or more
 // after the trade before it has ended) and writes a summary. This reads that summary, checks it, cuts it down to what the
 // page shows and writes it as signals.json in the folder given (the "track" branch, next to the counts), where the page
-// reads it. Only dates and counts are written: no path, no reason text, nothing else of the summary.
+// reads it. Only dates and counts are written: no path, no reason text, nothing else of the summary. With them goes the
+// system's backtest over the same days (bt): the page's plan runs at it and its My record shows it.
 // A summary whose status does not start with "ok" (its own check failed) is not published: the file keeps what it had.
 //
 // Usage: node tools/signals.js <folder> <summary.json>      It prints one line for the log.
@@ -33,8 +34,27 @@ function clean(o){
   if (!isDay(n.min_day) || !isDay(n.max_day) || n.min_day < o.first || n.max_day > o.last || n.max_day < o.first || n.min_day > o.last) return { error: 'the fewest and most days are not in the period' };
   if (Math.abs(n.mean * o.days - o.counted) > o.days * 0.006 + 1e-9) return { error: 'the average is not counted / days' };
   if (!a || typeof a !== 'object' || !num(a.mean, 1000) || a.mean < n.mean || Math.abs(a.mean * o.days - o.signals) > o.days * 0.006 + 1e-9) return { error: 'the average of all signals does not add up' };
-  return { v: 1, first: o.first, last: o.last, days: o.days, signals: o.signals, counted: o.counted,
+  const out = { v: 1, first: o.first, last: o.last, days: o.days, signals: o.signals, counted: o.counted,
     none: { mean: c2(n.mean), median: c2(n.median), min: n.min, min_day: n.min_day, max: n.max, max_day: n.max_day }, all: { mean: c2(a.mean) } };
+  // The backtest over the same days (the summary's version 2; the owner, 20 Nov 2026: "under it the rate of the backtest ...
+  // keep update going forward live like the Signals a day"): every GO at the bot's eval and funded targets, rate = won /
+  // (won + lost), flats left out, chance = stop / (stop + target). Each side has to add up, or nothing is published.
+  if (o.backtest !== undefined){
+    const b = o.backtest, e = b && typeof b === 'object' ? side(b.eval) : null, f = b && typeof b === 'object' ? side(b.funded) : null;
+    if (!e || !f) return { error: 'the backtest does not add up' };
+    if (e.won + e.lost + e.flat > o.signals || f.won + f.lost + f.flat > o.signals) return { error: 'the backtest has more trades than signals' };
+    out.bt = { eval: e, funded: f };
+  }
+  return out;
+}
+// one side of the backtest, or null: its counts, and its rate and chance as the summary gives them (two decimals of a percent)
+function side(x){
+  if (!x || typeof x !== 'object' || !num(x.stop, 1000) || !(x.stop > 0) || !num(x.target, 1000) || !(x.target > 0)) return null;
+  if (!count(x.won, 1e7) || !count(x.lost, 1e7) || !count(x.flat, 1e7) || x.won + x.lost < 1) return null;
+  if (x.decided !== undefined && x.decided !== x.won + x.lost) return null;
+  if (!num(x.rate_pct, 100) || Math.abs(x.rate_pct - 100 * x.won / (x.won + x.lost)) > 0.006) return null;
+  if (!num(x.chance_pct, 100) || Math.abs(x.chance_pct - 100 * x.stop / (x.stop + x.target)) > 0.006) return null;
+  return { stop: x.stop, target: x.target, won: x.won, lost: x.lost, flat: x.flat, rate: c2(x.rate_pct), chance: c2(x.chance_pct) };
 }
 // one pass: the line to print. The file is written only when what it would hold changed.
 function pass(dir, file){
@@ -44,7 +64,7 @@ function pass(dir, file){
   if (c.error) return 'signals: not published: ' + c.error;
   const out = path.join(dir, 'signals.json'), text = JSON.stringify(c, null, 1) + '\n';
   let old = null; try { old = fs.readFileSync(out, 'utf8'); } catch (e) {}
-  const what = c.days + ' days to ' + c.last + ', ' + c.none.mean + ' a day';
+  const what = c.days + ' days to ' + c.last + ', ' + c.none.mean + ' a day' + (c.bt ? ', backtest ' + c.bt.eval.rate + '% / ' + c.bt.funded.rate + '%' : '');
   if (old === text) return 'signals: ' + what + ', as kept';
   fs.writeFileSync(out, text);
   return 'signals: ' + what + ', written';

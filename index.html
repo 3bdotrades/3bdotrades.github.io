@@ -702,9 +702,11 @@ var TWO_ON = true;
 // (the owner, 20 Nov 2026: "Yes, extend it"): his PC counts every day that has ended and publishes the summary as
 // signals.json next to the counts (tools/signals.js). The page shows the newest it has: that file, else the last one this
 // browser saw, else the one below (through 19 Nov 2026: 1,783 of 2,859 signals on 91 trading days, 19.59 a day, median 19,
-// the fewest 5 on 7 Sep, a US holiday, the most 43 on 6 Nov). Each says its own period.
+// the fewest 5 on 7 Sep, a US holiday, the most 43 on 6 Nov). Each says its own period. The summary carries the system's
+// backtest over the same days (bt; see FIVE_REAL): the 19 Nov one, 38.69% and 29.51%.
 var FIVE_SIG0 = { v: 1, first: '2026-07-13', last: '2026-11-19', days: 91, signals: 2859, counted: 1783,
-  none: { mean: 19.59, median: 19, min: 5, min_day: '2026-09-07', max: 43, max_day: '2026-11-06' }, all: { mean: 31.42 } };
+  none: { mean: 19.59, median: 19, min: 5, min_day: '2026-09-07', max: 43, max_day: '2026-11-06' }, all: { mean: 31.42 },
+  bt: { eval: { stop: 25, target: 38.25, won: 1105, lost: 1751, flat: 3, rate: 38.69, chance: 39.53 }, funded: { stop: 25, target: 57, won: 841, lost: 2009, flat: 9, rate: 29.51, chance: 30.49 } } };
 var SIG_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/signals.json', SIG_KEY = 'funded-slots-roadmap-signals';
 var SIG_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 var SIG = sigOf(FIVE_SIG0);
@@ -715,7 +717,9 @@ function sigDay(s, year){
   if (+m[1] < 2020 || +m[1] > 2100 || d.getFullYear() !== +m[1] || d.getMonth() !== +m[2] - 1 || d.getDate() !== +m[3]) return '';
   return d.getDate() + ' ' + SIG_MON[d.getMonth()] + (year ? ' ' + d.getFullYear() : '');
 }
-// the published summary as the record shows it; null when it is not one (the checks of tools/signals.js)
+// the published summary as the record shows it; null when it is not one (the checks of tools/signals.js). Its backtest, bt,
+// is null when the file has none or it does not add up (the page then keeps the one it has): the rates and chances as
+// fractions, to two decimals of a percent as published, and what their hovers say.
 function sigOf(o){
   function cnt(v, max){ return typeof v === 'number' && isFinite(v) && Math.floor(v) === v && v >= 0 && v <= max; }
   function nm(v, max){ return typeof v === 'number' && isFinite(v) && v >= 0 && v <= max; }
@@ -724,11 +728,21 @@ function sigOf(o){
   if (!cnt(o.signals, 1e7) || !cnt(o.counted, 1e7) || o.counted > o.signals || !n || typeof n !== 'object' || !a || typeof a !== 'object') return null;
   if (!nm(n.mean, 1000) || !nm(n.median, 1000) || !cnt(n.min, 1000) || !cnt(n.max, 1000) || !(n.min <= n.median && n.median <= n.max && n.min <= n.mean && n.mean <= n.max)) return null;
   if (!sigDay(n.min_day) || !sigDay(n.max_day) || n.min_day < o.first || n.min_day > o.last || n.max_day < o.first || n.max_day > o.last || !nm(a.mean, 1000)) return null;
-  var one = o.first.slice(0, 4) === o.last.slice(0, 4);
-  return { period: sigDay(o.first, !one) + ' – ' + sigDay(o.last, true) + ' · ' + o.days + ' days', last: o.last, avg: n.mean, med: n.median, min: n.min, max: n.max,
+  var one = o.first.slice(0, 4) === o.last.slice(0, 4), period = sigDay(o.first, !one) + ' – ' + sigDay(o.last, true) + ' · ' + o.days + ' days', from = sigDay(o.first, !one) + ' to ' + sigDay(o.last, true);
+  function side(x, what){
+    if (!x || typeof x !== 'object' || !nm(x.stop, 1000) || !(x.stop > 0) || !nm(x.target, 1000) || !(x.target > 0) || !cnt(x.won, 1e7) || !cnt(x.lost, 1e7) || !cnt(x.flat, 1e7) || x.won + x.lost < 1) return null;
+    if (!nm(x.rate, 100) || Math.abs(x.rate - 100 * x.won / (x.won + x.lost)) > 0.006 || !nm(x.chance, 100) || Math.abs(x.chance - 100 * x.stop / (x.stop + x.target)) > 0.006) return null;
+    var rate = Math.round(x.rate * 100) / 100, chance = Math.round(x.chance * 100) / 100;
+    return { rate: Math.round(rate * 100) / 10000, chance: Math.round(chance * 100) / 10000,
+      says: 'every G1 and V2 GO from ' + from + ', walked at the bot\'s targets: ' + what + ' (' + x.stop + '-point stop, ' + x.target + '-point target) won ' + x.won.toLocaleString('en-US') + ' and lost ' + x.lost.toLocaleString('en-US') + ' = ' + rate + '%' + (x.flat ? ', ' + x.flat + ' flat left out' : ''),
+      chanceSays: what + ' with a ' + x.stop + '-point stop and a ' + x.target + '-point target wins ' + chance + '% of the time' };
+  }
+  var e = o.bt && typeof o.bt === 'object' ? side(o.bt.eval, "an eval's trade") : null, w = e ? side(o.bt.funded, 'a funded trade') : null;
+  return { period: period, last: o.last, avg: n.mean, med: n.median, min: n.min, max: n.max,
     minDay: sigDay(n.min_day, true), maxDay: sigDay(n.max_day, true),
-    says: 'One trade at a time: of the ' + o.signals.toLocaleString('en-US') + ' G1 and V2 signals from ' + sigDay(o.first, !one) + ' to ' + sigDay(o.last, true) + ', the ' + o.counted.toLocaleString('en-US') +
-      ' that fill 60 seconds or more after the trade before them has ended. All signals: ' + a.mean + ' a day.' };
+    says: 'One trade at a time: of the ' + o.signals.toLocaleString('en-US') + ' G1 and V2 signals from ' + from + ', the ' + o.counted.toLocaleString('en-US') +
+      ' that fill 60 seconds or more after the trade before them has ended. All signals: ' + a.mean + ' a day.',
+    bt: e && w ? { period: period, pass: e.rate, win: w.rate, chance: e.chance, fchance: w.chance, says: { pass: e.says, win: w.says }, chanceSays: { pass: e.chanceSays, win: w.chanceSays } } : null };
 }
 // the four numbers; the fewest and the most say their day on hover
 function sigCells(){
@@ -742,12 +756,22 @@ function drawSig(){
   if (!h || !b) return;
   h.textContent = 'Signals a day · ' + SIG.period; h.title = SIG.says; h.hidden = false; b.hidden = false; b.innerHTML = sigCells();
 }
-// a summary is taken when it reaches the same day as the one shown or a later one
+// a summary is taken when it reaches the same day as the one shown or a later one; one without a backtest that adds up
+// keeps the backtest the page has
 function takeSig(o, keep){
   var s = sigOf(o); if (!s || s.last < SIG.last) return;
+  if (!s.bt) s.bt = SIG.bt;
+  var moved = JSON.stringify(s.bt) !== JSON.stringify(SIG.bt);
   SIG = s; drawSig();
+  if (moved) btMoved();
   if (keep) try { localStorage.setItem(SIG_KEY, JSON.stringify(o)); } catch (e) {}
 }
+// The backtest moved (a new day, or this browser's copy): the plan's rates, its dashed line and My record follow, on a
+// profile's page once it is built (FIVE_READY)
+var FIVE_READY = false;
+function btMoved(){ setBt(SIG.bt); coinTitle(); if (FIVE && !TWO_UP && FIVE_READY) update(); }
+// the dashed line's legend: the same plan with every trade at chance
+function coinTitle(){ var lg = document.getElementById('lg-coin'); if (lg) lg.title = 'The same plan with every trade at chance (' + FIVE_CHANCE_SAYS.pass + ', ' + FIVE_CHANCE_SAYS.win + ') instead of the plan\'s rates'; }
 function loadSig(){
   try { takeSig(JSON.parse(localStorage.getItem(SIG_KEY) || 'null'), false); } catch (e) {}
   drawSig();
@@ -857,9 +881,8 @@ function clone(o){ return JSON.parse(JSON.stringify(o)); }
 // days after the day it was funded ($1,158 each on a 50K, $579 on a 25K; the owner, 17 Nov 2026: "3 x $1,158 / 3 x $579",
 // 77.2% of the win, as his $2,316 was of $3,000), and on the trading day after its third payout it takes one more funded
 // trade, whose win is paid 14, 28 and 42 days after that last payout (FIVE_PAYS payouts, FIVE_WAIT days apart). An account
-// that ended is replaced by a new eval on the next trading day. Chance, what a trade wins with no edge, is
-// risk / (risk + make): 40% for an eval's trade (FIVE_CHANCE), 2,000 / 6,500 = 30.769...% for a funded one, taken as the
-// page shows it, 30.77% (FIVE_FCHANCE).
+// that ended is replaced by a new eval on the next trading day. Chance, what a trade wins with no edge, and the backtest
+// the plan runs at: see FIVE_REAL below.
 // What an eval costs (the owner, 13 Nov 2026): its list price ($100 a 50K, $59 a 25K) less the hub credits used, then 20%
 // off. Every eval bought and every eval passed earns hub credits ($10 a 50K, $5 a 25K), and they go into the next evals
 // bought. So `price`, what one costs with the credits of one buy, is the amount of the "Bought" button, and a run takes each
@@ -871,16 +894,19 @@ function clone(o){ return JSON.parse(JSON.stringify(o)); }
 // buys today cost that much less (fivePlan).
 var FIVE_DISC = 0.8;
 var FIVE_SIZES = [{ k: '50', size: '50K', list: 100, credit: 10, price: 72, pay: 1158, risk: 2000, make: 3000, fmake: 4500 }, { k: '25', size: '25K', list: 59, credit: 5, price: 43.2, pay: 579, risk: 1000, make: 1500, fmake: 2250 }];
-var FIVE_MAX = 5, FIVE_WAIT = 14, FIVE_PAYS = 3, FIVE_CHANCE = FIVE_SIZES[0].risk / (FIVE_SIZES[0].risk + FIVE_SIZES[0].make);
-var FIVE_FCHANCE = Math.round(10000 * FIVE_SIZES[0].risk / (FIVE_SIZES[0].risk + FIVE_SIZES[0].fmake)) / 10000;
-// what the hover of each rate and the dashed line's legend say about chance
-var FIVE_CHANCE_SAYS = { pass: "an eval's trade that risks $2,000 to make $3,000 wins 40% of the time", win: 'a funded trade that risks $2,000 to make $4,500 wins 30.77% of the time' };
-// The real rates (the owner, 18 Nov 2026: "can i also get the real winrate across one year not in wins at chance", then "Use
-// real rates"): every G1 and V2 GO from 13 Jul to 13 Nov 2026 (the GO history starts 13 Jul 2026), traded the bot's way on
-// whole NQ: an eval's trade (25-point stop, 37.50-point target) won 1,051 of 2,659 = 39.53%, a funded one (25 / 56.25)
-// 788 of 2,653 = 29.70%. The plan runs at them while My record has no line of that kind; chance stays the dashed line.
-var FIVE_REAL = { pass: 0.3953, win: 0.297 };
-var FIVE_REAL_SAYS = { pass: "every G1 and V2 GO from 13 Jul to 13 Nov 2026, traded the bot's way: an eval's trade (25-point stop, 37.50-point target) won 1,051 of 2,659 = 39.53%", win: "every G1 and V2 GO from 13 Jul to 13 Nov 2026, traded the bot's way: a funded trade (25-point stop, 56.25-point target) won 788 of 2,653 = 29.70%" };
+var FIVE_MAX = 5, FIVE_WAIT = 14, FIVE_PAYS = 3;
+// The backtest, the plan's rates and chance (the owner, 20 Nov 2026: "My record show my real record and under it the rate of
+// the backtest and also wider like that 91 days and keep update going forward live like the Signals a day", in the dialog
+// "Bot's targets", then "under this show my own rate ok"): every G1 and V2 GO of the days Signals a day covers, walked at
+// the bot's targets since 18 Nov 2026 (a 25-point stop; a 38.25-point target for an eval's trade, 57 for a funded one),
+// rate = won / (won + lost), flats left out. The plan runs at it until My record has FIVE_MIN results of a kind of his own
+// (FIVE_REAL, fiveRates), and chance, stop / (stop + target), is the dashed line (FIVE_CHANCE for an eval's trade,
+// FIVE_FCHANCE for a funded one). It comes with Signals a day and follows its days (SIG.bt, btMoved); until the file is
+// read, the summary of 19 Nov 2026: 38.69% and 29.51%, chance 39.53% and 30.49%. (Before 20 Nov 2026 the page took chance
+// from the dollar sizes, 40% and 30.77%, and the real rates at 37.50 / 56.25 over 13 Jul - 13 Nov, 39.53% and 29.70%.)
+var FIVE_REAL, FIVE_REAL_SAYS, FIVE_CHANCE, FIVE_FCHANCE, FIVE_CHANCE_SAYS;
+function setBt(b){ FIVE_REAL = { pass: b.pass, win: b.win }; FIVE_REAL_SAYS = b.says; FIVE_CHANCE = b.chance; FIVE_FCHANCE = b.fchance; FIVE_CHANCE_SAYS = b.chanceSays; }
+setBt(SIG.bt);
 function fivePrice(z, p){ return FIVE_DISC * (z.list - z.credit * (1 + clamp01(p))); }
 function cent2(v){ return Math.round(v * 100) / 100; }
 // n evals of a size bought with cr hub credits held: the credits used and what is paid
@@ -1601,7 +1627,7 @@ function fiveDay(z, p, q){
   return den > 0 ? (FIVE_PAYS * p * q * z.pay - z.price * (1 - q)) / den : 0;
 }
 // the two rates of a run: My record as the page shows it (a percentage to one decimal) once it has FIVE_MIN results of that
-// kind, the real rates until then (FIVE_REAL: 39.53% for the eval pass, 29.70% for the funded win)
+// kind, the backtest until then (FIVE_REAL: 38.69% for the eval pass, 29.51% for the funded win on 19 Nov 2026)
 function fiveRates(){
   var r = fiveRecord(state.five);
   return { pass: r.pass + r.lost >= FIVE_MIN ? Math.round(1000 * r.pass / (r.pass + r.lost)) / 1000 : FIVE_REAL.pass, win: r.won + r.flost >= FIVE_MIN ? Math.round(1000 * r.won / (r.won + r.flost)) / 1000 : FIVE_REAL.win };
@@ -1824,13 +1850,15 @@ function buildFive(){
   document.getElementById('accs-h').hidden = false; accsEl.hidden = false;
   document.getElementById('jour-h').hidden = !JOUR_ON; jourEl.hidden = !JOUR_ON;
   document.getElementById('hold-h').hidden = false; holdEl.hidden = false;
-  document.getElementById('lg-coin').title = 'The same plan with every trade at chance (' + FIVE_CHANCE_SAYS.pass + ', ' + FIVE_CHANCE_SAYS.win + ') instead of the rates My record shows';
+  coinTitle();
   var first = 'Paid <b id="f-paid" title="Counted from the journal: evals bought"></b> · Received <b id="f-out" title="Counted from the journal: payouts, in cash and in hub credits"></b> · <span id="f-net"></span> · <span class="nb">Hub credits <input class="box m" type="number" inputmode="decimal" min="0" max="' + CR_MAX + '" step="0.01" id="f-cr" value="' + num(state.five.cr, 0) + '" aria-label="Hub credits held" title="Hub credits held: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K"></span>';
   // the hub credits held are shown, not typed (CR_LOCK)
   if (CR_LOCK) first = first.replace(/<input[^>]*>/, '<b id="f-cr-v" title="Counted, not typed: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K">' + num(state.five.cr, 0) + '</b>');
   g1El.innerHTML = first;
+  // My record: each rate has the backtest's line and under it this profile's own (updateFive)
   ratesEl.innerHTML = [['pass', 'Eval pass'], ['win', 'Funded win']].map(function(x){
-    return '<div class="cell two" id="c5-' + x[0] + '"><span class="k">' + x[1] + '</span><span class="v"><span id="f-' + x[0] + '-r"></span><small id="f-' + x[0] + '-c"></small></span></div>';
+    return '<div class="cell two" id="c5-' + x[0] + '"><span class="k">' + x[1] + '</span><span class="v"><span id="f-' + x[0] + '-r"></span><small id="f-' + x[0] + '-c"></small></span>' +
+      '<span class="v" id="m5-' + x[0] + '"><span id="f-' + x[0] + '-m"></span><small id="f-' + x[0] + '-mc"></small></span></div>';
   }).join('');
   if (PROFILE){ var ph = document.getElementById('prof-h'); ph.textContent = 'Profile ' + PROFILE; ph.hidden = false; }
   // the system's signals a day, one trade at a time (SIG), on a profile opened alone; side by side the page around shows it once
@@ -1860,16 +1888,22 @@ function updateFive(){
   document.getElementById('f-paid').textContent = cents(m.paid);
   document.getElementById('f-out').textContent = cents(m.out);
   document.getElementById('f-net').innerHTML = 'So far <span class="' + (base >= 0 ? 'pos' : 'neg') + '">' + (base > 0 ? '+' : '') + cents(base) + '</span>';
-  // My record: counted from the journal, not typed (a rate to one decimal; the funded trade's chance to two, 30.77%)
+  // My record (the owner, 20 Nov 2026: "My record show my real record and under it the rate of the backtest ... like that 91
+  // days", then "under this show my own rate ok"): first the backtest, with its days on the heading (FIVE_REAL, what the plan
+  // runs at until this profile has FIVE_MIN results of a kind), and under it this profile's own rate from its journal, a
+  // rate to one decimal ("none yet" with no result: never 0%). The counts are on the hover, not on the page (the owner, 20
+  // Nov 2026: "don't show 1 of 1 or 3 of 9").
   var rec = fiveRecord(f);
+  document.getElementById('rates-h').textContent = 'My record · backtest ' + SIG.bt.period;
   [['pass', rec.pass, rec.lost, 'evals passed', 'lost'], ['win', rec.won, rec.flost, 'funded trades won', 'lost']].forEach(function(x){
-    var done = x[1] + x[2];
-    // Only the plan's rate is shown (the owner, 20 Nov 2026: "don't show 1 of 1 or 3 of 9 only the plan"): the real one until
-    // the record has FIVE_MIN results of that kind, then the record's own with its counts. The counts so far are in the hover.
-    document.getElementById('f-' + x[0] + '-r').textContent = (Math.round(10000 * rr[x[0]]) / 100) + '%';
-    document.getElementById('f-' + x[0] + '-c').textContent = done >= FIVE_MIN ? x[1] + ' of ' + done : 'real';
-    document.getElementById('c5-' + x[0]).title = (done > 0 ? 'From the journal: ' + x[1] + ' ' + x[3] + ', ' + x[2] + ' ' + x[4] + ' = ' + (100 * x[1] / done).toFixed(2) + '%' : 'Nothing in the journal yet') +
-      (done >= FIVE_MIN ? '' : '. The plan runs at the real rate until there are ' + FIVE_MIN + ' results. Real: ' + FIVE_REAL_SAYS[x[0]]);
+    var k = x[0], done = x[1] + x[2], m = document.getElementById('f-' + k + '-m'), mc = document.getElementById('f-' + k + '-mc');
+    document.getElementById('f-' + k + '-r').textContent = (Math.round(10000 * FIVE_REAL[k]) / 100) + '%';
+    document.getElementById('f-' + k + '-c').textContent = 'backtest';
+    document.getElementById('c5-' + k).title = 'Backtest: ' + FIVE_REAL_SAYS[k] + '. Chance: ' + FIVE_CHANCE_SAYS[k] + '. The plan runs at the backtest until this profile has ' + FIVE_MIN + ' results of its own.';
+    m.textContent = done > 0 ? (Math.round(1000 * x[1] / done) / 10) + '%' : '';
+    mc.textContent = done > 0 ? 'mine' : 'mine: none yet';
+    document.getElementById('m5-' + k).title = done > 0 ? 'From this profile\'s journal: ' + x[1] + ' ' + x[3] + ', ' + x[2] + ' ' + x[4] + ' = ' + (100 * x[1] / done).toFixed(2) + '%' + (done >= FIVE_MIN ? '. The plan runs at this rate.' : '')
+      : 'No result in this profile\'s journal yet';
   });
 
   var at = document.activeElement, back = at && at.id && firmsEl.contains(at) ? at.id : '';
@@ -1885,7 +1919,7 @@ function updateFive(){
   if (back){ var box = document.getElementById(back); if (box && box.focus){ box.focus(); if (box.select) box.select(); } }
 
   // the dashed line: the same accounts with every trade at chance, drawn when the plan's rates are not chance (always while
-  // the real rates stand in for an empty record)
+  // the backtest stands in for a record of fewer than FIVE_MIN results)
   var coin = rr.pass !== FIVE_CHANCE || rr.win !== FIVE_FCHANCE ? fivePlan({ pass: FIVE_CHANCE, win: FIVE_FCHANCE }, WEEKS) : null;
   drawChart(res.rows.map(function(r, i){ var o = { t: r.t, inn: r.inn, out: r.out, cum: r.cum + base }; if (coin) o.coin = coin.rows[i].cum + base; return o; }));
   tellParent();
@@ -2119,8 +2153,9 @@ if (FIVE){
   accsEl.addEventListener('click', accsClick);
   jourEl.addEventListener('input', typed); jourEl.addEventListener('input', jourInput); jourEl.addEventListener('change', jourChange); jourEl.addEventListener('click', jourClick);
   jourEl.addEventListener('keydown', function(e){ var t = e.target || {}; if (e.key === 'Enter' && (t.id === 'j-a' || t.id === 'j-d' || t.id === 'j-n')){ e.preventDefault(); jAdd(); } });
-  buildFive(); update();
-  if (!EMBED) loadSig();
+  buildFive(); update(); FIVE_READY = true;
+  // Signals a day and the backtest it carries: each profile's frame reads it too, for the plan and My record
+  loadSig();
   if (EMBED && window.ResizeObserver && document.querySelector('main')) new ResizeObserver(tellParent).observe(document.querySelector('main'));
 }
 else { syncRates(); update(); drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000); }
