@@ -700,9 +700,59 @@ var TWO_ON = true;
 // 13 Nov 2026 (2,662 signals on 87 trading days), a signal counted only when it fills 60 seconds or more after the trade
 // counted before it has ended (a trade to the funded target). 1,657 of them count: 19.05 a day on average, median 18, the
 // fewest 5 (7 Sep, a US holiday), the most 43. Measured once for that period; not counted live.
-var FIVE_SIG = { period: '13 Jul – 13 Nov 2026 · 87 days', avg: 19.05, med: 18, min: 5, max: 43,
+var FIVE_SIG = { period: '13 Jul – 13 Nov 2026 · 87 days', last: '2026-11-13', avg: 19.05, med: 18, min: 5, max: 43, minDay: '7 Sep 2026', maxDay: '6 Nov 2026',
   says: 'One trade at a time: of the 2,662 G1 and V2 signals from 13 Jul to 13 Nov 2026, the 1,657 that fill 60 seconds or more after the trade before them has ended. All signals: 30.6 a day.' };
-function sigCells(){ return [['Average', FIVE_SIG.avg], ['Median', FIVE_SIG.med], ['Fewest', FIVE_SIG.min], ['Most', FIVE_SIG.max]].map(function(x){ return '<div class="cell"><span class="k">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join(''); }
+// The record grows by a day each trading day (the owner, 20 Nov 2026: "Yes, extend it"): his PC counts every day that has
+// ended and publishes the summary as signals.json next to the counts (tools/signals.js). The page shows the newest it has:
+// that file, else the last one this browser saw, else the measured numbers above. Each says its own period.
+var SIG_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/signals.json', SIG_KEY = 'funded-slots-roadmap-signals';
+var SIG_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+var SIG = FIVE_SIG;
+// a day 'YYYY-MM-DD' as '13 Jul', with its year when asked ('13 Jul 2026'); '' when it is not a day
+function sigDay(s, year){
+  var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s)); if (!m) return '';
+  var d = new Date(+m[1], +m[2] - 1, +m[3]);
+  if (+m[1] < 2020 || +m[1] > 2100 || d.getFullYear() !== +m[1] || d.getMonth() !== +m[2] - 1 || d.getDate() !== +m[3]) return '';
+  return d.getDate() + ' ' + SIG_MON[d.getMonth()] + (year ? ' ' + d.getFullYear() : '');
+}
+// the published summary as the record shows it; null when it is not one (the checks of tools/signals.js)
+function sigOf(o){
+  function cnt(v, max){ return typeof v === 'number' && isFinite(v) && Math.floor(v) === v && v >= 0 && v <= max; }
+  function nm(v, max){ return typeof v === 'number' && isFinite(v) && v >= 0 && v <= max; }
+  var n = o && o.none, a = o && o.all;
+  if (!o || typeof o !== 'object' || o.v !== 1 || !sigDay(o.first) || !sigDay(o.last) || o.first > o.last || !cnt(o.days, 5000) || o.days < 1) return null;
+  if (!cnt(o.signals, 1e7) || !cnt(o.counted, 1e7) || o.counted > o.signals || !n || typeof n !== 'object' || !a || typeof a !== 'object') return null;
+  if (!nm(n.mean, 1000) || !nm(n.median, 1000) || !cnt(n.min, 1000) || !cnt(n.max, 1000) || !(n.min <= n.median && n.median <= n.max && n.min <= n.mean && n.mean <= n.max)) return null;
+  if (!sigDay(n.min_day) || !sigDay(n.max_day) || n.min_day < o.first || n.min_day > o.last || n.max_day < o.first || n.max_day > o.last || !nm(a.mean, 1000)) return null;
+  var one = o.first.slice(0, 4) === o.last.slice(0, 4);
+  return { period: sigDay(o.first, !one) + ' – ' + sigDay(o.last, true) + ' · ' + o.days + ' days', last: o.last, avg: n.mean, med: n.median, min: n.min, max: n.max,
+    minDay: sigDay(n.min_day, true), maxDay: sigDay(n.max_day, true),
+    says: 'One trade at a time: of the ' + o.signals.toLocaleString('en-US') + ' G1 and V2 signals from ' + sigDay(o.first, !one) + ' to ' + sigDay(o.last, true) + ', the ' + o.counted.toLocaleString('en-US') +
+      ' that fill 60 seconds or more after the trade before them has ended. All signals: ' + a.mean + ' a day.' };
+}
+// the four numbers; the fewest and the most say their day on hover
+function sigCells(){
+  return [['Average', SIG.avg, ''], ['Median', SIG.med, ''], ['Fewest', SIG.min, SIG.minDay], ['Most', SIG.max, SIG.maxDay]].map(function(x){
+    return '<div class="cell"' + (x[2] ? ' title="' + x[2] + '"' : '') + '><span class="k">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join('');
+}
+// the record where this page shows it: once above the two profiles, or on a profile opened alone (not in a profile's frame)
+function drawSig(){
+  if (!(TWO_UP || (FIVE && !EMBED))) return;
+  var h = document.getElementById(TWO_UP ? 'sigw-h' : 'sig-h'), b = document.getElementById(TWO_UP ? 'sigw' : 'sig');
+  if (!h || !b) return;
+  h.textContent = 'Signals a day · ' + SIG.period; h.title = SIG.says; h.hidden = false; b.hidden = false; b.innerHTML = sigCells();
+}
+// a summary is taken when it reaches the same day as the one shown or a later one
+function takeSig(o, keep){
+  var s = sigOf(o); if (!s || s.last < SIG.last) return;
+  SIG = s; drawSig();
+  if (keep) try { localStorage.setItem(SIG_KEY, JSON.stringify(o)); } catch (e) {}
+}
+function loadSig(){
+  try { takeSig(JSON.parse(localStorage.getItem(SIG_KEY) || 'null'), false); } catch (e) {}
+  drawSig();
+  try { fetch(SIG_URL + '?t=' + Date.now(), { cache: 'no-store' }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(o){ takeSig(o, true); }).catch(function(){}); } catch (e) {}
+}
 // The Journal card is not shown (the owner, 20 Nov 2026: "remove the Journal no need"): what it holds stays and is still
 // counted (Paid, Received, My record), his bot's results still go into it, and "Bought" still adds its line.
 var JOUR_ON = false;
@@ -721,8 +771,7 @@ if (TWO_UP){
     var main = document.querySelector('main'); if (main) main.className = 'wide';
     document.getElementById('one').hidden = true; document.getElementById('split').hidden = false;
     // the system's signals a day, once for both profiles (the owner, 20 Nov 2026: "make it wider no need to make it * 2")
-    var sw = document.getElementById('sigw-h'); sw.textContent = 'Signals a day · ' + FIVE_SIG.period; sw.title = FIVE_SIG.says;
-    document.getElementById('sigw').innerHTML = sigCells();
+    loadSig();
     function c2(v){ return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
     function fin(v){ return typeof v === 'number' && isFinite(v) && Math.abs(v) < 1e9 ? Math.round(v * 100) / 100 : 0; }
     window.addEventListener('message', function(e){
@@ -1785,10 +1834,7 @@ function buildFive(){
   }).join('');
   if (PROFILE){ var ph = document.getElementById('prof-h'); ph.textContent = 'Profile ' + PROFILE; ph.hidden = false; }
   // the system's signals a day, one trade at a time (FIVE_SIG), on a profile opened alone; side by side the page around shows it once
-  if (!EMBED){
-    var sh = document.getElementById('sig-h'), se = document.getElementById('sig');
-    sh.textContent = 'Signals a day · ' + FIVE_SIG.period; sh.title = FIVE_SIG.says; sh.hidden = false; se.hidden = false; se.innerHTML = sigCells();
-  }
+  drawSig();
   jArm = null;
   buildAccs(); buildHold(); buildJour();
 }
@@ -2074,6 +2120,7 @@ if (FIVE){
   jourEl.addEventListener('input', typed); jourEl.addEventListener('input', jourInput); jourEl.addEventListener('change', jourChange); jourEl.addEventListener('click', jourClick);
   jourEl.addEventListener('keydown', function(e){ var t = e.target || {}; if (e.key === 'Enter' && (t.id === 'j-a' || t.id === 'j-d' || t.id === 'j-n')){ e.preventDefault(); jAdd(); } });
   buildFive(); update();
+  if (!EMBED) loadSig();
   if (EMBED && window.ResizeObserver && document.querySelector('main')) new ResizeObserver(tellParent).observe(document.querySelector('main'));
 }
 else { syncRates(); update(); drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000); }
