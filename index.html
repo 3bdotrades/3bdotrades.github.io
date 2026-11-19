@@ -79,7 +79,7 @@ tbody tr+tr td.same{border-top-color:transparent}
 .nb{white-space:nowrap}
 /* the 5ers tab: two profiles side by side, each the tab of one profile in a frame of its own */
 main.wide{max-width:1560px}
-.profiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.profiles{margin-top:6px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
 .profiles iframe{display:block;width:100%;height:1400px;border:0;background:var(--bg);color-scheme:dark}
 .embed main{max-width:none;padding:0;display:flow-root}
 html.embed,.embed body{overflow:hidden}
@@ -145,6 +145,8 @@ tr.off .pick{color:var(--mute)}
   <nav class="tabs" aria-label="Fleet"><a class="tab" id="fleet-g1" href="?fleet=g1">G1</a><a class="tab" id="fleet-v2" href="?fleet=v2">V2 fleet</a><a class="tab" id="fleet-5ers" href="?fleet=5ers">5ers</a></nav>
   <div id="split" hidden>
     <p class="note" id="both"></p>
+    <h2 id="sigw-h"></h2>
+    <div class="wrap cells" id="sigw"></div>
     <div class="profiles"><iframe id="pf1" title="Profile 1"></iframe><iframe id="pf2" title="Profile 2"></iframe></div>
   </div>
   <div id="one">
@@ -693,6 +695,20 @@ var FIVE = FLEET.key === '5ers';
 // its own journal, money, record, payouts on hold, hub credits, accounts and plan, kept and shared apart (parts 5ers and
 // 5ers2). A frame tells the page around it how tall it is and its money, for the line that adds the two up.
 var TWO_ON = true;
+// The system's signals a trading day when it takes one trade at a time (the owner, 19 Nov 2026: "put the avg signals for
+// system we use None trade at the same time stats ... under my record a stats record"): every G1 and V2 GO from 13 Jul to
+// 13 Nov 2026 (2,662 signals on 87 trading days), a signal counted only when it fills 60 seconds or more after the trade
+// counted before it has ended (a trade to the funded target). 1,657 of them count: 19.05 a day on average, median 18, the
+// fewest 5 (7 Sep, a US holiday), the most 43. Measured once for that period; not counted live.
+var FIVE_SIG = { period: '13 Jul – 13 Nov 2026 · 87 days', avg: 19.05, med: 18, min: 5, max: 43,
+  says: 'One trade at a time: of the 2,662 G1 and V2 signals from 13 Jul to 13 Nov 2026, the 1,657 that fill 60 seconds or more after the trade before them has ended. All signals: 30.6 a day.' };
+function sigCells(){ return [['Average', FIVE_SIG.avg], ['Median', FIVE_SIG.med], ['Fewest', FIVE_SIG.min], ['Most', FIVE_SIG.max]].map(function(x){ return '<div class="cell"><span class="k">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join(''); }
+// The Journal card is not shown (the owner, 20 Nov 2026: "remove the Journal no need"): what it holds stays and is still
+// counted (Paid, Received, My record), his bot's results still go into it, and "Bought" still adds its line.
+var JOUR_ON = false;
+// The hub credits held are shown, not typed (the owner, 20 Nov 2026: "lock the hub credits"): they move with the evals
+// bought and passed, and are set on his word.
+var CR_LOCK = true;
 var PROFILE = FIVE ? +((/[?&]p=([12])(&|$)/.exec((window.location && window.location.search) || '') || [])[1] || 0) : 0;
 var TWO_UP = FIVE && !PROFILE && TWO_ON, P2 = PROFILE === 2;
 var EMBED = false; try { EMBED = FIVE && !TWO_UP && !!window.parent && window.parent !== window; } catch (e) {}
@@ -704,6 +720,9 @@ if (TWO_UP){
     var frames = [document.getElementById('pf1'), document.getElementById('pf2')], got = [null, null], bothEl = document.getElementById('both');
     var main = document.querySelector('main'); if (main) main.className = 'wide';
     document.getElementById('one').hidden = true; document.getElementById('split').hidden = false;
+    // the system's signals a day, once for both profiles (the owner, 20 Nov 2026: "make it wider no need to make it * 2")
+    var sw = document.getElementById('sigw-h'); sw.textContent = 'Signals a day · ' + FIVE_SIG.period; sw.title = FIVE_SIG.says;
+    document.getElementById('sigw').innerHTML = sigCells();
     function c2(v){ return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
     function fin(v){ return typeof v === 'number' && isFinite(v) && Math.abs(v) < 1e9 ? Math.round(v * 100) / 100 : 0; }
     window.addEventListener('message', function(e){
@@ -822,13 +841,7 @@ function fiveEarn(f, z, n, used){ f.cr = Math.min(CR_MAX, Math.max(0, cent2(num(
 // My record's rate of a kind is the plan's once it has this many results (the owner, 18 Nov 2026, asked at 3 evals passed of
 // 9 and 1 funded trade won of 1: "Real rates until 20 results"); with fewer the plan keeps the real rate.
 var FIVE_MIN = 20, CR_MAX = 9999.99;
-// The system's signals a trading day when it takes one trade at a time (the owner, 19 Nov 2026: "put the avg signals for
-// system we use None trade at the same time stats ... under my record a stats record"): every G1 and V2 GO from 13 Jul to
-// 13 Nov 2026 (2,662 signals on 87 trading days), a signal counted only when it fills 60 seconds or more after the trade
-// counted before it has ended (a trade to the funded target). 1,657 of them count: 19.05 a day on average, median 18, the
-// fewest 5 (7 Sep, a US holiday), the most 43. Measured once for that period; not counted live.
-var FIVE_SIG = { period: '13 Jul – 13 Nov 2026 · 87 days', avg: 19.05, med: 18, min: 5, max: 43,
-  says: 'One trade at a time: of the 2,662 G1 and V2 signals from 13 Jul to 13 Nov 2026, the 1,657 that fill 60 seconds or more after the trade before them has ended. All signals: 30.6 a day.' };
+
 // What is typed on the 5ers tab, checked (cleanFive), v 4 (FIVE_V). The tab started from scratch on 17 Nov 2026 (v 3: the
 // owner, "edit 5ers to start from scratch") and again that evening with his accounts and the evals he holds (v 4, J_SEED and
 // ACC_SEED below): it opens with them, and what was kept before (v 3 and older, in a browser, on the relay or in shared.json)
@@ -1760,18 +1773,22 @@ function buildFive(){
   document.getElementById('rates-h').textContent = 'My record';
   document.getElementById('firms-h').textContent = 'Per size';
   document.getElementById('accs-h').hidden = false; accsEl.hidden = false;
-  document.getElementById('jour-h').hidden = false; jourEl.hidden = false;
+  document.getElementById('jour-h').hidden = !JOUR_ON; jourEl.hidden = !JOUR_ON;
   document.getElementById('hold-h').hidden = false; holdEl.hidden = false;
   document.getElementById('lg-coin').title = 'The same plan with every trade at chance (' + FIVE_CHANCE_SAYS.pass + ', ' + FIVE_CHANCE_SAYS.win + ') instead of the rates My record shows';
-  g1El.innerHTML = 'Paid <b id="f-paid" title="Counted from the journal: evals bought"></b> · Received <b id="f-out" title="Counted from the journal: payouts, in cash and in hub credits"></b> · <span id="f-net"></span> · <span class="nb">Hub credits <input class="box m" type="number" inputmode="decimal" min="0" max="' + CR_MAX + '" step="0.01" id="f-cr" value="' + num(state.five.cr, 0) + '" aria-label="Hub credits held" title="Hub credits held: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K"></span>';
+  var first = 'Paid <b id="f-paid" title="Counted from the journal: evals bought"></b> · Received <b id="f-out" title="Counted from the journal: payouts, in cash and in hub credits"></b> · <span id="f-net"></span> · <span class="nb">Hub credits <input class="box m" type="number" inputmode="decimal" min="0" max="' + CR_MAX + '" step="0.01" id="f-cr" value="' + num(state.five.cr, 0) + '" aria-label="Hub credits held" title="Hub credits held: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K"></span>';
+  // the hub credits held are shown, not typed (CR_LOCK)
+  if (CR_LOCK) first = first.replace(/<input[^>]*>/, '<b id="f-cr-v" title="Counted, not typed: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K">' + num(state.five.cr, 0) + '</b>');
+  g1El.innerHTML = first;
   ratesEl.innerHTML = [['pass', 'Eval pass'], ['win', 'Funded win']].map(function(x){
     return '<div class="cell two" id="c5-' + x[0] + '"><span class="k">' + x[1] + '</span><span class="v"><span id="f-' + x[0] + '-r"></span><small id="f-' + x[0] + '-c"></small></span></div>';
   }).join('');
   if (PROFILE){ var ph = document.getElementById('prof-h'); ph.textContent = 'Profile ' + PROFILE; ph.hidden = false; }
-  // the system's signals a day, one trade at a time (FIVE_SIG): measured, the same for both profiles
-  var sg = FIVE_SIG, sh = document.getElementById('sig-h'), se = document.getElementById('sig');
-  sh.textContent = 'Signals a day · ' + sg.period; sh.title = sg.says; sh.hidden = false; se.hidden = false;
-  se.innerHTML = [['Average', sg.avg], ['Median', sg.med], ['Fewest', sg.min], ['Most', sg.max]].map(function(x){ return '<div class="cell"><span class="k">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join('');
+  // the system's signals a day, one trade at a time (FIVE_SIG), on a profile opened alone; side by side the page around shows it once
+  if (!EMBED){
+    var sh = document.getElementById('sig-h'), se = document.getElementById('sig');
+    sh.textContent = 'Signals a day · ' + FIVE_SIG.period; sh.title = FIVE_SIG.says; sh.hidden = false; se.hidden = false; se.innerHTML = sigCells();
+  }
   jArm = null;
   buildAccs(); buildHold(); buildJour();
 }
@@ -1801,9 +1818,10 @@ function updateFive(){
   var rec = fiveRecord(f);
   [['pass', rec.pass, rec.lost, 'evals passed', 'lost'], ['win', rec.won, rec.flost, 'funded trades won', 'lost']].forEach(function(x){
     var done = x[1] + x[2];
-    // his own rate once there is a result; until there are FIVE_MIN of them the plan's rate, the real one, stands next to it
-    document.getElementById('f-' + x[0] + '-r').textContent = (done > 0 ? Math.round(1000 * x[1] / done) / 10 : Math.round(10000 * rr[x[0]]) / 100) + '%';
-    document.getElementById('f-' + x[0] + '-c').textContent = done >= FIVE_MIN ? x[1] + ' of ' + done : done > 0 ? x[1] + ' of ' + done + ' · plan ' + (Math.round(10000 * rr[x[0]]) / 100) + '%' : 'real';
+    // Only the plan's rate is shown (the owner, 20 Nov 2026: "don't show 1 of 1 or 3 of 9 only the plan"): the real one until
+    // the record has FIVE_MIN results of that kind, then the record's own with its counts. The counts so far are in the hover.
+    document.getElementById('f-' + x[0] + '-r').textContent = (Math.round(10000 * rr[x[0]]) / 100) + '%';
+    document.getElementById('f-' + x[0] + '-c').textContent = done >= FIVE_MIN ? x[1] + ' of ' + done : 'real';
     document.getElementById('c5-' + x[0]).title = (done > 0 ? 'From the journal: ' + x[1] + ' ' + x[3] + ', ' + x[2] + ' ' + x[4] + ' = ' + (100 * x[1] / done).toFixed(2) + '%' : 'Nothing in the journal yet') +
       (done >= FIVE_MIN ? '' : '. The plan runs at the real rate until there are ' + FIVE_MIN + ' results. Real: ' + FIVE_REAL_SAYS[x[0]]);
   });
