@@ -14,7 +14,8 @@ const fs = require('fs'), path = require('path');
 const TOPIC = process.env.SHARE_TOPIC || 'funded-slots-roadmap-edits-7c41f9';
 const RELAY = 'https://ntfy.sh/' + TOPIC + '/json?poll=1&since=all';
 // (The Simulation tab's part, sim, went with the tab on 17 Nov 2026: it is no longer read or kept.)
-const PARTS = ['g1', 'v2', '5ers'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX = /^[a-z]{1,40}$/, SLOTS_MAX = 5;
+// (5ers2: the 5ers tab's second profile, since 19 Nov 2026; the same numbers as 5ers, and it starts empty.)
+const PARTS = ['g1', 'v2', '5ers', '5ers2'], KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/, FIRM_RX = /^[a-z]{1,40}$/, SLOTS_MAX = 5;
 
 // The 5ers tab's numbers, by the page's own rule (cleanFive in index.html), v 4 (FIVE_V): the slots of the 50K and of the 25K; five
 // accounts a size ('' none, 'e' an eval, 'f' a funded account, 'p3:DATE' / 'p2:DATE' / 'p1:DATE' a funded win with three,
@@ -57,9 +58,9 @@ function accClean(x, z){
   if (m[2] !== undefined && !(amt > 0)) return '';
   return x.slice(0, 13) + (amt > 0 && amt !== z.pay ? ':' + amt : '');
 }
-function cleanFive(o){
+function cleanFive(o, second){
   o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
-  if (o.v !== FIVE_V) o = { v: FIVE_V, acc: ACC_SEED, j: J_SEED };     // (from before v 4: nothing kept, the owner's state)
+  if (o.v !== FIVE_V) o = second ? { v: FIVE_V, acc: {}, j: [] } : { v: FIVE_V, acc: ACC_SEED, j: J_SEED };     // (from before v 4: nothing kept, the owner's state)
   const pre = {}, lines = [], p = { v: FIVE_V, cap: [], acc: {}, j: [] };
   const fold = l => { const q = pre[l.k] || (pre[l.k] = { n: 0, a: 0 }); q.n += l.n; q.a = Math.round((q.a + l.a) * 100) / 100; };
   (Array.isArray(o.j) ? o.j.slice(0, 2000) : []).forEach(x => { const l = jLine(x); if (l){ if (l.d === '-') fold(l); else lines.push(l); } });
@@ -101,9 +102,9 @@ function ahead(a, b){ return !!a && (!b || (a.n !== b.n ? a.n > b.n : a.t !== b.
 function cleanPart(o, name){
   const p = cleanVersion(o), k = name || (o && o.k);
   if (!p || PARTS.indexOf(k) < 0) return null;
-  if (k === '5ers'){                                 // (a 5ers part of before v 4 is not taken)
+  if (k === '5ers' || k === '5ers2'){                                 // (a 5ers part of before v 4 is not taken)
     if (!o.five || typeof o.five !== 'object' || o.five.v !== FIVE_V) return null;
-    p.five = cleanFive(o.five); return [k, p];
+    p.five = cleanFive(o.five, k === '5ers2'); return [k, p];
   }
   p.skip = cleanKeys(o.skip);
   p.slots = cleanSlots(o.slots);

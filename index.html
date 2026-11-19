@@ -77,6 +77,15 @@ tbody tr+tr td.same{border-top-color:transparent}
 .hold tfoot td{font-weight:600;border-top:1px solid var(--line)}
 .note .box{margin-left:6px}
 .nb{white-space:nowrap}
+/* the 5ers tab: two profiles side by side, each the tab of one profile in a frame of its own */
+main.wide{max-width:1560px}
+.profiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.profiles iframe{display:block;width:100%;height:1400px;border:0;background:var(--bg);color-scheme:dark}
+.embed main{max-width:none;padding:0;display:flow-root}
+html.embed,.embed body{overflow:hidden}
+.embed .tabs{display:none}
+.embed h2.prof{margin-top:0}
+h2.prof{color:var(--ink)}
 
 /* per firm */
 table{width:100%;border-collapse:collapse}
@@ -113,6 +122,9 @@ tr.off .pick{color:var(--mute)}
 @media (max-width:1040px){
   .top{grid-template-columns:minmax(0,1fr)}
 }
+@media (max-width:900px){
+  .profiles{grid-template-columns:minmax(0,1fr);gap:22px 0}
+}
 @media (max-width:700px){
   .accs{grid-template-columns:minmax(0,1fr)}
   .accs>div+div{border-left:0;border-top:1px solid var(--line)}
@@ -131,6 +143,12 @@ tr.off .pick{color:var(--mute)}
 <main>
   <h1 class="sr">Funded Slots Roadmap</h1>
   <nav class="tabs" aria-label="Fleet"><a class="tab" id="fleet-g1" href="?fleet=g1">G1</a><a class="tab" id="fleet-v2" href="?fleet=v2">V2 fleet</a><a class="tab" id="fleet-5ers" href="?fleet=5ers">5ers</a></nav>
+  <div id="split" hidden>
+    <p class="note" id="both"></p>
+    <div class="profiles"><iframe id="pf1" title="Profile 1"></iframe><iframe id="pf2" title="Profile 2"></iframe></div>
+  </div>
+  <div id="one">
+  <h2 class="prof" id="prof-h" hidden></h2>
   <p class="note" id="g1"></p>
 
   <div class="top">
@@ -151,6 +169,8 @@ tr.off .pick{color:var(--mute)}
         <div class="cell" id="c-flip"><span class="k">Flip 50K</span><span class="v"><span id="r-flip">–</span><small>%</small></span></div>
         <div class="cell" id="c-flip25"><span class="k">Flip 25K</span><span class="v"><span id="r-flip25">–</span><small>%</small></span></div>
       </div>
+      <h2 id="sig-h" hidden></h2>
+      <div class="wrap cells" id="sig" hidden></div>
     </div>
   </div>
 
@@ -166,6 +186,7 @@ tr.off .pick{color:var(--mute)}
 
   <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span><span id="lg-coin" title="The same plan from today with every trade at chance (what the fleet's trade sizes give with no edge) instead of its live rates" hidden><i class="line dash"></i>Coin flip</span></span></h2>
   <div class="wrap chartcard"><div class="chartbox" id="chart" tabindex="0" role="img" aria-label="Weekly cash in and out with the running total and, for the weeks ahead, the same plan at coin-flip rates. Use the left and right arrow keys to read each week."></div></div>
+  </div>
 </main>
 
 <script>
@@ -664,9 +685,41 @@ var WEEKS = 12;
 var FLEETS = { g1: { key: 'g1', label: 'G1', store: 'funded-slots-roadmap-v1' }, v2: { key: 'v2', label: 'V2 fleet', store: 'funded-slots-roadmap-v2fleet' },
                '5ers': { key: '5ers', label: '5ers', store: 'funded-slots-roadmap-5ers' } };
 var FLEET = FLEETS[((/[?&]fleet=(v2|5ers)(&|$)/i.exec((window.location && window.location.search) || '') || [])[1] || 'g1').toLowerCase()];
-var STORE = FLEET.store, FIVE = FLEET.key === '5ers';
+var FIVE = FLEET.key === '5ers';
+// The 5ers tab holds two profiles at the same time (the owner, 19 Nov 2026: "split the page into 2 profiles at same time";
+// asked, "Profile 1 / Profile 2" and the second one "Empty"): Profile 1 is his, everything the tab held until then, and the
+// only one his bot feeds; Profile 2 is his friend's, typed on the page. ?fleet=5ers shows both side by side (one under the
+// other on a narrow screen), each in a frame of its own that is this page for one profile (?fleet=5ers&p=1, &p=2), with
+// its own journal, money, record, payouts on hold, hub credits, accounts and plan, kept and shared apart (parts 5ers and
+// 5ers2). A frame tells the page around it how tall it is and its money, for the line that adds the two up.
+var TWO_ON = true;
+var PROFILE = FIVE ? +((/[?&]p=([12])(&|$)/.exec((window.location && window.location.search) || '') || [])[1] || 0) : 0;
+var TWO_UP = FIVE && !PROFILE && TWO_ON, P2 = PROFILE === 2;
+var EMBED = false; try { EMBED = FIVE && !TWO_UP && !!window.parent && window.parent !== window; } catch (e) {}
+var STORE = FLEET.store + (P2 ? '-p2' : '');
 document.getElementById('fleet-' + FLEET.key).setAttribute('aria-current', 'page');
 if (FLEET.key !== 'g1') document.title = 'Funded Slots Roadmap · ' + FLEET.label;
+if (TWO_UP){
+  (function(){
+    var frames = [document.getElementById('pf1'), document.getElementById('pf2')], got = [null, null], bothEl = document.getElementById('both');
+    var main = document.querySelector('main'); if (main) main.className = 'wide';
+    document.getElementById('one').hidden = true; document.getElementById('split').hidden = false;
+    function c2(v){ return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function fin(v){ return typeof v === 'number' && isFinite(v) && Math.abs(v) < 1e9 ? Math.round(v * 100) / 100 : 0; }
+    window.addEventListener('message', function(e){
+      var d = e.data, i = d && (d.five === 1 || d.five === 2) ? d.five - 1 : -1;
+      if (i < 0 || e.origin !== window.location.origin || !frames[i] || e.source !== frames[i].contentWindow) return;
+      if (typeof d.h === 'number' && d.h > 100 && d.h < 30000) frames[i].style.height = Math.ceil(d.h) + 'px';
+      got[i] = { paid: fin(d.paid), out: fin(d.out), hold: fin(d.hold) };
+      if (!got[0] || !got[1]) return;
+      var paid = fin(got[0].paid + got[1].paid), out = fin(got[0].out + got[1].out), hold = fin(got[0].hold + got[1].hold), net = fin(out - paid);
+      bothEl.innerHTML = 'Both · Paid <b>' + c2(paid) + '</b> · Received <b>' + c2(out) + '</b> · So far <span class="' + (net >= 0 ? 'pos' : 'neg') + '">' + (net > 0 ? '+' : '') + c2(net) + '</span> · On hold <b>' + c2(hold) + '</b>';
+    });
+    frames[0].src = '?fleet=5ers&p=1'; frames[1].src = '?fleet=5ers&p=2';
+  })();
+  return;
+}
+if (EMBED) document.documentElement.className = 'embed';
 // The four rates on the page are the fleet's own record and nothing else: the Lifetime table of the fleet dashboard when it
 // carries one, else the counts kept from the dashboard's builds since its last Lifetime table (tools/track.js, see counted
 // below). They cannot be typed. Funded win is the share of funded accounts that reach profit (the dashboard's "Funded first
@@ -769,6 +822,13 @@ function fiveEarn(f, z, n, used){ f.cr = Math.min(CR_MAX, Math.max(0, cent2(num(
 // My record's rate of a kind is the plan's once it has this many results (the owner, 18 Nov 2026, asked at 3 evals passed of
 // 9 and 1 funded trade won of 1: "Real rates until 20 results"); with fewer the plan keeps the real rate.
 var FIVE_MIN = 20, CR_MAX = 9999.99;
+// The system's signals a trading day when it takes one trade at a time (the owner, 19 Nov 2026: "put the avg signals for
+// system we use None trade at the same time stats ... under my record a stats record"): every G1 and V2 GO from 13 Jul to
+// 13 Nov 2026 (2,662 signals on 87 trading days), a signal counted only when it fills 60 seconds or more after the trade
+// counted before it has ended (a trade to the funded target). 1,657 of them count: 19.05 a day on average, median 18, the
+// fewest 5 (7 Sep, a US holiday), the most 43. Measured once for that period; not counted live.
+var FIVE_SIG = { period: '13 Jul – 13 Nov 2026 · 87 days', avg: 19.05, med: 18, min: 5, max: 43,
+  says: 'One trade at a time: of the 2,662 G1 and V2 signals from 13 Jul to 13 Nov 2026, the 1,657 that fill 60 seconds or more after the trade before them has ended. All signals: 30.6 a day.' };
 // What is typed on the 5ers tab, checked (cleanFive), v 4 (FIVE_V). The tab started from scratch on 17 Nov 2026 (v 3: the
 // owner, "edit 5ers to start from scratch") and again that evening with his accounts and the evals he holds (v 4, J_SEED and
 // ACC_SEED below): it opens with them, and what was kept before (v 3 and older, in a browser, on the relay or in shared.json)
@@ -846,7 +906,7 @@ function accClean(x, z){
 }
 function cleanFive(o){
   o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
-  if (o.v !== FIVE_V) o = { v: FIVE_V, acc: ACC_SEED, j: J_SEED };     // (from before v 4: nothing kept, the owner's state)
+  if (o.v !== FIVE_V) o = P2 ? { v: FIVE_V, acc: {}, j: [] } : { v: FIVE_V, acc: ACC_SEED, j: J_SEED };     // (from before v 4: nothing kept: the owner's state; Profile 2 starts empty)
   var pre = {}, lines = [], p = { v: FIVE_V, cap: [], acc: {}, j: [] };
   function fold(l){ var q = pre[l.k] || (pre[l.k] = { n: 0, a: 0 }); q.n += l.n; q.a = Math.round((q.a + l.a) * 100) / 100; }
   (Array.isArray(o.j) ? o.j.slice(0, 2000) : []).forEach(function(x){ var l = jLine(x); if (l){ if (l.d === '-') fold(l); else lines.push(l); } });
@@ -954,7 +1014,7 @@ function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } cat
 // Each view's part (g1, v2, 5ers) has a version: n counts its edits; t (when) and by (which browser) settle a tie.
 // A copy of the page somewhere else (a preview on a PC) talks to a relay topic of its own.
 var LIVE_SITE = /^3bdotrades\.github\.io$/i.test(String((window.location && window.location.hostname) || ''));
-var SHARE_URL = 'https://ntfy.sh/funded-slots-roadmap-edits-7c41f9' + (LIVE_SITE ? '' : '-dev'), SHARE_KEY = FLEET.key;
+var SHARE_URL = 'https://ntfy.sh/funded-slots-roadmap-edits-7c41f9' + (LIVE_SITE ? '' : '-dev'), SHARE_KEY = FLEET.key + (P2 ? '2' : '');
 var KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/;
 function cleanKeys(a){ var o = []; (Array.isArray(a) ? a : []).forEach(function(k){ if (typeof k === 'string' && KEY_RX.test(k) && o.indexOf(k) < 0 && o.length < 40) o.push(k); }); return o; }
 function cleanVersion(o){
@@ -1707,8 +1767,22 @@ function buildFive(){
   ratesEl.innerHTML = [['pass', 'Eval pass'], ['win', 'Funded win']].map(function(x){
     return '<div class="cell two" id="c5-' + x[0] + '"><span class="k">' + x[1] + '</span><span class="v"><span id="f-' + x[0] + '-r"></span><small id="f-' + x[0] + '-c"></small></span></div>';
   }).join('');
+  if (PROFILE){ var ph = document.getElementById('prof-h'); ph.textContent = 'Profile ' + PROFILE; ph.hidden = false; }
+  // the system's signals a day, one trade at a time (FIVE_SIG): measured, the same for both profiles
+  var sg = FIVE_SIG, sh = document.getElementById('sig-h'), se = document.getElementById('sig');
+  sh.textContent = 'Signals a day · ' + sg.period; sh.title = sg.says; sh.hidden = false; se.hidden = false;
+  se.innerHTML = [['Average', sg.avg], ['Median', sg.med], ['Fewest', sg.min], ['Most', sg.max]].map(function(x){ return '<div class="cell"><span class="k">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join('');
   jArm = null;
   buildAccs(); buildHold(); buildJour();
+}
+// a frame tells the page around it how tall it is and its money (see TWO_UP)
+function tellParent(){
+  if (!EMBED) return;
+  try {
+    var m = fiveMoney(state.five), hold = 0, main = document.querySelector('main');
+    fiveHold(state.five).forEach(function(r){ hold = cent2(hold + r.a); });
+    window.parent.postMessage({ five: PROFILE, h: main ? main.offsetHeight : 0, paid: m.paid, out: m.out, hold: hold }, window.location.origin);
+  } catch (e) {}
 }
 function updateFive(){
   var f = state.five, rr = fiveRates(), res = fivePlan(rr, WEEKS), runs = fiveMonthly(rr), buy = 0, cost = 0, run = 0;
@@ -1750,6 +1824,7 @@ function updateFive(){
   // the real rates stand in for an empty record)
   var coin = rr.pass !== FIVE_CHANCE || rr.win !== FIVE_FCHANCE ? fivePlan({ pass: FIVE_CHANCE, win: FIVE_FCHANCE }, WEEKS) : null;
   drawChart(res.rows.map(function(r, i){ var o = { t: r.t, inn: r.inn, out: r.out, cum: r.cum + base }; if (coin) o.coin = coin.rows[i].cum + base; return o; }));
+  tellParent();
 }
 // a number or a date typed on the 5ers tab (a box emptied to type a new one: nothing yet)
 function fiveInput(e){
@@ -1981,6 +2056,7 @@ if (FIVE){
   jourEl.addEventListener('input', typed); jourEl.addEventListener('input', jourInput); jourEl.addEventListener('change', jourChange); jourEl.addEventListener('click', jourClick);
   jourEl.addEventListener('keydown', function(e){ var t = e.target || {}; if (e.key === 'Enter' && (t.id === 'j-a' || t.id === 'j-d' || t.id === 'j-n')){ e.preventDefault(); jAdd(); } });
   buildFive(); update();
+  if (EMBED && window.ResizeObserver && document.querySelector('main')) new ResizeObserver(tellParent).observe(document.querySelector('main'));
 }
 else { syncRates(); update(); drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000); }
 // edits made in other browsers: now, whenever this tab is shown again, and every two minutes while it is
