@@ -144,7 +144,6 @@ tr.off .pick{color:var(--mute)}
   <h1 class="sr">Funded Slots Roadmap</h1>
   <nav class="tabs" aria-label="Fleet"><a class="tab" id="fleet-g1" href="?fleet=g1">G1</a><a class="tab" id="fleet-v2" href="?fleet=v2">V2 fleet</a><a class="tab" id="fleet-5ers" href="?fleet=5ers">5ers</a></nav>
   <div id="split" hidden>
-    <p class="note" id="both"></p>
     <h2 id="sigw-h"></h2>
     <div class="wrap cells" id="sigw"></div>
     <div class="profiles"><iframe id="pf1" title="Profile 1"></iframe><iframe id="pf2" title="Profile 2"></iframe></div>
@@ -159,7 +158,7 @@ tr.off .pick{color:var(--mute)}
       <div class="wrap cells tiles" id="tiles">
         <div class="cell"><span class="k" id="t-buy-k">Buy today</span><span class="v" id="t-buy">–</span></div>
         <div class="cell"><span class="k" title="The most cash you are out before payouts cover it">Cash needed</span><span class="v" id="t-need">–</span></div>
-        <div class="cell"><span class="k">Net after 12 weeks</span><span class="v" id="t-net">–</span></div>
+        <div class="cell"><span class="k" id="t-net-k">Net after 12 weeks</span><span class="v" id="t-net">–</span></div>
         <div class="cell"><span class="k">Once running</span><span class="v" id="t-run">–</span></div>
       </div>
     </div>
@@ -681,6 +680,9 @@ function perWinning(f, r){
 // ---------- MODEL END ----------
 
 var WEEKS = 12;
+// the 5ers tab plans 6 weeks (the owner, 20 Nov 2026: "Net after 12 weeks make it 6 weeks"): its Net tile, its per-size
+// column and its cash chart; G1 and V2 keep 12
+var FIVE_WEEKS = 6;
 // two fleets on the same dashboard: G1 (default) and the V2 fleet (?fleet=v2); each keeps its own rates and last account counts.
 // ?fleet=5ers is one firm with rules of its own, not on the dashboard: its accounts, record and money are typed there (see FIVE_SIZES)
 // (The Simulation tab, ?fleet=sim, was taken off on 17 Nov 2026, the owner's word: an old link to it opens G1.)
@@ -791,21 +793,16 @@ document.getElementById('fleet-' + FLEET.key).setAttribute('aria-current', 'page
 if (FLEET.key !== 'g1') document.title = 'Funded Slots Roadmap · ' + FLEET.label;
 if (TWO_UP){
   (function(){
-    var frames = [document.getElementById('pf1'), document.getElementById('pf2')], got = [null, null], bothEl = document.getElementById('both');
+    var frames = [document.getElementById('pf1'), document.getElementById('pf2')];
     var main = document.querySelector('main'); if (main) main.className = 'wide';
     document.getElementById('one').hidden = true; document.getElementById('split').hidden = false;
     // the system's signals a day, once for both profiles (the owner, 20 Nov 2026: "make it wider no need to make it * 2")
     loadSig();
-    function c2(v){ return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-    function fin(v){ return typeof v === 'number' && isFinite(v) && Math.abs(v) < 1e9 ? Math.round(v * 100) / 100 : 0; }
+    // each frame says how tall it is (the line that added the two profiles up went on 20 Nov 2026, the owner: "delete both section")
     window.addEventListener('message', function(e){
       var d = e.data, i = d && (d.five === 1 || d.five === 2) ? d.five - 1 : -1;
       if (i < 0 || e.origin !== window.location.origin || !frames[i] || e.source !== frames[i].contentWindow) return;
       if (typeof d.h === 'number' && d.h > 100 && d.h < 30000) frames[i].style.height = Math.ceil(d.h) + 'px';
-      got[i] = { paid: fin(d.paid), out: fin(d.out), hold: fin(d.hold) };
-      if (!got[0] || !got[1]) return;
-      var paid = fin(got[0].paid + got[1].paid), out = fin(got[0].out + got[1].out), hold = fin(got[0].hold + got[1].hold), net = fin(out - paid);
-      bothEl.innerHTML = 'Both · Paid <b>' + c2(paid) + '</b> · Received <b>' + c2(out) + '</b> · So far <span class="' + (net >= 0 ? 'pos' : 'neg') + '">' + (net > 0 ? '+' : '') + c2(net) + '</span> · On hold <b>' + c2(hold) + '</b>';
     });
     frames[0].src = '?fleet=5ers&p=1'; frames[1].src = '?fleet=5ers&p=2';
   })();
@@ -1847,13 +1844,16 @@ function buildFive(){
   document.getElementById('sum-h').textContent = '5ers';
   document.getElementById('rates-h').textContent = 'My record';
   document.getElementById('firms-h').textContent = 'Per size';
+  document.getElementById('t-net-k').textContent = 'Net after ' + FIVE_WEEKS + ' weeks';
   document.getElementById('accs-h').hidden = false; accsEl.hidden = false;
   document.getElementById('jour-h').hidden = !JOUR_ON; jourEl.hidden = !JOUR_ON;
   document.getElementById('hold-h').hidden = false; holdEl.hidden = false;
   coinTitle();
   var first = 'Paid <b id="f-paid" title="Counted from the journal: evals bought"></b> · Received <b id="f-out" title="Counted from the journal: payouts, in cash and in hub credits"></b> · <span id="f-net"></span> · <span class="nb">Hub credits <input class="box m" type="number" inputmode="decimal" min="0" max="' + CR_MAX + '" step="0.01" id="f-cr" value="' + num(state.five.cr, 0) + '" aria-label="Hub credits held" title="Hub credits held: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K"></span>';
-  // the hub credits held are shown, not typed (CR_LOCK)
-  if (CR_LOCK) first = first.replace(/<input[^>]*>/, '<b id="f-cr-v" title="Counted, not typed: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K">' + num(state.five.cr, 0) + '</b>');
+  // the hub credits held are shown, not typed (CR_LOCK), and while there are some, "Reset" sets them to 0 (crClick)
+  crArm = false;
+  if (CR_LOCK) first = first.replace(/<input[^>]*>/, '<b id="f-cr-v" title="Counted, not typed: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K">' + num(state.five.cr, 0) + '</b>' +
+    (num(state.five.cr, 0) > 0 ? ' <button type="button" class="lnk" id="f-cr-0" title="Set the hub credits held to 0 (asked once more)">Reset</button>' : ''));
   g1El.innerHTML = first;
   // My record: each rate has the backtest's line and under it this profile's own (updateFive)
   ratesEl.innerHTML = [['pass', 'Eval pass'], ['win', 'Funded win']].map(function(x){
@@ -1866,17 +1866,25 @@ function buildFive(){
   jArm = null;
   buildAccs(); buildHold(); buildJour();
 }
-// a frame tells the page around it how tall it is and its money (see TWO_UP)
+// "Reset" beside the hub credits (the owner, 20 Nov 2026: "make reset botton to make it 0 if its number and i need to reset
+// it to 0"): the first press asks ("Reset to 0?"), the second sets them to 0 and shares it, like a journal line's ×
+var crArm = false;
+function crClick(e){
+  var el = e.target || {}; if (el.id !== 'f-cr-0') return;
+  if (!crArm){ crArm = true; el.textContent = 'Reset to 0?'; return; }
+  crArm = false; delete state.five.cr; state.five = cleanFive(state.five);
+  save(); buildFive(); update(); shareEdit();
+}
+// a frame tells the page around it how tall it is (see TWO_UP)
 function tellParent(){
   if (!EMBED) return;
   try {
-    var m = fiveMoney(state.five), hold = 0, main = document.querySelector('main');
-    fiveHold(state.five).forEach(function(r){ hold = cent2(hold + r.a); });
-    window.parent.postMessage({ five: PROFILE, h: main ? main.offsetHeight : 0, paid: m.paid, out: m.out, hold: hold }, window.location.origin);
+    var main = document.querySelector('main');
+    window.parent.postMessage({ five: PROFILE, h: main ? main.offsetHeight : 0 }, window.location.origin);
   } catch (e) {}
 }
 function updateFive(){
-  var f = state.five, rr = fiveRates(), res = fivePlan(rr, WEEKS), runs = fiveMonthly(rr), buy = 0, cost = 0, run = 0;
+  var f = state.five, rr = fiveRates(), res = fivePlan(rr, FIVE_WEEKS), runs = fiveMonthly(rr), buy = 0, cost = 0, run = 0;
   res.per.forEach(function(p, i){ buy += p.buy; cost += p.cost; run += runs[i]; });
   document.getElementById('t-buy-k').textContent = BUY_K;
   document.getElementById('t-buy').innerHTML = buy + ' evals' + (buy > 0 ? ' <small>' + money(cost) + '</small>' : '');
@@ -1907,7 +1915,7 @@ function updateFive(){
   });
 
   var at = document.activeElement, back = at && at.id && firmsEl.contains(at) ? at.id : '';
-  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Size</th><th>Slots</th><th>' + esc(BUY_K) + '</th><th>Evals</th><th>Funded</th><th>Paying</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' +
+  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Size</th><th>Slots</th><th>' + esc(BUY_K) + '</th><th>Evals</th><th>Funded</th><th>Paying</th><th>' + FIVE_WEEKS + ' weeks</th><th>Once running</th></tr></thead><tbody>' +
     FIVE_SIZES.map(function(z, i){
       var p = res.per[i], inn = 0, out = 0, n = { e: 0, f: 0, p: 0 };
       p.rows.forEach(function(x){ inn += x.inn; out += x.out; });
@@ -1920,7 +1928,7 @@ function updateFive(){
 
   // the dashed line: the same accounts with every trade at chance, drawn when the plan's rates are not chance (always while
   // the backtest stands in for a record of fewer than FIVE_MIN results)
-  var coin = rr.pass !== FIVE_CHANCE || rr.win !== FIVE_FCHANCE ? fivePlan({ pass: FIVE_CHANCE, win: FIVE_FCHANCE }, WEEKS) : null;
+  var coin = rr.pass !== FIVE_CHANCE || rr.win !== FIVE_FCHANCE ? fivePlan({ pass: FIVE_CHANCE, win: FIVE_FCHANCE }, FIVE_WEEKS) : null;
   drawChart(res.rows.map(function(r, i){ var o = { t: r.t, inn: r.inn, out: r.out, cum: r.cum + base }; if (coin) o.coin = coin.rows[i].cum + base; return o; }));
   tellParent();
 }
@@ -2150,6 +2158,7 @@ function syncG1(){
 
 if (FIVE){
   [ratesEl, firmsEl, accsEl, g1El].forEach(function(el){ el.addEventListener('input', typed); el.addEventListener('input', fiveInput); el.addEventListener('change', fiveChange); });
+  g1El.addEventListener('click', crClick);
   accsEl.addEventListener('click', accsClick);
   jourEl.addEventListener('input', typed); jourEl.addEventListener('input', jourInput); jourEl.addEventListener('change', jourChange); jourEl.addEventListener('click', jourClick);
   jourEl.addEventListener('keydown', function(e){ var t = e.target || {}; if (e.key === 'Enter' && (t.id === 'j-a' || t.id === 'j-d' || t.id === 'j-n')){ e.preventDefault(); jAdd(); } });
