@@ -785,6 +785,11 @@ var JOUR_ON = false;
 // The hub credits held are shown, not typed (the owner, 20 Nov 2026: "lock the hub credits"): they move with the evals
 // bought and passed, and are set on his word.
 var CR_LOCK = true;
+// Nothing on the 5ers tab is typed or clicked any more (the owner, 20 Nov 2026: "lock all data on page and let it update
+// automaticlly"; in the dialog "5ers tab only" and, for his friend's Profile 2, "Lock it too"): account stages, payout days
+// and amounts, and slots are shown as text, Bought and Reset are gone. The tab changes from his bot's feed and the payout
+// days (tools/five.js) and from what a session sends; G1 and V2 keep their tick boxes and slots boxes.
+var FIVE_LOCK = true;
 var PROFILE = FIVE ? +((/[?&]p=([12])(&|$)/.exec((window.location && window.location.search) || '') || [])[1] || 0) : 0;
 var TWO_UP = FIVE && !PROFILE && TWO_ON, P2 = PROFILE === 2;
 var EMBED = false; try { EMBED = FIVE && !TWO_UP && !!window.parent && window.parent !== window; } catch (e) {}
@@ -1780,6 +1785,13 @@ function buildAccs(){
     a.forEach(function(x, j){ if (x) rows = Math.max(rows, j + 1); });
     for (var j = 0; j < rows; j++){
       var st = accStage(a[j]), name = z.size + ' account ' + (j + 1), m = ACC_RX.exec(a[j]), key = z.k + '|' + j;
+      if (FIVE_LOCK){
+        // locked: the stage as words, and for a funded win what each payout still due brings, how many, and their days
+        var said = (FIVE_STAGES.filter(function(o){ return o[0] === st; })[0] || ['', 'Empty'])[1], left = st.charAt(0) === 'p' ? +st.charAt(1) : 0;
+        body += '<tr><td>' + (j + 1) + '</td><td id="a' + z.k + '-' + j + '-v">' + (st ? said : quiet(said)) + '</td><td>' +
+          (left ? '<span class="num">' + price(m[2] === undefined ? z.pay : Number(m[2])) + (left > 1 ? ' × ' + left : '') + '</span> <span class="mute" id="u' + z.k + '-' + j + '">· ' + dueDays(m[1], left) + '</span>' : '') + '</td></tr>';
+        continue;
+      }
       body += '<tr><td>' + (j + 1) + '</td><td><select class="sel" id="a' + z.k + '-' + j + '" data-a="' + key + '" aria-label="Stage of ' + name + '">' +
         FIVE_STAGES.map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === st ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td><td>' +
         (st.charAt(0) === 'p' ? '<div class="jadd"><input class="sel" type="date" id="d' + z.k + '-' + j + '" data-d="' + key + '" value="' + m[1] + '" aria-label="Next payout of ' + name + '">' +
@@ -1911,7 +1923,7 @@ function buildFive(){
   // the hub credits held are shown, not typed (CR_LOCK), and while there are some, "Reset" sets them to 0 (crClick)
   crArm = false;
   if (CR_LOCK) first = first.replace(/<input[^>]*>/, '<b id="f-cr-v" title="Counted, not typed: they go into the next evals bought ($1 of credits takes $0.80 off), and every eval bought or passed earns $10 on a 50K, $5 on a 25K">' + num(state.five.cr, 0) + '</b>' +
-    (num(state.five.cr, 0) > 0 ? ' <button type="button" class="lnk" id="f-cr-0" title="Set the hub credits held to 0 (asked once more)">Reset</button>' : ''));
+    (!FIVE_LOCK && num(state.five.cr, 0) > 0 ? ' <button type="button" class="lnk" id="f-cr-0" title="Set the hub credits held to 0 (asked once more)">Reset</button>' : ''));
   g1El.innerHTML = first;
   // My record: each rate has the backtest's line and under it this profile's own (updateFive)
   ratesEl.innerHTML = [['pass', 'Eval pass'], ['win', 'Funded win']].map(function(x){
@@ -1984,7 +1996,7 @@ function updateFive(){
       var p = res.per[i], inn = 0, out = 0, n = { e: 0, f: 0, p: 0 };
       p.rows.forEach(function(x){ inn += x.inn; out += x.out; });
       p.seats.forEach(function(a){ if (n[a.s] !== undefined) n[a.s]++; });
-      return '<tr><td>5ers ' + quiet(z.size) + '</td><td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + FIVE_MAX + '" step="1" value="' + f.cap[i] + '" id="f-cap-' + i + '" aria-label="Slots for ' + z.size + ' accounts" title="' + z.size + ' accounts at once: 0 to ' + FIVE_MAX + '"></td>' +
+      return '<tr><td>5ers ' + quiet(z.size) + '</td>' + (FIVE_LOCK ? '<td class="slots" id="f-cap-' + i + '-v">' + f.cap[i] + '</td>' : '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + FIVE_MAX + '" step="1" value="' + f.cap[i] + '" id="f-cap-' + i + '" aria-label="Slots for ' + z.size + ' accounts" title="' + z.size + ' accounts at once: 0 to ' + FIVE_MAX + '"></td>') +
         '<td id="c' + i + '-buy" title="An eval at ' + cents(p.z.price) + ': $' + z.list + ' less the hub credits of its buy ($' + z.credit + ') and of its pass ($' + z.credit + ', ' + (Math.round(1000 * rr.pass) / 10) + '% of the time), then 20% off">' + (p.buy > 0 ? '<b>' + p.buy + '</b> ' + quiet(price(p.cost)) : quiet('0')) + '</td><td id="c' + i + '-ev">' + count(n.e) + '</td><td id="c' + i + '-fu">' + count(n.f) + '</td><td id="c' + i + '-pa">' + count(n.p) + '</td>' +
         '<td id="c' + i + '-w12">' + gain(inn - out) + '</td><td id="c' + i + '-run">' + gain(runs[i]) + quiet('/mo') + '</td></tr>' + fiveWarn(p.z, rr, p.buy, 8, p.cost);
     }).join('') + '</tbody></table>';
