@@ -25,12 +25,16 @@
 // marks = each eval that passed and each new funded account that showed up, with the time and the firm and size
 // ("topstep|50"): the page uses them to know which of the funded accounts it holds as "not on the dashboard yet" have
 // come onto it since.
+// unread = the time of the first build of the ones it could not read since the last one it read (none while it reads them):
+// the page says the rates are not being counted when that lasts (from 16 Nov 2026 21:56 UTC to 20 Nov the dashboard's footer
+// had no trading day, every build was not readable and the rates stood still with no word of it).
 const fs = require('fs'), path = require('path'), crypto = require('crypto'), cp = require('child_process');
 
 const FLEETS = ['g1', 'v2'], KEYS = ['pass', 'win', 'flip', 'flip25'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', times: '×', minus: '-' };
 const KEEP_GONE_DAYS = 10, LOG_LINES = 400, MARK_LINES = 400, SAVE_EVERY = 200;
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function entity(m, e){
   if (e[0] !== '#') return ENT[e.toLowerCase()] !== undefined ? ENT[e.toLowerCase()] : m;
@@ -68,8 +72,9 @@ function pane(sec, k, name){
 }
 
 // What one build of the dashboard shows for a fleet, or null when its section cannot be trusted:
-// the three tables have to be there with as many rows as the tabs above them say.
-function read(html, k){
+// the three tables have to be there with as many rows as the tabs above them say. built: the build's time (its commit's),
+// for its trading day when the footer does not say it.
+function read(html, k, built){
   const a = html.indexOf('id="eng-' + k + '"'); if (a < 0) return null;
   let b = html.length;
   FLEETS.forEach(o => { const i = o === k ? -1 : html.indexOf('id="eng-' + o + '"', a + 1); if (i > a && i < b) b = i; });
@@ -81,11 +86,15 @@ function read(html, k){
   const ids = {}; let twice = false;
   snap.eval.concat(snap.funded, snap.flip).forEach(r => { if (ids[r.id]) twice = true; ids[r.id] = 1; });
   if (twice) return null;
-  // the trading day (it rolls at 18:00 ET), and the date a trade of that day carries in the "Last trade" column
-  const fi = html.indexOf('class="foot"'), day = /Trading day ([A-Za-z]{3}) (\d{1,2}) ([A-Za-z]{3})/.exec(text(html.slice(fi < 0 ? 0 : fi))), mon = day ? MONTHS.indexOf(day[3].toLowerCase()) : -1;
-  if (!day || mon < 0) return null;
-  snap.day = day[1] + ' ' + (+day[2]) + ' ' + day[3];
-  snap.date = ('0' + (mon + 1)).slice(-2) + '-' + ('0' + (+day[2])).slice(-2);
+  // the trading day (it rolls at 18:00 ET), and the date a trade of that day carries in the "Last trade" column: as the
+  // footer says it, else from the build's time (tradingDay)
+  const fi = html.indexOf('class="foot"'), foot = text(html.slice(fi < 0 ? 0 : fi)), day = /Trading day ([A-Za-z]{3}) (\d{1,2}) ([A-Za-z]{3})/.exec(foot), mon = day ? MONTHS.indexOf(day[3].toLowerCase()) : -1;
+  let td = null;
+  if (day){ if (mon >= 0) td = { name: day[1] + ' ' + (+day[2]) + ' ' + day[3], m: mon + 1, d: +day[2] }; }
+  else if (built) td = tradingDay(built, foot);
+  if (!td) return null;
+  snap.day = td.name;
+  snap.date = ('0' + td.m).slice(-2) + '-' + ('0' + td.d).slice(-2);
   // the Lifetime table, when the build has one: for each rate [won, finished]
   const la = sec.indexOf('<h2>Lifetime</h2>');
   if (la >= 0){
@@ -97,6 +106,31 @@ function read(html, k){
     if (KEYS.every(x => life[x])) snap.life = life;
   }
   return snap;
+}
+
+// New York's date and time at a moment (ms): { y, m, d, h, mi }
+const NY = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' });
+function nyAt(ms){ const p = {}; NY.formatToParts(new Date(ms)).forEach(x => { if (x.type !== 'literal') p[x.type] = Number(x.value); }); return { y: p.year, m: p.month, d: p.day, h: p.hour % 24, mi: p.minute }; }
+function dayAfter(y, m, d, n){ const t = new Date(Date.UTC(y, m - 1, d + n)); return [t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate()]; }
+// The trading day of a build the dashboard made at `built` (its commit time) whose footer says no trading day (since 16 Nov
+// 2026 21:56 UTC it says only "Updated 08:17 ET"): the New York time of the build, which is the footer's "Updated" time,
+// the last one at or before the commit (the day before when it is later in the day than the commit by more than SLACK
+// minutes, which the two clocks may differ by), else the commit's own; from 18:00 on, the next day; a Saturday or a Sunday,
+// the Monday after. That is the trading day each of the 1,763 builds from 5 to 16 Nov 2026 that carried "Trading day Ddd D
+// Mon" says, Friday evenings and weekends included. Returns { name: 'Mon 16 Nov', m, d } or null.
+const SLACK = 15;
+function tradingDay(built, foot){
+  const ms = Date.parse(built); if (!isFinite(ms)) return null;
+  let { y, m, d, h, mi } = nyAt(ms);
+  const up = /Updated (?:\(page built\) )?(\d{1,2}):(\d\d) ?ET/.exec(foot || '');
+  if (up && +up[1] < 24 && +up[2] < 60){
+    if (+up[1] * 60 + +up[2] > h * 60 + mi + SLACK) [y, m, d] = dayAfter(y, m, d, -1);
+    h = +up[1]; mi = +up[2];
+  }
+  if (h >= 18) [y, m, d] = dayAfter(y, m, d, 1);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  if (wd === 6) [y, m, d] = dayAfter(y, m, d, 2); else if (wd === 0) [y, m, d] = dayAfter(y, m, d, 1);
+  return { name: WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] + ' ' + d + ' ' + MON[m - 1], m: m, d: d };
 }
 
 function copy(o){ return JSON.parse(JSON.stringify(o)); }
@@ -208,7 +242,7 @@ function step(st, snap, meta){
 // one remembered account and one log line per line, so a change shows as a short diff
 function dump(st){
   const rows = Object.keys(st.acc).map(h => '  ' + JSON.stringify(h) + ': ' + JSON.stringify(st.acc[h])).join(',\n');
-  const head = ['v', 'at', 'built', 'day', 'counts', 'flipDone', 'base', 'today'].map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
+  const head = ['v', 'at', 'built', 'unread', 'day', 'counts', 'flipDone', 'base', 'today'].filter(k => st[k] !== undefined).map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
   const lines = a => a.length ? '\n' + a.map(l => '  ' + JSON.stringify(l)).join(',\n') + '\n ' : '';
   return '{\n' + head + ',\n "marks": [' + lines(st.marks || []) + '],\n "acc": {' + (rows ? '\n' + rows + '\n ' : '') + '},\n "log": [' + lines(st.log) + ']\n}\n';
 }
@@ -241,23 +275,24 @@ function main(){
     else {
       // first run: start at the newest build that carries the Lifetime table
       const all = builds(dash); let i = all.length - 1;
-      for (; i >= 0; i--){ const snap = read(shown(all[i].sha), k); if (snap && snap.life) break; }
+      for (; i >= 0; i--){ const snap = read(shown(all[i].sha), k, all[i].built); if (snap && snap.life) break; }
       if (i < 0){ console.log(k + ': no build with a Lifetime table to start from: nothing written'); continue; }
       list = all.slice(i);
     }
     const before = st ? body(st) : '';
     let unread = 0;
     for (const b of list){
-      const snap = read(shown(b.sha), k);
-      if (snap) st = step(st, snap, b); else unread++;
+      const snap = read(shown(b.sha), k, b.built);
+      if (snap){ st = step(st, snap, b); delete st.unread; }
+      else { unread++; if (st && !st.unread) st.unread = b.built; }
       if (st){ st.at = b.sha; st.built = b.built; }
     }
     if (!st){ console.log(k + ': nothing readable'); continue; }
     // how far it has read is saved with a change, or once enough builds have gone by
     const changed = body(st) !== before, out = dump(st);
     if (out !== old && (changed || list.length >= SAVE_EVERY)) fs.writeFileSync(file, out);
-    console.log(k + ': ' + list.length + ' builds read' + (unread ? ' (' + unread + ' not readable)' : '') + ' | ' + KEYS.map(x => x + ' ' + st.counts[x][0] + '/' + st.counts[x][1]).join(', ') + (changed ? ' | saved' : ''));
+    console.log(k + ': ' + list.length + ' builds read' + (unread ? ' (' + unread + ' not readable)' : '') + ' | ' + KEYS.map(x => x + ' ' + st.counts[x][0] + '/' + st.counts[x][1]).join(', ') + ' | ' + st.day + (st.unread ? ' | not readable since ' + st.unread : '') + (changed ? ' | saved' : ''));
   }
 }
 if (require.main === module) main();
-module.exports = { read: read, step: step, dump: dump, text: text, money: money, key: key, small: small };
+module.exports = { read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
