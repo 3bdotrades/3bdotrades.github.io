@@ -25,6 +25,14 @@
 // waited while BlackArrow stayed closed (the bot sees an account only once it is added there): seen after 3 days, they
 // would have been priced again and given a second place each. An eval recorded by hand that BlackArrow never shows would
 // now cover a real purchase of its size within those 30 days instead (taken off the list by a session when that is known).
+// Accounts whose results he gave himself (a session records them; the owner, 20 Nov 2026: "the 50k account passed and 25k
+// blown ... we will start boot on monday when account created as funded"): a file next to the marker, on this PC only
+// (`<marker>.hand`, as BlackArrow's tag ends and size: [{ "end": "289", "k": "50", "from": "2026-11-20T00:00:00+02:00",
+// "skip": "results" }]) lists them, and what the bot's journal says of them from `from` on is left out: "results" leaves out
+// their passes, losses, wins and blocks (an eval he passed that the5ers then close is not a loss), "all" leaves out their
+// new-account sighting too (an eval that ended before the bot saw it, whose purchase is in the journal already). The bot's
+// tags are BlackArrow's last three digits, so two accounts can share one (two ****290 in Nov 2026): an entry holds only for
+// accounts of its size, from its time on.
 // Payouts that have come, on both profiles (5ers and 5ers2; the owner, in the dialog: "Yes, add it"): the day after a
 // payout's day it goes into Received (a journal line 'DAY p 0 AMOUNT', in cash) and its account steps down, 3 payouts due -> 2
 // (the next one 14 days later) -> 1 -> Funded, which trades again: a funded account goes on trading after its third payout.
@@ -51,8 +59,10 @@ const PLAN_RX = /Daytrade(F?)-(25|50)K/, PAY_RX = /^p([123]):(\d{4}-\d\d-\d\d)(?
 const cent2 = v => Math.round(v * 100) / 100;
 
 // the journal's happenings from `after` on (a time in ms), oldest first: { t, ms, day, what: 'b' | 's' | 'x' | 'w' | 'l', k: size }
-function happenings(text, after, before){
+// hand: the accounts whose results he gave himself (see the top), as read by handList
+function happenings(text, after, before, hand){
   const plan = {}, seen = {}, ended = {}, bought = {}, out = [], startMs = Date.parse(START);
+  hand = hand || [];
   let last = null;
   String(text).split('\n').forEach(line => {
     if (line.indexOf('"account') < 0 && line.indexOf('"armed"') < 0) return;
@@ -82,11 +92,20 @@ function happenings(text, after, before){
       ended[acc] = true;
       if (p && bought[acc]) what = p.funded ? 'l' : 'x';
     }
+    // one of his accounts whose results he gave himself: left out
+    const own = what && p && !p.funded ? hand.filter(e => /^\*+\d{3}$/.test(acc) && acc.slice(-3) === e.end && p.k === e.k && ms >= e.fromMs)[0] : null;
+    if (own && (own.skip === 'all' || what !== 'b')) what = null;
     if (!(ms > after && ms < before)) return;
     last = o.t;
     if (what) out.push({ t: o.t, day: o.t.slice(0, 10), what: what, k: p.k });
   });
   return { list: out, last: last };
+}
+// the list of accounts whose results he gave himself, from its file ([] when there is none or it is not one)
+function handList(file){
+  let a = []; try { a = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return []; }
+  return (Array.isArray(a) ? a : []).filter(e => e && /^\d{3}$/.test(e.end) && (e.k === '50' || e.k === '25') && isFinite(Date.parse(e.from)) && (e.skip === 'results' || e.skip === 'all'))
+    .map(e => ({ end: e.end, k: e.k, fromMs: Date.parse(e.from), skip: e.skip }));
 }
 function addDays(day, n){ const d = new Date(day + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 // this PC's own date (Cairo), 'YYYY-MM-DD'
@@ -208,7 +227,7 @@ async function profile1(o, text, relay, old, state, marker, now, today){
   // of the page edited it and dropped the mark, and the PC's mark stands in.
   const day0 = START.slice(0, 10), has = base.j.some(x => { const l = S.jLine(x); return !!l && l.d !== '-' && l.d >= day0 && /^[bsxwl]/.test(l.k); });
   const from = base.fed || (isFinite(Date.parse(kept)) && has ? kept : START);
-  const got = happenings(text, Math.max(Date.parse(from), Date.parse(START) - 1), now - SETTLE_MS);
+  const got = happenings(text, Math.max(Date.parse(from), Date.parse(START) - 1), now - SETTLE_MS, handList(marker + '.hand'));
   // more new evals at once than he ever buys (the bot's list of accounts made again): those are left to him, the results go in
   let list = got.list, more = '';
   if (list.filter(h => h.what === 'b').length > MAX_NEW){ list = list.filter(h => h.what !== 'b'); more = ' | more than ' + MAX_NEW + ' new evals at once: left to him'; }
@@ -246,4 +265,4 @@ if (require.main === module){
   if (a.length < 3 || (i >= 0 && !(cr >= 0 && cr <= CR_MAX))){ console.error('usage: node five.js <folder> <journal.jsonl> <marker file> [--dry] [--credits-as N]'); process.exit(2); }
   pass(a[0], a[1], a[2], { dry: a.indexOf('--dry') >= 0, creditsAs: cr }).then(line => console.log(line), e => console.log('five: ' + String(e && e.message || e).slice(0, 120)));
 }
-module.exports = { happenings: happenings, apply: apply, payoutsCome: payoutsCome, pass: pass, addLine: addLine, localDay: localDay, START: START };
+module.exports = { happenings: happenings, handList: handList, apply: apply, payoutsCome: payoutsCome, pass: pass, addLine: addLine, localDay: localDay, START: START };
