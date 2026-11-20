@@ -21,7 +21,10 @@
 // cleared by hand that the bot still trades has its later result put on another place of its size.
 // An eval he recorded himself before the bot saw it (the tab's "Bought" button, a Bought line, or a session typing it for him)
 // waits in the part's `pre` list; a new eval account of that size seen up to PRE_DAYS days later takes one off the list
-// and is not counted again. Entries older than that are dropped.
+// and is not counted again. Entries older than that are dropped. PRE_DAYS was 3 until 20 Nov 2026, when two evals he bought
+// waited while BlackArrow stayed closed (the bot sees an account only once it is added there): seen after 3 days, they
+// would have been priced again and given a second place each. An eval recorded by hand that BlackArrow never shows would
+// now cover a real purchase of its size within those 30 days instead (taken off the list by a session when that is known).
 // Payouts that have come, on both profiles (5ers and 5ers2; the owner, in the dialog: "Yes, add it"): the day after a
 // payout's day it goes into Received (a journal line 'DAY p 0 AMOUNT', in cash) and its account steps down, 3 payouts due -> 2
 // (the next one 14 days later) -> 1 -> Funded, which trades again: a funded account goes on trading after its third payout.
@@ -43,7 +46,7 @@ const POST = 'https://ntfy.sh/' + S.TOPIC, BY = 'pcfeed01', QUIET_MS = 90 * 1000
 // his record counts from 18 Nov 2026 (his word of 17 Nov: "my record start from zero from tommrow"); nothing older is taken
 const START = '2026-11-18T00:00:00.000+02:00';
 const SIZES = { '50': { list: 100, credit: 10, pay: 1158 }, '25': { list: 59, credit: 5, pay: 579 } };
-const DISC = 0.8, WAIT = 14, PAYS = 3, CR_MAX = 9999.99, PRE_DAYS = 3;
+const DISC = 0.8, WAIT = 14, PAYS = 3, CR_MAX = 9999.99, PRE_DAYS = 30;
 const PLAN_RX = /Daytrade(F?)-(25|50)K/, PAY_RX = /^p([123]):(\d{4}-\d\d-\d\d)(?::(\d+(?:\.\d+)?))?$/;
 const cent2 = v => Math.round(v * 100) / 100;
 

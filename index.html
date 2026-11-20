@@ -951,7 +951,7 @@ var FIVE_MIN = 20, CR_MAX = 9999.99;
 // trades won and lost) and starts after it the next time.
 // pre: the evals recorded here as bought that his bot has not seen yet, 'DATE:SIZE' each (left out when none): the "Bought"
 // button and a Bought line of the journal add them, taking that line out takes them back, and when the bot then sees a new
-// eval account of that size within a few days, tools/five.js takes one off instead of counting the purchase again (the
+// eval account of that size within 30 days (3 until 20 Nov 2026), tools/five.js takes one off instead of counting the purchase again (the
 // owner, 19 Nov 2026: "add to 5ers expense 40$", for an eval his bot had not seen yet).
 var FIVE_V = 4, ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
 var PRE_RX = /^\d{4}-\d\d-\d\d:(?:50|25)$/, PRE_MAX = 20;
