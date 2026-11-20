@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "ab3c9b03832d965a3f0b35729cea7a4f8f7c5b86",
- "built": "2026-11-20T14:17:03.000Z",
+ "at": "a02288d443e10603655d95411eda37a7a38bcfd2",
+ "built": "2026-11-20T14:47:04.000Z",
  "day": "Fri 20 Nov",
- "counts": {"pass":[32,125],"win":[10,22],"flip":[36,80],"flip25":[19,40]},
+ "counts": {"pass":[32,126],"win":[10,22],"flip":[36,80],"flip25":[19,40]},
  "flipDone": {"flip":[32,74],"flip25":[19,39]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"b3bb30ebaeb4":[0,1],"0818c51c6877":[0,-1],"93f31a30919c":[1,-1],"e0028132017c":[0,1],"6d5033218423":[0,1],"78f6aeb38ea0":[0,1],"b2b210b8e64c":[0,-1]},
@@ -43,7 +43,7 @@
   "72dc043f4b02": {"p":"e","f":"Blue Guardian","gone":"2026-11-12","z":1,"u":1},
   "9bbba5c4fcd3": {"p":"e","f":"Blue Guardian","gone":"2026-11-13","z":1,"u":1},
   "57f4d75cb949": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
-  "9a75237998fa": {"p":"e","f":"FuturesElite"},
+  "9a75237998fa": {"p":"e","f":"FuturesElite","gone":"2026-11-20","z":1,"u":1},
   "f84f1f803a61": {"p":"e","f":"FuturesElite","gone":"2026-11-11","z":1,"u":1},
   "bd926e162267": {"p":"e","f":"FuturesElite"},
   "4040af924c0c": {"p":"e","f":"FuturesElite"},
@@ -205,6 +205,7 @@
   "2026-11-20 11:27 back on the dashboard: its count is taken back · FuturesElite 9a7523",
   "2026-11-20 13:27 back on the dashboard: its count is taken back · FuturesElite bd926e",
   "2026-11-20 13:27 back on the dashboard: its count is taken back · FuturesElite aa289b",
-  "2026-11-20 14:17 flip account back in the funded table: no first win to count · Lucid 93f31a"
+  "2026-11-20 14:17 flip account back in the funded table: no first win to count · Lucid 93f31a",
+  "2026-11-20 14:47 eval left the dashboard without a pass: blown · FuturesElite 9a7523"
  ]
 }
