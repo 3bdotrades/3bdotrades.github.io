@@ -102,6 +102,7 @@ td.who{padding:0}
 .pick{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer}
 .pick input{flex:none;width:15px;height:15px;margin:0;accent-color:var(--accent);cursor:pointer}
 tr.off .pick{color:var(--mute)}
+span.pick{cursor:default}
 .note.after{margin:8px 2px 0}
 
 /* cash by week */
@@ -788,8 +789,13 @@ var CR_LOCK = true;
 // Nothing on the 5ers tab is typed or clicked any more (the owner, 20 Nov 2026: "lock all data on page and let it update
 // automaticlly"; in the dialog "5ers tab only" and, for his friend's Profile 2, "Lock it too"): account stages, payout days
 // and amounts, and slots are shown as text, Bought and Reset are gone. The tab changes from his bot's feed and the payout
-// days (tools/five.js) and from what a session sends; G1 and V2 keep their tick boxes and slots boxes.
+// days (tools/five.js) and from what a session sends.
 var FIVE_LOCK = true;
+// G1 and V2 locked the same way (the owner, 20 Nov 2026: "make sure g1 and v2 is like 5ers locked and automatic and no error
+// or something wroung"): no tick box, slots box or button; the firms unticked and the slots of the shared part are shown as
+// text as they are, and the dashboard and the kept counts are read again on their own every FLEET_EVERY (they are rebuilt
+// every 10 minutes) and when the tab is shown again. false brings the boxes and the Sync button back.
+var FLEET_LOCK = true, FLEET_EVERY = 5 * 60 * 1000;
 var PROFILE = FIVE ? +((/[?&]p=([12])(&|$)/.exec((window.location && window.location.search) || '') || [])[1] || 0) : 0;
 var TWO_UP = FIVE && !PROFILE && TWO_ON, P2 = PROFILE === 2;
 var EMBED = false; try { EMBED = FIVE && !TWO_UP && !!window.parent && window.parent !== window; } catch (e) {}
@@ -822,8 +828,8 @@ if (EMBED) document.documentElement.className = 'embed';
 // one (lossDays: the room, in losing days, of a size that has no room set: a firm the dashboard lists and the sets below do not).
 var RATE_KEYS = ['pass', 'win', 'flip', 'flip25'];
 var FIXED = { tries: 2, payDays1: 4, payDays: 5, lossDays: 20 };
-// the counts on 10 Nov 2026 22:00 UTC, each [won, finished]: used only until this browser has read them itself
-var LIVE0 = { g1: { pass: [18, 67], win: [8, 12], flip: [12, 38], flip25: [13, 25] }, v2: { pass: [31, 114], win: [11, 33], flip: [60, 138], flip25: [40, 65] } };
+// Until a browser has read them (the dashboard's Lifetime table or the kept counts), there are no rates: the four show "–",
+// and so does the plan. (Before 20 Nov 2026 a new browser showed the counts of 10 Nov as live meanwhile.)
 
 // ---------- numbers per fleet (the owner's, from the chat; nothing here is typed on the page) ----------
 // evalPrice: what an eval costs at that firm and size (no activation or monthly fees).
@@ -857,6 +863,9 @@ v2: [
   { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1800, pay2: 900, room: 3895 }
 ] };
 var OWNER = OWNER_SETS[FLEET.key] || [];
+// the names of firms the dashboard lists by a code ("LUCID_DAILY": Lucid Daily, a firm of V2 since 20 Nov 2026 that the
+// fleet has no rules for yet); see firmLabel
+var FIRM_NAMES = { luciddaily: 'Lucid Daily' };
 var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'idle', 'room'];
 var COUNT_KEYS = ['openEvals', 'passedNow', 'fundedNow', 'inProfitNow'];
 // A firm lets 5 accounts trade at once, shared by its sizes (the owner's "5 max funding per firm"). The Slots box of a firm
@@ -1043,7 +1052,7 @@ function firmRows(saved){
     if (!y || !y.g1 || typeof y.firm !== 'string') return;
     var held = 0, f = null; COUNT_KEYS.forEach(function(k){ held += Math.max(0, num(y[k], 0)); });
     rows.forEach(function(x){ if (!f && sameUnit(x, y.firm, y.size)) f = x; });
-    if (!f){ if (!(held > 0)) return; f = addRow(rows, y.firm, String(y.size || '')); }
+    if (!f){ if (!(held > 0)) return; f = addRow(rows, firmLabel(y.firm), String(y.size || '')); }
     COUNT_KEYS.forEach(function(k){ f[k] = Math.max(0, num(y[k], 0)); });
     f.passedDone = Math.max(0, num(y.passedDone, 0));
     f.g1Flips = Array.isArray(y.g1Flips) ? y.g1Flips : []; f.g1Evals = Array.isArray(y.g1Evals) ? y.g1Evals : []; f.g1 = true;
@@ -1068,13 +1077,13 @@ function cameOf(x){
   });
   return o;
 }
+// the counts read, for each rate [won, finished]; null until all four have been read
 function liveCounts(){
-  var d = (state.g1 && state.g1.life) || {}, z = LIVE0[FLEET.key], o = {};
-  RATE_KEYS.forEach(function(k){ o[k] = d[k] || z[k]; });
-  return o;
+  var d = (state.g1 && state.g1.life) || {};
+  return RATE_KEYS.every(function(k){ return Array.isArray(d[k]) && d[k][1] > 0; }) ? d : null;
 }
-// the live rates as the page shows them and as a run uses them: percentages to one decimal
-function liveRates(){ var c = liveCounts(), o = {}; RATE_KEYS.forEach(function(k){ o[k] = Math.round(1000 * c[k][0] / c[k][1]) / 10; }); return o; }
+// the live rates as the page shows them and as a run uses them: percentages to one decimal (null: not read yet)
+function liveRates(){ var c = liveCounts(), o = {}; if (!c) return null; RATE_KEYS.forEach(function(k){ o[k] = Math.round(1000 * c[k][0] / c[k][1]) / 10; }); return o; }
 (function(){
   var s = null; try { s = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
   if (!s || typeof s !== 'object') s = {};
@@ -1228,6 +1237,7 @@ function chanceRates(fleet){
 // rate was earned on.
 function fracRates(){
   var r = liveRates(), f = {};
+  if (!r) return null;
   RATE_KEYS.forEach(function(k){ f[k] = r[k] / 100; });
   return { pass: f.pass, win: 1 - Math.pow(1 - clamp01(f.win), 1 / FIXED.tries), odds: fundedOdds(FLEET.key), flip: f.flip, flip25: f.flip25,
     tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
@@ -1240,7 +1250,7 @@ function boxed(f, rr){
 }
 
 // ---------- dates ----------
-var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function mondayOf(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
 var START = mondayOf(new Date());
 var WD0 = (function(d){ return d === 0 || d === 6 ? 5 : d - 1; })(new Date().getDay());
@@ -1433,9 +1443,10 @@ var RATE_WORDS = { pass: 'finished evals passed', win: 'funded accounts reached 
 // Eval pass also says what it comes to at Tradeify, where an eval needs three winning days.
 function syncRates(){
   if (FIVE) return;                                    // the 5ers tab has its own two rates (see buildFive)
-  var rr = fracRates(), three = (100 * evalOf({ firm: 'Tradeify' }, params(rr)).fresh.rate).toFixed(1) + '%';
+  var rr = fracRates();
   document.getElementById('rates-h').textContent = 'Live rates';
-  var c = liveCounts(), r = liveRates();
+  if (!rr){ RATE_KEYS.forEach(function(k){ document.getElementById('r-' + k).textContent = '–'; document.getElementById('c-' + k).title = 'Not read yet'; }); return; }
+  var three = (100 * evalOf({ firm: 'Tradeify' }, params(rr)).fresh.rate).toFixed(1) + '%', c = liveCounts(), r = liveRates();
   RATE_KEYS.forEach(function(k){
     document.getElementById('r-' + k).textContent = r[k];
     document.getElementById('c-' + k).title = 'Live: ' + c[k][0] + ' of ' + c[k][1] + ' ' + RATE_WORDS[k] + ' = ' + (100 * c[k][0] / c[k][1]).toFixed(2) + '%' +
@@ -1447,7 +1458,7 @@ function seats(){ var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.m
 // the fleet's firms as a run at these rates takes them; all = with no firm skipped
 function planFirms(rr, all){
   var on = dayOn(), late = on ? lateShare() : 0;
-  return state.firms.map(function(f){ var x = slotted(boxed(clone(f), rr)); x.idle = idleOf(f); x.dayOn = on; x.lateShare = late; if (!all && skipped(f)) x.skip = true; return x; });
+  return state.firms.map(function(f){ var x = slotted(boxed(clone(f), rr)); x.idle = idleOf(f); x.dayOn = on; x.lateShare = late; if ((!all && skipped(f)) || !inSet(f)) x.skip = true; return x; });
 }
 // 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
 function outcome(rr, all){
@@ -1498,51 +1509,58 @@ function count(v){ return v > 0 ? acc(v) : quiet('0'); }
 function gain(v){ return Math.abs(v) <= 0.5 ? quiet('$0') : '<span class="' + (v > 0 ? 'pos' : 'neg') + '">' + signed(v) + '</span>'; }
 function update(){
   if (FIVE) return updateFive();
-  var rr = fracRates(), res = outcome(rr), off = state.firms.filter(skipped), all = off.length ? outcome(rr, true) : null;
+  // no rates read yet: the plan is not worked out (its numbers show "–"), the accounts read are shown
+  var rr = fracRates(), res = rr ? outcome(rr) : null, off = state.firms.filter(skipped), all = res && off.length ? outcome(rr, true) : null;
   document.getElementById('t-buy-k').textContent = BUY_K;
-  document.getElementById('t-buy').innerHTML = res.buy + ' evals' + (res.buy > 0 ? ' <small>' + money(res.cost) + '</small>' : '');
-  document.getElementById('t-need').textContent = money(res.need);
-  var tn = document.getElementById('t-net'); tn.textContent = signed(res.net); tn.className = 'v ' + (res.net >= 0 ? 'pos' : 'neg');
-  var tr = document.getElementById('t-run'); tr.innerHTML = signed(res.run) + '<small>/mo</small>'; tr.className = 'v ' + (res.run >= 0 ? 'pos' : 'neg');
+  document.getElementById('t-buy').innerHTML = res ? res.buy + ' evals' + (res.buy > 0 ? ' <small>' + money(res.cost) + '</small>' : '') : '–';
+  document.getElementById('t-need').textContent = res ? money(res.need) : '–';
+  var tn = document.getElementById('t-net'); tn.textContent = res ? signed(res.net) : '–'; tn.className = 'v' + (res ? (res.net >= 0 ? ' pos' : ' neg') : '');
+  var tr = document.getElementById('t-run'); tr.innerHTML = res ? signed(res.run) + '<small>/mo</small>' : '–'; tr.className = 'v' + (res ? (res.run >= 0 ? ' pos' : ' neg') : '');
 
-  // a tick box per firm: unticked, the plan buys no new evals there (the accounts already held keep running)
+  // a tick box per firm: unticked, the plan buys no new evals there (the accounts already held keep running). Locked
+  // (FLEET_LOCK): the firm's name only, an unticked one as "skipped". A firm or size the fleet has no rules for (one the
+  // dashboard lists that the sets above do not, like V2's Lucid Daily on 20 Nov 2026) gets no evals: "no rules yet".
   var at = document.activeElement, here = at && at.getAttribute && firmsEl.contains(at), back = here ? at.getAttribute('data-k') : null, backS = here ? at.getAttribute('data-s') : null;
   firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Slots</th><th>' + esc(BUY_K) + '</th><th>Next 4 days</th><th>Evals</th><th>Funded</th><th>Flips</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' +
     state.firms.map(function(f, i){
-      var p = res.per[i], d0 = p.days[0], inn = 0, out = 0, next = [1, 2, 3, 4].map(function(d){ return p.days[d] ? p.days[d].buy : 0; });
-      var no = skipped(f), name = esc((f.firm + ' ' + f.size).trim());
-      p.rows.forEach(function(x){ inn += x.inn; out += x.out; });
+      var p = res ? res.per[i] : null, d0 = p ? p.days[0] : null, inn = 0, out = 0, next = p ? [1, 2, 3, 4].map(function(d){ return p.days[d] ? p.days[d].buy : 0; }) : null;
+      var ruled = inSet(f), no = ruled && skipped(f), name = esc((f.firm + ' ' + f.size).trim()), dash = quiet('–');
+      if (p) p.rows.forEach(function(x){ inn += x.inn; out += x.out; });
       var td = {
-        buy: no ? quiet('skipped') : d0 && d0.buy > 0 ? '<b>' + d0.buy + '</b> ' + quiet(money(d0.evalCost)) : quiet('0'),
-        next: next.some(function(n){ return n > 0; }) ? next.join(' · ') : quiet(next.join(' · ')),
+        buy: !ruled ? quiet('no rules yet') : no ? quiet('skipped') : !p ? dash : d0 && d0.buy > 0 ? '<b>' + d0.buy + '</b> ' + quiet(money(d0.evalCost)) : quiet('0'),
+        next: !p ? dash : next.some(function(n){ return n > 0; }) ? next.join(' · ') : quiet(next.join(' · ')),
         ev: count(num(f.openEvals, 0)) + (num(f.passedNow, 0) > 0 ? ' ' + quiet('+' + acc(num(f.passedNow, 0)) + ' passed') : ''),
         fu: count(num(f.fundedNow, 0) + idleOf(f)),
         fl: count(num(f.inProfitNow, 0)),
-        w12: gain(inn - out),
-        run: gain(res.runs[i]) + quiet('/mo')
+        w12: p ? gain(inn - out) : dash,
+        run: p ? gain(res.runs[i]) + quiet('/mo') : dash
       };
-      return '<tr' + (no ? ' class="off"' : '') + '><td class="who"><label class="pick" title="Untick to see the plan without buying evals here"><input type="checkbox" data-k="' + unitKey(f) + '"' + (no ? '' : ' checked') + ' aria-label="Buy evals at ' + name + '">' +
-        '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>' + slotsCell(state.firms, i) + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
-        (no || !d0 ? '' : warnRow(f, rr, d0.buy, 9));
+      var who = FLEET_LOCK || !ruled ? '<td class="who"><span class="pick"><span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></span></td>'
+        : '<td class="who"><label class="pick" title="Untick to see the plan without buying evals here"><input type="checkbox" data-k="' + unitKey(f) + '"' + (no ? '' : ' checked') + ' aria-label="Buy evals at ' + name + '">' + '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>';
+      return '<tr' + (no || !ruled ? ' class="off"' : '') + '>' + who + slotsCell(state.firms, i) + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
+        (no || !ruled || !d0 ? '' : warnRow(f, rr, d0.buy, 9));
     }).join('') + '</tbody></table>';
   if (back){ var box = firmsEl.querySelector('[data-k="' + back + '"]'); if (box) box.focus(); }
   if (backS){ var sbox = firmsEl.querySelector('[data-s="' + backS + '"]'); if (sbox){ sbox.focus(); if (sbox.select) sbox.select(); } }
 
   if (all){
     var names = off.length > 2 ? off.length + ' firms' : off.map(function(f){ return esc((f.firm + ' ' + f.size).trim()); }).join(' and ');
-    skipEl.innerHTML = 'Skipping ' + names + ': ' + effect(res, all) + ' <button type="button" id="buyall">Buy all</button>';
-    document.getElementById('buyall').onclick = function(){ delete state.skip; save(); update(); shareEdit(); };
+    skipEl.innerHTML = 'Skipping ' + names + ': ' + effect(res, all) + (FLEET_LOCK ? '' : ' <button type="button" id="buyall">Buy all</button>');
+    if (!FLEET_LOCK) document.getElementById('buyall').onclick = function(){ delete state.skip; save(); update(); shareEdit(); };
   } else skipEl.innerHTML = '';
   skipEl.hidden = !all;
 
-  drawChart(withHistory(res, coinFlip()).rows);
+  if (res) drawChart(withHistory(res, coinFlip()).rows);
+  else { lastRows = []; geom = null; chartEl.innerHTML = '<p class="note">' + (keptFail ? 'Live rates not readable right now.' : 'Reading the live rates…') + '</p>'; var lg = document.getElementById('lg-coin'); if (lg) lg.hidden = true; }
 }
 // The Slots cell of row i: a firm's sizes share its slots, so its first row has the box and its other rows an empty cell
 // that joins it.
 function slotsCell(rows, i){
   var f = rows[i], k = normFirm(f.firm), name = esc(f.firm);
   if (i > 0 && normFirm(rows[i - 1].firm) === k) return '<td class="slots same"></td>';
-  if (!FIRM_RX.test(k)) return '<td class="slots"></td>';      // a name that cannot be kept as a firm: no box
+  // a name that cannot be kept as a firm, or a firm the fleet has no rules for: no slots
+  if (!FIRM_RX.test(k) || !OWNER.some(function(o){ return normFirm(o.firm) === k; })) return '<td class="slots"></td>';
+  if (FLEET_LOCK) return '<td class="slots" id="s-' + esc(k) + '">' + slotsAt(k) + '</td>';
   return '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + SLOTS_MAX + '" step="1" value="' + slotsAt(k) + '" data-s="' + esc(k) + '" aria-label="Slots at ' + name + '" title="Accounts trading at once at ' + name + ', all its sizes together: 0 to ' + SLOTS_MAX + '"></td>';
 }
 // a firm's slots typed in its box (emptied to type a new number: nothing yet)
@@ -2083,8 +2101,10 @@ function fiveChange(e){
 var G1_URL ='https://randompotato247.github.io/fleet-dashboard/';
 // What tools/track.js keeps on this site's "track" branch from the dashboard's builds, or null when it cannot be read:
 // life = the Lifetime counts, counted on from the last Lifetime table the dashboard showed (used when it carries none);
-// came = per firm and size, the funded accounts that came onto the dashboard and the evals that passed since IDLE_AT (see idleOf).
-var COUNTS_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/';
+// came = per firm and size, the funded accounts that came onto the dashboard and the evals that passed since IDLE_AT (see idleOf);
+// unread = the time of the first build of the ones the counter could not read since the last one it read ('' while it reads
+// them): the G1 line says so when that is more than UNREAD_MS ago (from 16 to 20 Nov 2026 the rates stood still unseen).
+var COUNTS_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/', UNREAD_MS = 30 * 60 * 1000, unreadAt = '';
 function counted(k){
   return fetch(COUNTS_URL + k + '.json?t=' + Date.now(), { cache: 'no-store' })
     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -2096,7 +2116,7 @@ function counted(k){
         var o = m[1] === 'wired' ? came.wired : m[1] === 'pass' ? came.passes : null;
         if (o) o[m[2]] = (o[m[2]] || 0) + 1;
       });
-      return { life: life, came: cameOf(came) };
+      return { life: life, came: cameOf(came), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
     })
     .catch(function(){ return null; });
 }
@@ -2112,6 +2132,33 @@ function normFirm(s){
   for (var i = 0; i < FIRM_KEYS.length; i++){ var k = FIRM_KEYS[i]; if (lev(s, k) <= (k.length >= 10 ? 2 : k.length >= 5 ? 1 : 0)) return k; }
   return s;
 }
+// A firm's name as the page shows it: the dashboard's, with the account kind it adds left out ("Topstep XFA") and a code of
+// its made readable (FIRM_NAMES, above).
+function firmLabel(s){
+  s = String(s || '').replace(/\s+(XFA|funded|Flex)$/i, '').trim();
+  var k = s.toLowerCase().replace(/[^a-z]/g, '');
+  if (ownOf(FIRM_NAMES, k)) return FIRM_NAMES[k];
+  return /_/.test(s) && s === s.toUpperCase() ? s.toLowerCase().split('_').filter(Boolean).map(function(w){ return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ') : s;
+}
+// The trading day of a dashboard page that says only when it was built ("Updated 08:17 ET", since 16 Nov 2026), read at
+// `now`: that time is the last one at or before now in New York (the day before when it is later in the day than now by
+// more than 15 minutes, which the clocks may differ by), the next day from 18:00 on, and a Saturday or a Sunday is the
+// Monday after: the counter's rule (tools/track.js tradingDay), which gives the day every build that said it gave.
+// { name: 'Fri 20 Nov', m, d }, or null when the page says no time.
+function tradingDayAt(text, now){
+  var up = /Updated (?:\(page built\) )?(\d{1,2}):(\d\d) ?ET/.exec(text || ''), c = nyClock(now); if (!up || !c) return null;
+  var h = +up[1], mi = +up[2]; if (h > 23 || mi > 59) return null;
+  var t = new Date(Date.UTC(c.y, c.m - 1, c.d));
+  if (h * 60 + mi > c.min + 15) t.setUTCDate(t.getUTCDate() - 1);
+  if (h >= 18) t.setUTCDate(t.getUTCDate() + 1);
+  var wd = t.getUTCDay(); if (wd === 6) t.setUTCDate(t.getUTCDate() + 2); else if (wd === 0) t.setUTCDate(t.getUTCDate() + 1);
+  return { name: WEEKDAY[t.getUTCDay()] + ' ' + t.getUTCDate() + ' ' + MONTHS[t.getUTCMonth()], m: t.getUTCMonth() + 1, d: t.getUTCDate() };
+}
+// a moment as New York's day and time: "Mon 16 Nov 16:56 ET"
+function nyStamp(ms){
+  var c = nyClock(new Date(ms)); if (!c) return new Date(ms).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  return WEEKDAY[new Date(Date.UTC(c.y, c.m - 1, c.d)).getUTCDay()] + ' ' + c.d + ' ' + MONTHS[c.m - 1] + ' ' + ('0' + Math.floor(c.min / 60)).slice(-2) + ':' + ('0' + c.min % 60).slice(-2) + ' ET';
+}
 function sizeNum(s){ var m = /(\d+)/.exec(String(s || '')); return m ? +m[1] : 50; }
 function moneyNum(s){ var m = /([-−]?)\$([\d,]+)/.exec(String(s || '')); return m ? (m[1] ? -1 : 1) * Number(m[2].replace(/,/g, '')) : null; }
 function g1Size(id, total, isEval){
@@ -2125,14 +2172,17 @@ function parseG1(html, K){
   K = K || FLEET.key;
   var sec = doc.getElementById('eng-' + K); if (!sec) return null;
   var units = {};
-  // The fleet's trading day ("Wed 11 Nov"; it rolls at 18:00 ET) as the "MM-DD" its rows date their last trade with. An
+  // The fleet's trading day ("Wed 11 Nov"; it rolls at 18:00 ET) as the "MM-DD" its rows date their last trade with: as the
+  // footer says it, and since 16 Nov 2026, when the footer says only "Updated 08:17 ET", from that time (tradingDayAt). An
   // account whose last trade has that date, or whose day P&L is not zero, has traded today (done).
-  var dm = /Trading day [A-Za-z]{3} (\d{1,2}) ([A-Za-z]{3})/.exec((doc.querySelector('.foot') || {}).textContent || ''), mi = dm ? MONTHS.indexOf(dm[2]) : -1;
-  var dayKey = mi >= 0 ? ('0' + (mi + 1)).slice(-2) + '-' + ('0' + dm[1]).slice(-2) : '';
+  var ft = (doc.querySelector('.foot') || {}).textContent || '';
+  var dm = /Trading day ([A-Za-z]{3}) (\d{1,2}) ([A-Za-z]{3})/.exec(ft), mi = dm ? MONTHS.indexOf(dm[3]) : -1;
+  var td = dm ? (mi >= 0 ? { name: dm[1] + ' ' + (+dm[2]) + ' ' + dm[3], m: mi + 1, d: +dm[2] } : null) : tradingDayAt(ft, new Date());
+  var dayKey = td ? ('0' + td.m).slice(-2) + '-' + ('0' + td.d).slice(-2) : '';
   function traded(c){ var p = moneyNum(c[2]); return (dayKey !== '' && String(c[5] || '').indexOf(dayKey) === 0) || (p !== null && p !== 0); }
   function unit(firmText, size){
     var fk = normFirm(firmText), key = fk + '|' + size;
-    if (!units[key]) units[key] = { fkey: fk, firm: firmText.replace(/\s+(XFA|funded|Flex)$/i, ''), size: size, evals: 0, passed: 0, passedDone: 0, fundeds: 0, fundedsAt: [], flips: [], evalsAt: [] };
+    if (!units[key]) units[key] = { fkey: fk, firm: firmLabel(firmText), size: size, evals: 0, passed: 0, passedDone: 0, fundeds: 0, fundedsAt: [], flips: [], evalsAt: [] };
     return units[key];
   }
   function cells(tr){ return Array.prototype.map.call(tr.children, function(c){ return c.textContent.replace(/\s+/g, ' ').trim(); }); }
@@ -2194,11 +2244,10 @@ function parseG1(html, K){
       if (won + lost > 0) life[row[1]] = [won, won + lost];
     });
   });
-  var ft = (doc.querySelector('.foot') || {}).textContent || '';
-  var up = /Updated \(page built\) ([0-9:]+ ?ET)/.exec(ft), day = /Trading day ([A-Za-z]{3} \d{1,2} [A-Za-z]{3})/.exec(ft);
+  var up = /Updated (?:\(page built\) )?([0-9:]+ ?ET)/.exec(ft);
   var total = { evals: 0, passed: 0, fundeds: 0, flips: 0 };
   Object.keys(units).forEach(function(k){ var x = units[k]; total.evals += x.evals; total.passed += x.passed; total.fundeds += x.fundeds; total.flips += x.flips.length; });
-  return { units: units, sig: sig, total: total, updated: up ? up[1] : '', day: day ? day[1] : '', cash: cashIn !== null && cashOut !== null ? { inn: Math.abs(cashIn), out: Math.abs(cashOut) } : null,
+  return { units: units, sig: sig, total: total, updated: up ? up[1] : '', day: td ? td.name : '', cash: cashIn !== null && cashOut !== null ? { inn: Math.abs(cashIn), out: Math.abs(cashOut) } : null,
            life: Object.keys(life).length ? life : null };
 }
 function applyG1(g){
@@ -2207,6 +2256,7 @@ function applyG1(g){
     var x = g.units[key], f = null;
     state.firms.forEach(function(y){ if (!f && normFirm(y.firm) === x.fkey && sizeNum(y.size) === x.size) f = y; });
     if (!f) f = addRow(state.firms, x.firm, x.size + 'K');
+    else if (!inSet(f)) f.firm = x.firm;                 // (a row kept with the dashboard's code for a name: its name)
     f.openEvals = x.evals; f.passedNow = x.passed; f.passedDone = x.passedDone; f.fundedNow = x.fundeds; f.inProfitNow = x.flips.length;
     f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net, done: z.done ? 1 : undefined }; });
     f.g1Evals = x.evalsAt; f.g1Funded = x.fundedsAt;
@@ -2223,28 +2273,44 @@ function applyG1(g){
   state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
   save(); syncRates(); update(); drawG1(false);
 }
-var g1El = document.getElementById('g1');
+var g1El = document.getElementById('g1'), g1Fail = false, keptFail = false, lastSync = 0;
+// The fleet's line: what the dashboard shows now (its trading day and build time, the accounts), or that it cannot be read;
+// and the live rates when they could not be read, or when the counter has not been able to count the dashboard's builds for
+// a while. failed: the dashboard could not be read (left out: as the last time).
 function drawG1(failed){
-  var g = state.g1, has = g && g.total, L = esc(FLEET.label), s = failed ? (has ? L + ' not readable right now, using the last numbers. ' : L + ' not readable right now: account counts are not filled in. ') : '';
+  if (failed !== undefined) g1Fail = !!failed;
+  var g = state.g1, has = g && g.total, L = esc(FLEET.label), s = g1Fail ? (has ? L + ' not readable right now, using the last numbers. ' : L + ' not readable right now: account counts are not filled in. ') : '';
   if (has){
     var lack = g.sig ? g.sig.max - g.total.evals : 0;
     s += L + ' ' + esc(g.day || '') + ' ' + esc(g.at || '') + ': ' + g.total.evals + (g.total.evals === 1 ? ' eval' : ' evals') + (g.total.passed ? ' (+' + g.total.passed + ' passed)' : '') + ', ' + g.total.fundeds + ' funded, ' + g.total.flips + ' flipping.';
     if (g.sig) s += ' Max ' + g.sig.max + ' eval signals a day: ' + (lack > 0 ? 'room for ' + lack + ' more.' : 'no room for more evals.');
-  } else if (!failed) s += 'Reading ' + L + '…';
-  g1El.innerHTML = s + ' <button type="button" id="g1sync">Sync</button>';
-  document.getElementById('g1sync').onclick = syncG1;
+  } else if (!g1Fail) s += 'Reading ' + L + '…';
+  if (keptFail && !liveCounts()) s += ' Live rates not readable right now.';
+  var un = unreadAt ? Date.parse(unreadAt) : NaN;
+  if (isFinite(un) && Date.now() - un > UNREAD_MS) s += ' Live rates not counted since ' + nyStamp(un) + ': the dashboard changed.';
+  g1El.innerHTML = s + (FLEET_LOCK ? '' : ' <button type="button" id="g1sync">Sync</button>');
+  if (!FLEET_LOCK) document.getElementById('g1sync').onclick = syncG1;
 }
+// Read the dashboard and what is kept from its builds (the counts, as it has had no Lifetime table since 10 Nov 2026, and the
+// accounts that came onto it). Each is taken when it comes: the kept counts also when the dashboard cannot be read.
 function syncG1(){
+  lastSync = Date.now();
   var kept = counted(FLEET.key);
-  fetch(G1_URL + '?t=' + Date.now(), { cache: 'no-store' })
+  var dash = fetch(G1_URL + '?t=' + Date.now(), { cache: 'no-store' })
     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-    .then(function(html){
-      var g = parseG1(html); if (!g) throw new Error('fleet section not readable');
-      applyG1(g);
-      // what is kept from the dashboard's builds: the counts when the dashboard has no Lifetime table, and the accounts that came onto it
-      kept.then(function(c){ if (!c || !state.g1) return; if (!g.life) state.g1.life = c.life; state.g1.came = c.came; save(); syncRates(); update(); });
-    })
-    .catch(function(){ drawG1(true); });
+    .then(function(html){ var g = parseG1(html); if (!g) throw new Error('fleet section not readable'); applyG1(g); return g; })
+    .catch(function(){ drawG1(true); return null; });
+  Promise.all([kept, dash]).then(function(x){
+    var c = x[0], g = x[1];
+    keptFail = !c;
+    if (c){
+      if (!state.g1) state.g1 = { life: {}, came: cameOf(null) };
+      if (!(g && g.life)) state.g1.life = c.life;
+      state.g1.came = c.came; unreadAt = c.unread;
+      save(); syncRates(); update();
+    } else if (!liveCounts()) update();
+    drawG1();
+  });
 }
 
 if (FIVE){
@@ -2258,7 +2324,13 @@ if (FIVE){
   loadSig();
   if (EMBED && window.ResizeObserver && document.querySelector('main')) new ResizeObserver(tellParent).observe(document.querySelector('main'));
 }
-else { syncRates(); update(); drawG1(false); syncG1(); setInterval(syncG1, 30 * 60 * 1000); }
+else {
+  syncRates(); update(); drawG1(false); syncG1();
+  // read again on their own (locked: every FLEET_EVERY while the tab is shown, and when it is shown again after that)
+  var g1Every = FLEET_LOCK ? FLEET_EVERY : 30 * 60 * 1000;
+  setInterval(function(){ if (document.visibilityState !== 'hidden') syncG1(); }, g1Every);
+  if (document.addEventListener) document.addEventListener('visibilitychange', function(){ if (document.visibilityState !== 'hidden' && Date.now() - lastSync > g1Every) syncG1(); });
+}
 // edits made in other browsers: now, whenever this tab is shown again, and every two minutes while it is
 pullShared(true);
 // A tab left open past midnight would go on planning from the day it was opened on ("Buy today", the weeks, who has traded
