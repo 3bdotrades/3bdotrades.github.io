@@ -162,7 +162,12 @@ function step(st, snap, meta){
   if (!st.counts) return st;
   const note = (what, firm, h) => { if (!based) st.log.push(when + ' ' + what + ' · ' + firm + ' ' + h.slice(0, 6)); };
   const add = (k, won) => { if (!based){ st.counts[k][1]++; if (won) st.counts[k][0]++; } };
-  const out = r => r.dead || (r.room !== null && r.room <= 0);
+  // A row with no trade yet (no date in "Last trade", which says "none yet", no day P&L, no total) is a new account whose
+  // numbers have not loaded: the dashboard often first lists a new eval or funded account that way, with $0 of room
+  // ("Topstep | $0 | $0 | $0 | none yet"). It is neither out nor a result, so its real result is counted when it comes
+  // (until 20 Nov 2026 such a row was taken as out with an older result, and that account was never counted).
+  const fresh = r => !r.dead && !r.passed && !r.day && !r.dayPnl && !r.pnl;
+  const out = r => r.dead || (!fresh(r) && r.room !== null && r.room <= 0);
   // An account that was gone is back. If its result was set only because it left (u: 1 = counted here, 2 = left on a build
   // with the Lifetime table, so not counted here) and it is not out after all, it is running again: a count made here is taken back.
   const back = (a, r, k, h, stillOut) => {
