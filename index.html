@@ -1194,6 +1194,9 @@ function pullShared(first){
     keptSeen = got[1];
     if (ahead(keptSeen, best)) best = keptSeen;
     if (shareBusy || typing()) return;                 // an edit made here is on its way, or being typed: it goes first
+    // G1 and V2 locked: nothing is changed or sent from here, and the view shows the shared part as it is kept, whatever this
+    // browser holds (one could hold the shared version's number with other choices, kept by a page of before the slots)
+    if (!FIVE && FLEET_LOCK){ if (best && !samePart(best)) takePart(best); return; }
     if (ahead(best, state.sh)) takePart(best);
     // nobody has this browser's version any more (the relay forgot it and it was never kept): the relay gets it again
     else if (relay.ok && state.sh && ahead(state.sh, best)) sendPart().catch(function(){});
@@ -1201,6 +1204,11 @@ function pullShared(first){
     // shared ones, as if made now. (A browser that starts as a new one does has nothing to tell.)
     else if (first && relay.ok && !state.sh && !best && ownChoices()) shareEdit();
   });
+}
+// is part p what this browser has: the same version, the same firms unticked and the same slots?
+function samePart(p){
+  function slots(o){ return JSON.stringify(Object.keys(o || {}).sort().map(function(k){ return [k, o[k]]; })); }
+  return !!state.sh && p.n === state.sh.n && p.t === state.sh.t && p.by === state.sh.by && JSON.stringify(cleanKeys(state.skip).sort()) === JSON.stringify(p.skip.slice().sort()) && slots(cleanSlots(state.slots)) === slots(p.slots);
 }
 function ownChoices(){
   if (FIVE) return JSON.stringify(cleanFive(state.five)) !== JSON.stringify(cleanFive(null));
@@ -2285,7 +2293,7 @@ function drawG1(failed){
     s += L + ' ' + esc(g.day || '') + ' ' + esc(g.at || '') + ': ' + g.total.evals + (g.total.evals === 1 ? ' eval' : ' evals') + (g.total.passed ? ' (+' + g.total.passed + ' passed)' : '') + ', ' + g.total.fundeds + ' funded, ' + g.total.flips + ' flipping.';
     if (g.sig) s += ' Max ' + g.sig.max + ' eval signals a day: ' + (lack > 0 ? 'room for ' + lack + ' more.' : 'no room for more evals.');
   } else if (!g1Fail) s += 'Reading ' + L + '…';
-  if (keptFail && !liveCounts()) s += ' Live rates not readable right now.';
+  if (keptFail) s += liveCounts() ? ' Live rates not readable right now, using the last ones read.' : ' Live rates not readable right now.';
   var un = unreadAt ? Date.parse(unreadAt) : NaN;
   if (isFinite(un) && Date.now() - un > UNREAD_MS) s += ' Live rates not counted since ' + nyStamp(un) + ': the dashboard changed.';
   g1El.innerHTML = s + (FLEET_LOCK ? '' : ' <button type="button" id="g1sync">Sync</button>');
