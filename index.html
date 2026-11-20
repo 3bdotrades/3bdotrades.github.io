@@ -1187,16 +1187,24 @@ var shareSeq = 0, shareBusy = false, shareTimer = 0, keptSeen = null, typedAt = 
 function isNumberBox(el){ var t = el && el.tagName === 'INPUT' && el.getAttribute ? el.getAttribute('type') : ''; return t === 'number' || t === 'date'; }
 function typed(e){ if (isNumberBox(e && e.target)) typedAt = Date.now(); }
 function typing(){ return isNumberBox(document.activeElement) && Date.now() - typedAt < TYPING_MS; }
-// Take what another browser changed. first: when the page opens, the version kept on the "track" branch is read as well.
+// Take what another browser changed. first: when the page opens, the version kept on the "track" branch is read as well
+// (on a locked G1 or V2 tab, every time).
 function pullShared(first){
-  return Promise.all([relayPart(), first ? keptPart() : Promise.resolve(keptSeen)]).then(function(got){
+  var locked = !FIVE && FLEET_LOCK;
+  return Promise.all([relayPart(), first || locked ? keptPart() : Promise.resolve(keptSeen)]).then(function(got){
     var relay = got[0], best = relay.best;
     keptSeen = got[1];
     if (ahead(keptSeen, best)) best = keptSeen;
     if (shareBusy || typing()) return;                 // an edit made here is on its way, or being typed: it goes first
     // G1 and V2 locked: nothing is changed or sent from here, and the view shows the shared part as it is kept, whatever this
-    // browser holds (one could hold the shared version's number with other choices, kept by a page of before the slots)
-    if (!FIVE && FLEET_LOCK){ if (best && !samePart(best)) takePart(best); return; }
+    // browser holds: the kept version, unless the relay has a newer one (sent by a session); with no kept version read, only a
+    // newer one than this browser's. (On 20 Nov 2026 a browser held V2's version 3 with no slots, kept by a page of before
+    // the slots, and sent it to the relay again: the kept version 3 has Aqua at 2, and that one is shown.)
+    if (locked){
+      var top = keptSeen ? (ahead(relay.best, keptSeen) ? relay.best : keptSeen) : (ahead(relay.best, state.sh) ? relay.best : null);
+      if (top && !samePart(top)) takePart(top);
+      return;
+    }
     if (ahead(best, state.sh)) takePart(best);
     // nobody has this browser's version any more (the relay forgot it and it was never kept): the relay gets it again
     else if (relay.ok && state.sh && ahead(state.sh, best)) sendPart().catch(function(){});
