@@ -1789,7 +1789,7 @@ function buildAccs(){
         // locked: the stage as words, and for a funded win what each payout still due brings, how many, and their days
         var said = (FIVE_STAGES.filter(function(o){ return o[0] === st; })[0] || ['', 'Empty'])[1], left = st.charAt(0) === 'p' ? +st.charAt(1) : 0;
         body += '<tr><td>' + (j + 1) + '</td><td id="a' + z.k + '-' + j + '-v">' + (st ? said : quiet(said)) + '</td><td>' +
-          (left ? '<span class="num">' + price(m[2] === undefined ? z.pay : Number(m[2])) + (left > 1 ? ' × ' + left : '') + '</span> <span class="mute" id="u' + z.k + '-' + j + '">· ' + dueDays(m[1], left) + '</span>' : '') + '</td></tr>';
+          (left ? '<span class="num">' + price(m[2] === undefined ? z.pay : Number(m[2])) + (left > 1 ? ' × ' + left : '') + '</span><div class="due" id="u' + z.k + '-' + j + '">' + dueDays(m[1], left) + '</div>' : '') + '</td></tr>';
         continue;
       }
       body += '<tr><td>' + (j + 1) + '</td><td><select class="sel" id="a' + z.k + '-' + j + '" data-a="' + key + '" aria-label="Stage of ' + name + '">' +
