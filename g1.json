@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "7d667f997146ab2388751a21901f1e6b9293f242",
- "built": "2026-11-20T14:07:05.000Z",
+ "at": "ab3c9b03832d965a3f0b35729cea7a4f8f7c5b86",
+ "built": "2026-11-20T14:17:03.000Z",
  "day": "Fri 20 Nov",
  "counts": {"pass":[32,125],"win":[10,22],"flip":[36,80],"flip25":[19,40]},
  "flipDone": {"flip":[32,74],"flip25":[19,39]},
@@ -69,7 +69,7 @@
   "0375f3fcc515": {"p":"x","f":"Aqua"},
   "38b9209a2597": {"p":"f","f":"Lucid","r":1,"gone":"2026-11-17"},
   "8f43dd7465bf": {"p":"f","f":"Lucid","r":1,"gone":"2026-11-17"},
-  "93f31a30919c": {"p":"x","f":"Lucid"},
+  "93f31a30919c": {"p":"f","f":"Lucid","r":1},
   "e0028132017c": {"p":"x","f":"Lucid"},
   "6d5033218423": {"p":"x","f":"Lucid"},
   "0818c51c6877": {"p":"x","f":"Topstep"},
@@ -204,6 +204,7 @@
   "2026-11-20 09:27 eval passed · Topstep 607ce9",
   "2026-11-20 11:27 back on the dashboard: its count is taken back · FuturesElite 9a7523",
   "2026-11-20 13:27 back on the dashboard: its count is taken back · FuturesElite bd926e",
-  "2026-11-20 13:27 back on the dashboard: its count is taken back · FuturesElite aa289b"
+  "2026-11-20 13:27 back on the dashboard: its count is taken back · FuturesElite aa289b",
+  "2026-11-20 14:17 flip account back in the funded table: no first win to count · Lucid 93f31a"
  ]
 }
