@@ -1731,6 +1731,19 @@ function fiveMonthly(rr){
   var W = 64, from = 24;
   return fivePlan(rr, W).per.map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
 }
+// How many of the plan's weeks Cash by week shows (the owner, 20 Nov 2026: "Cash by week edit it to be not that too long just
+// untill curve be consitent"): FIVE_PAST weeks past the first week from which the average weekly net (payouts in less evals
+// out) of the FIVE_AVG weeks up to each week stays within FIVE_BAND of the steady week (`week`: Once running a week, the
+// average week of fiveMonthly) to the plan's end; FIVE_SHOW weeks at least, and all of them when it never settles.
+var FIVE_AVG = 4, FIVE_BAND = 0.1, FIVE_PAST = 4, FIVE_SHOW = 8;
+function fiveShow(rows, week){
+  var n = rows.length, from = -1;
+  for (var u = n - 1; u >= FIVE_AVG - 1; u--){
+    var s = 0; for (var k = u - FIVE_AVG + 1; k <= u; k++) s += rows[k].inn - rows[k].out;
+    if (Math.abs(s / FIVE_AVG - week) <= FIVE_BAND * Math.abs(week)) from = u; else break;
+  }
+  return from < 0 ? n : Math.min(n, Math.max(FIVE_SHOW, from + FIVE_PAST + 1));
+}
 // The warning under a size that has evals to buy, as warnRow: what they cost, the payouts expected of the accounts they
 // become (every win of a funded account, with no end when it wins every time: then that part is left out), and what their
 // places make a day in the long run (fiveDay), which is what a day with them empty does not make.
@@ -2005,7 +2018,9 @@ function updateFive(){
   // the dashed line: the same accounts with every trade at chance, drawn when the plan's rates are not chance (always while
   // the backtest stands in for a record of fewer than FIVE_MIN results)
   var coin = rr.pass !== FIVE_CHANCE || rr.win !== FIVE_FCHANCE ? fivePlan({ pass: FIVE_CHANCE, win: FIVE_FCHANCE }, FIVE_WEEKS) : null;
-  drawChart(res.rows.map(function(r, i){ var o = { t: r.t, inn: r.inn, out: r.out, cum: r.cum + base }; if (coin) o.coin = coin.rows[i].cum + base; return o; }));
+  // the chart ends a little after its running total turns into a steady line (fiveShow); Net and the per-size column keep
+  // their FIVE_WEEKS
+  drawChart(res.rows.slice(0, fiveShow(res.rows, run * 12 / 52)).map(function(r, i){ var o = { t: r.t, inn: r.inn, out: r.out, cum: r.cum + base }; if (coin) o.coin = coin.rows[i].cum + base; return o; }));
   tellParent();
 }
 // a number or a date typed on the 5ers tab (a box emptied to type a new one: nothing yet)
