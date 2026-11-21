@@ -51,7 +51,6 @@ h2{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;align-
 .box:hover{border-color:var(--mute)}
 td .box{width:4em;font-size:14px;line-height:1.5}
 td .box.s{width:2.8em;text-align:center}
-tbody tr+tr td.same{border-top-color:transparent}
 /* 5ers: the money boxes of its first line, the two counts of a rate, a stage picker and a date */
 .box.m{width:6.8em;font-size:14px;line-height:1.5}
 .rates .cell.two{grid-column:span 2}
@@ -1554,7 +1553,8 @@ function update(){
   // a tick box per firm: unticked, the plan buys no new evals there (the accounts already held keep running). Locked
   // (FLEET_LOCK): the firm's name only, an unticked one as "skipped". A firm or size the fleet has no rules for (one the
   // dashboard lists that the sets above do not, like V2's Lucid Daily on 20 Nov 2026) gets no evals: "no rules yet".
-  var at = document.activeElement, here = at && at.getAttribute && firmsEl.contains(at), back = here ? at.getAttribute('data-k') : null, backS = here ? at.getAttribute('data-s') : null;
+  var at = document.activeElement, here = at && at.getAttribute && firmsEl.contains(at), back = here ? at.getAttribute('data-k') : null;
+  var backS = here && at.hasAttribute('data-s') ? at.id : '', emptySlot = backS && at.value === '';
   // the buys: one column for the week (NEXT_WEEK), or the plan's first day and the 4 after it
   var heads = NEXT_WEEK ? '<th title="' + WEEK_SAID + '">Next week</th>' : '<th>' + esc(BUY_K) + '</th><th>Next 4 days</th>', cols = NEXT_WEEK ? 8 : 9;
   firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Slots</th>' + heads + '<th>Evals</th><th>Funded</th><th>Flips</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' +
@@ -1575,11 +1575,14 @@ function update(){
       };
       var who = FLEET_LOCK || !ruled ? '<td class="who"><span class="pick"><span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></span></td>'
         : '<td class="who"><label class="pick" title="Untick to see the plan without buying evals here"><input type="checkbox" data-k="' + unitKey(f) + '"' + (no ? '' : ' checked') + ' aria-label="Buy evals at ' + name + '">' + '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>';
-      return '<tr' + (no || !ruled ? ' class="off"' : '') + '>' + who + slotsCell(state.firms, i) + (NEXT_WEEK ? ['week', 'ev', 'fu', 'fl', 'w12', 'run'] : ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run']).map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
+      return '<tr' + (no || !ruled ? ' class="off"' : '') + '>' + who + slotsCell(f, name) + (NEXT_WEEK ? ['week', 'ev', 'fu', 'fl', 'w12', 'run'] : ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run']).map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
         (no || !ruled || !d0 ? '' : warnRow(f, rr, NEXT_WEEK ? wk.n : d0.buy, cols));
     }).join('') + '</tbody></table>';
   if (back){ var box = firmsEl.querySelector('[data-k="' + back + '"]'); if (box) box.focus(); }
-  if (backS){ var sbox = firmsEl.querySelector('[data-s="' + backS + '"]'); if (sbox){ sbox.focus(); if (sbox.select) sbox.select(); } }
+  if (backS){
+    var sbox = document.getElementById(backS);
+    if (sbox){ if (emptySlot) sbox.value = ''; sbox.focus({ preventScroll: true }); }
+  }
 
   if (all){
     var names = off.length > 2 ? off.length + ' firms' : off.map(function(f){ return esc((f.firm + ' ' + f.size).trim()); }).join(' and ');
@@ -1591,15 +1594,13 @@ function update(){
   if (res) drawChart(withHistory(res, coinFlip()).rows);
   else { lastRows = []; geom = null; chartEl.innerHTML = '<p class="note">' + (keptFail ? 'Live rates not readable right now.' : 'Reading the live rates…') + '</p>'; var lg = document.getElementById('lg-coin'); if (lg) lg.hidden = true; }
 }
-// The Slots cell of row i: a firm's sizes share its slots, so its first row has the box and its other rows an empty cell
-// that joins it.
-function slotsCell(rows, i){
-  var f = rows[i], k = normFirm(f.firm), name = esc(f.firm);
-  if (i > 0 && normFirm(rows[i - 1].firm) === k) return '<td class="slots same"></td>';
+// Each size can edit the firm's shared slot limit.
+function slotsCell(f, name){
+  var k = normFirm(f.firm);
   // a name that cannot be kept as a firm, or a firm the fleet has no rules for: no slots
   if (!FIRM_RX.test(k) || !OWNER.some(function(o){ return normFirm(o.firm) === k; })) return '<td class="slots"></td>';
-  if (FLEET_LOCK && !SLOTS_OPEN) return '<td class="slots" id="s-' + esc(k) + '">' + slotsAt(k) + '</td>';
-  return '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + SLOTS_MAX + '" step="1" value="' + slotsAt(k) + '" data-s="' + esc(k) + '" aria-label="Slots at ' + name + '" title="Accounts trading at once at ' + name + ', all its sizes together: 0 to ' + SLOTS_MAX + '"></td>';
+  if (FLEET_LOCK && !SLOTS_OPEN) return '<td class="slots">' + slotsAt(k) + '</td>';
+  return '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + SLOTS_MAX + '" step="1" value="' + slotsAt(k) + '" id="slot-' + esc(unitKey(f)) + '" data-s="' + esc(k) + '" aria-label="Slots at ' + name + '" title="Shared limit for all ' + esc(f.firm) + ' sizes: 0 to ' + SLOTS_MAX + '"></td>';
 }
 // a firm's slots typed in its box (emptied to type a new number: nothing yet)
 firmsEl.addEventListener('input', function(e){
@@ -1610,9 +1611,9 @@ firmsEl.addEventListener('input', function(e){
   if (v < SLOTS_MAX) state.slots[k] = v; else delete state.slots[k];
   save(); update(); shareEdit();
 });
-firmsEl.addEventListener('change', function(e){
+firmsEl.addEventListener('focusout', function(e){
   var el = e.target, k = el && el.getAttribute ? el.getAttribute('data-s') : null;
-  if (k) el.value = slotsAt(k);
+  if (k && el.value === '') el.value = slotsAt(k);
 });
 firmsEl.addEventListener('change', function(e){
   var box = e.target, k = box && box.getAttribute ? box.getAttribute('data-k') : null; if (!k) return;
