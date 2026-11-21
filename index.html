@@ -792,10 +792,16 @@ var CR_LOCK = true;
 // days (tools/five.js) and from what a session sends.
 var FIVE_LOCK = true;
 // G1 and V2 locked the same way (the owner, 20 Nov 2026: "make sure g1 and v2 is like 5ers locked and automatic and no error
-// or something wroung"): no tick box, slots box or button; the firms unticked and the slots of the shared part are shown as
-// text as they are, and the dashboard and the kept counts are read again on their own every FLEET_EVERY (they are rebuilt
-// every 10 minutes) and when the tab is shown again. false brings the boxes and the Sync button back.
+// or something wroung"): no tick box or button (the slots box: SLOTS_OPEN below); the firms unticked are shown as text as
+// the shared part has them, and the dashboard and the kept counts are read again on their own every FLEET_EVERY (they are
+// rebuilt every 10 minutes) and when the tab is shown again. false brings the tick boxes and the Sync button back.
 var FLEET_LOCK = true, FLEET_EVERY = 5 * 60 * 1000;
+// What he asked back on 21 Nov 2026 ("can u make the buy next 4 days or in monday to be only buy next week ... + slots make
+// it i can change it"; in the dialog "One "Next week" column" and "G1 and V2"): the evals to buy are one number for the
+// week (NEXT_WEEK: the 5 trading days from the next buy day added up, Monday to Friday at a weekend, today and the next 4 on
+// a weekday; the plan itself is the same), and a firm's Slots box can be changed again (SLOTS_OPEN), shared to every
+// browser as before the lock; the rest stays locked.
+var NEXT_WEEK = true, SLOTS_OPEN = true;
 var PROFILE = FIVE ? +((/[?&]p=([12])(&|$)/.exec((window.location && window.location.search) || '') || [])[1] || 0) : 0;
 var TWO_UP = FIVE && !PROFILE && TWO_ON, P2 = PROFILE === 2;
 var EMBED = false; try { EMBED = FIVE && !TWO_UP && !!window.parent && window.parent !== window; } catch (e) {}
@@ -1202,6 +1208,8 @@ function pullShared(first){
     // the slots, and sent it to the relay again: the kept version 3 has Aqua at 2, and that one is shown.)
     if (locked){
       var top = keptSeen ? (ahead(relay.best, keptSeen) ? relay.best : keptSeen) : (ahead(relay.best, state.sh) ? relay.best : null);
+      // with the slots open (SLOTS_OPEN), an edit made here that nobody has yet (it could not be sent) goes again, not undone
+      if (SLOTS_OPEN && state.sh && ahead(state.sh, top || relay.best)){ if (relay.ok) sendPart().catch(function(){}); return; }
       if (top && !samePart(top)) takePart(top);
       return;
     }
@@ -1293,6 +1301,13 @@ function weekStart(t){ var d = new Date(START.getTime()); d.setDate(d.getDate() 
 function dShort(d){ return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
 // at a weekend the first day of the plan is Monday
 var BUY_K = WD0 === 5 ? 'Buy Monday ' + dShort(weekStart(1)) : 'Buy today', BUY_DAY = WD0 === 5 ? 'Monday' : 'today';
+// the 5 trading days "Next week" adds up on G1 and V2 (NEXT_WEEK), from the plan's first day: "Mon 23 – Fri 27 Nov"
+var WEEK_SAID = (function(){
+  var d = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()), a = [];
+  while (a.length < 5){ if (d.getDay() > 0 && d.getDay() < 6) a.push(new Date(d.getTime())); d.setDate(d.getDate() + 1); }
+  return WEEKDAY[a[0].getDay()] + ' ' + a[0].getDate() + (a[0].getMonth() === a[4].getMonth() ? '' : ' ' + MONTHS[a[0].getMonth()]) + ' – ' + WEEKDAY[a[4].getDay()] + ' ' + dShort(a[4]);
+})();
+var WEEK_K = 'Buy next week';
 
 // ---------- format ----------
 function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
@@ -1480,7 +1495,9 @@ function planFirms(rr, all){
 function outcome(rr, all){
   var firms = planFirms(rr, all), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
   res.runs = monthlyUnits(firms, rr, cap); res.run = res.runs.reduce(function(a, b){ return a + b; }, 0);
-  res.buy = 0; res.cost = 0; res.per.forEach(function(p){ if (p.days[0]){ res.buy += p.days[0].buy; res.cost += p.days[0].evalCost; } });
+  // the evals to buy: on the plan's first day, or with NEXT_WEEK on its first 5 trading days added up
+  var span = NEXT_WEEK ? 5 : 1;
+  res.buy = 0; res.cost = 0; res.per.forEach(function(p){ for (var d = 0; d < span; d++) if (p.days[d]){ res.buy += p.days[d].buy; res.cost += p.days[d].evalCost; } });
   return res;
 }
 // The chart's coin-flip line: the same 12 weeks from today (the accounts held, where each one stands, the eval seats, the
@@ -1504,7 +1521,7 @@ function evalWorth(f, rr, n){
 // made, not cash paid out. Nothing where there is nothing to buy or nothing to gain.
 function warnRow(f, rr, n, cols){
   var v = evalWorth(f, rr, n); if (!v || v.day < 1) return '';
-  var one = n === 1, day = BUY_DAY === 'today' ? 'today' : 'on ' + BUY_DAY;
+  var one = n === 1, day = NEXT_WEEK ? 'next week' : BUY_DAY === 'today' ? 'today' : 'on ' + BUY_DAY;
   return '<tr class="warn"><td colspan="' + cols + '"><div class="w" role="note">⚠ Buy ' + (one ? 'this one ' : 'these ' + n + ' ') + day + ': ' + money(v.cost) + ' for ' + money(v.pay) + ' of expected payouts. Every day you wait, ' +
     (one ? 'this eval seat makes' : 'these ' + n + ' eval seats make') + ' nothing instead of ' + money(v.day) + '.</div></td></tr>';
 }
@@ -1513,8 +1530,9 @@ function effect(res, all){
   var dBuy = res.buy - all.buy, dCost = res.cost - all.cost, dNeed = res.need - all.need, dNet = res.net - all.net, dRun = res.run - all.run, p = [];
   function amt(v, less, more){ return money(Math.abs(v)) + ' ' + (v < 0 ? less : more); }
   function tone(v, s){ return '<span class="' + (v > 0 ? 'pos' : 'neg') + '">' + s + '</span>'; }
-  if (dBuy !== 0) p.push(Math.abs(dBuy) + (dBuy < 0 ? ' fewer' : ' more') + (Math.abs(dBuy) === 1 ? ' eval ' : ' evals ') + BUY_DAY + ' (' + amt(dCost, 'saved', 'more') + ')');
-  else if (Math.abs(dCost) > 0.5) p.push('the evals ' + BUY_DAY + ' cost ' + amt(dCost, 'less', 'more'));
+  var when = NEXT_WEEK ? 'next week' : BUY_DAY;
+  if (dBuy !== 0) p.push(Math.abs(dBuy) + (dBuy < 0 ? ' fewer' : ' more') + (Math.abs(dBuy) === 1 ? ' eval ' : ' evals ') + when + ' (' + amt(dCost, 'saved', 'more') + ')');
+  else if (Math.abs(dCost) > 0.5) p.push('the evals ' + when + ' cost ' + amt(dCost, 'less', 'more'));
   if (Math.abs(dNeed) > 0.5) p.push(amt(dNeed, 'less', 'more') + ' cash needed');
   if (Math.abs(dNet) > 0.5) p.push(tone(dNet, amt(dNet, 'less', 'more')) + ' after 12 weeks');
   if (Math.abs(dRun) > 0.5) p.push(tone(dRun, amt(dRun, 'less', 'more')) + ' a month once running');
@@ -1527,7 +1545,7 @@ function update(){
   if (FIVE) return updateFive();
   // no rates read yet: the plan is not worked out (its numbers show "–"), the accounts read are shown
   var rr = fracRates(), res = rr ? outcome(rr) : null, off = state.firms.filter(skipped), all = res && off.length ? outcome(rr, true) : null;
-  document.getElementById('t-buy-k').textContent = BUY_K;
+  var tk = document.getElementById('t-buy-k'); tk.textContent = NEXT_WEEK ? WEEK_K : BUY_K; if (NEXT_WEEK) tk.title = WEEK_SAID;
   document.getElementById('t-buy').innerHTML = res ? res.buy + ' evals' + (res.buy > 0 ? ' <small>' + money(res.cost) + '</small>' : '') : '–';
   document.getElementById('t-need').textContent = res ? money(res.need) : '–';
   var tn = document.getElementById('t-net'); tn.textContent = res ? signed(res.net) : '–'; tn.className = 'v' + (res ? (res.net >= 0 ? ' pos' : ' neg') : '');
@@ -1537,14 +1555,18 @@ function update(){
   // (FLEET_LOCK): the firm's name only, an unticked one as "skipped". A firm or size the fleet has no rules for (one the
   // dashboard lists that the sets above do not, like V2's Lucid Daily on 20 Nov 2026) gets no evals: "no rules yet".
   var at = document.activeElement, here = at && at.getAttribute && firmsEl.contains(at), back = here ? at.getAttribute('data-k') : null, backS = here ? at.getAttribute('data-s') : null;
-  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Slots</th><th>' + esc(BUY_K) + '</th><th>Next 4 days</th><th>Evals</th><th>Funded</th><th>Flips</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' +
+  // the buys: one column for the week (NEXT_WEEK), or the plan's first day and the 4 after it
+  var heads = NEXT_WEEK ? '<th title="' + WEEK_SAID + '">Next week</th>' : '<th>' + esc(BUY_K) + '</th><th>Next 4 days</th>', cols = NEXT_WEEK ? 8 : 9;
+  firmsEl.innerHTML = '<table aria-labelledby="firms-h"><thead><tr><th>Firm</th><th>Slots</th>' + heads + '<th>Evals</th><th>Funded</th><th>Flips</th><th>12 weeks</th><th>Once running</th></tr></thead><tbody>' +
     state.firms.map(function(f, i){
       var p = res ? res.per[i] : null, d0 = p ? p.days[0] : null, inn = 0, out = 0, next = p ? [1, 2, 3, 4].map(function(d){ return p.days[d] ? p.days[d].buy : 0; }) : null;
+      var wk = p ? [0, 1, 2, 3, 4].reduce(function(a, d){ var x = p.days[d]; return x ? { n: a.n + x.buy, c: a.c + x.evalCost } : a; }, { n: 0, c: 0 }) : null;
       var ruled = inSet(f), no = ruled && skipped(f), name = esc((f.firm + ' ' + f.size).trim()), dash = quiet('–');
       if (p) p.rows.forEach(function(x){ inn += x.inn; out += x.out; });
       var td = {
         buy: !ruled ? quiet('no rules yet') : no ? quiet('skipped') : !p ? dash : d0 && d0.buy > 0 ? '<b>' + d0.buy + '</b> ' + quiet(money(d0.evalCost)) : quiet('0'),
         next: !p ? dash : next.some(function(n){ return n > 0; }) ? next.join(' · ') : quiet(next.join(' · ')),
+        week: !ruled ? quiet('no rules yet') : no ? quiet('skipped') : !p ? dash : wk.n > 0 ? '<b>' + wk.n + '</b> ' + quiet(money(wk.c)) : quiet('0'),
         ev: count(num(f.openEvals, 0)) + (num(f.passedNow, 0) > 0 ? ' ' + quiet('+' + acc(num(f.passedNow, 0)) + ' passed') : ''),
         fu: count(num(f.fundedNow, 0) + idleOf(f)),
         fl: count(num(f.inProfitNow, 0)),
@@ -1553,8 +1575,8 @@ function update(){
       };
       var who = FLEET_LOCK || !ruled ? '<td class="who"><span class="pick"><span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></span></td>'
         : '<td class="who"><label class="pick" title="Untick to see the plan without buying evals here"><input type="checkbox" data-k="' + unitKey(f) + '"' + (no ? '' : ' checked') + ' aria-label="Buy evals at ' + name + '">' + '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>';
-      return '<tr' + (no || !ruled ? ' class="off"' : '') + '>' + who + slotsCell(state.firms, i) + ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run'].map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
-        (no || !ruled || !d0 ? '' : warnRow(f, rr, d0.buy, 9));
+      return '<tr' + (no || !ruled ? ' class="off"' : '') + '>' + who + slotsCell(state.firms, i) + (NEXT_WEEK ? ['week', 'ev', 'fu', 'fl', 'w12', 'run'] : ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run']).map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
+        (no || !ruled || !d0 ? '' : warnRow(f, rr, NEXT_WEEK ? wk.n : d0.buy, cols));
     }).join('') + '</tbody></table>';
   if (back){ var box = firmsEl.querySelector('[data-k="' + back + '"]'); if (box) box.focus(); }
   if (backS){ var sbox = firmsEl.querySelector('[data-s="' + backS + '"]'); if (sbox){ sbox.focus(); if (sbox.select) sbox.select(); } }
@@ -1576,7 +1598,7 @@ function slotsCell(rows, i){
   if (i > 0 && normFirm(rows[i - 1].firm) === k) return '<td class="slots same"></td>';
   // a name that cannot be kept as a firm, or a firm the fleet has no rules for: no slots
   if (!FIRM_RX.test(k) || !OWNER.some(function(o){ return normFirm(o.firm) === k; })) return '<td class="slots"></td>';
-  if (FLEET_LOCK) return '<td class="slots" id="s-' + esc(k) + '">' + slotsAt(k) + '</td>';
+  if (FLEET_LOCK && !SLOTS_OPEN) return '<td class="slots" id="s-' + esc(k) + '">' + slotsAt(k) + '</td>';
   return '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + SLOTS_MAX + '" step="1" value="' + slotsAt(k) + '" data-s="' + esc(k) + '" aria-label="Slots at ' + name + '" title="Accounts trading at once at ' + name + ', all its sizes together: 0 to ' + SLOTS_MAX + '"></td>';
 }
 // a firm's slots typed in its box (emptied to type a new number: nothing yet)
