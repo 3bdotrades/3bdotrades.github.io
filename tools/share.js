@@ -1,5 +1,5 @@
 'use strict';
-// Keeps for good what people change on the page: the firms unticked in a fleet's view, a firm's slots, and what is typed
+// Keeps for good what people change on the page: the firms unticked in a fleet's view, each size's slots, and what is typed
 // on the 5ers tab (its money, record, slots and accounts).
 //
 // The page sends every such edit to a public relay (ntfy.sh), and the relay forgets a message after 12 hours. This reads what
@@ -81,10 +81,10 @@ function cleanFive(o, second){
   return p;
 }
 
-// the firms that have fewer slots than the usual 5: { firm: 0 to 4 }
+// Rows below the default 5, plus legacy firm defaults still waiting to be edited.
 function cleanSlots(o){
   const p = {};
-  if (o && typeof o === 'object' && !Array.isArray(o)) Object.keys(o).slice(0, 40).forEach(k => { const v = o[k], n = Math.round(v); if (FIRM_RX.test(k) && typeof v === 'number' && n >= 0 && n < SLOTS_MAX) p[k] = n; });
+  if (o && typeof o === 'object' && !Array.isArray(o)) Object.keys(o).slice(0, 40).forEach(k => { const v = o[k], n = Math.round(v); if ((KEY_RX.test(k) || FIRM_RX.test(k)) && typeof v === 'number' && n >= 0 && n < SLOTS_MAX) p[k] = n; });
   return p;
 }
 function cleanKeys(a){ const o = []; (Array.isArray(a) ? a : []).forEach(k => { if (typeof k === 'string' && KEY_RX.test(k) && o.indexOf(k) < 0 && o.length < 40) o.push(k); }); return o; }
@@ -97,7 +97,10 @@ function cleanVersion(o){
   return { n: n, t: o.t, by: o.by };
 }
 // is version a newer than version b?
-function ahead(a, b){ return !!a && (!b || (a.n !== b.n ? a.n > b.n : a.t !== b.t ? a.t > b.t : a.by > b.by)); }
+function ahead(a, b){
+  if (a && b && a.slotsV !== b.slotsV) return a.slotsV === 2;
+  return !!a && (!b || (a.n !== b.n ? a.n > b.n : a.t !== b.t ? a.t > b.t : a.by > b.by));
+}
 // one part as it came from the relay or from the file, with nothing in it but what the page understands: [name, part] or null
 function cleanPart(o, name){
   const p = cleanVersion(o), k = name || (o && o.k);
@@ -106,6 +109,7 @@ function cleanPart(o, name){
     if (!o.five || typeof o.five !== 'object' || o.five.v !== FIVE_V) return null;
     p.five = cleanFive(o.five, k === '5ers2'); return [k, p];
   }
+  if (o.slotsV === 2) p.slotsV = 2;
   p.skip = cleanKeys(o.skip);
   p.slots = cleanSlots(o.slots);
   return [k, p];

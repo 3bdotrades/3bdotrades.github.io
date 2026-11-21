@@ -457,7 +457,7 @@ function simulateAll(firms, r, weeks, seats, days){
   groups.forEach(function(idx, gi){ var out = sims[gi].done(); idx.forEach(function(i, j){ per[i] = out[j]; }); });
   return per;
 }
-// One firm, trading day by trading day. Sizes share the firm's max-trading cap; accounts above it wait idle.
+// One firm, trading day by trading day. Each size has its own limit within the firm's max-trading cap.
 // An eval takes one day at a time and finishes when it has passed or lost twice in a row (see evalRoad); a funded account takes
 // one try a day; an account in profit flips one day at a time: a winning day brings it closer to its payout (D1 winning days
 // for the first, D for later ones), a losing day takes room, and it is lost when the room is gone. What it does after its
@@ -492,7 +492,7 @@ function simulateGroup(units, r, weeks, days){
     capSum += u.slots;
     return u;
   });
-  var cap = units[0].firmCap !== undefined ? Math.max(0, Math.floor(num(units[0].firmCap, 0))) : capSum;
+  var cap = Math.min(capSum, Math.max(0, Math.floor(num(units[0].firmCap, capSum))));
   var order = U.map(function(u, j){ return j; }).sort(function(a, b){ return (U[b].value - U[a].value) || (a - b); });
   function trading(){ var s = 0; U.forEach(function(u){ s += u.trying + u.fc; }); return s; }
   // n accounts the run starts with in state i of their size's road (-1: done, nothing to follow). late: they have traded
@@ -597,18 +597,28 @@ function simulateGroup(units, r, weeks, days){
     pick = -1;
     var need = -1, total = 0;
     if (pc > 0 && cap > 0){
-      var covered = 0, idleWait = 0;
+      var covered = 0, idleWait = 0, rowNeed = 0;
       U.forEach(function(u){
-        covered += Math.max(0, u.fc - u.soon) + u.trying + u.waitOne * c1 + (u.waitFunded + u.wait + u.due) * c;
+        var occupied = Math.max(0, u.fc - u.soon) + u.trying;
+        var room = Math.max(0, u.slots - occupied);
+        var pipeline = Math.min(room, u.waitOne * c1 + (u.waitFunded + u.wait + u.due) * c);
+        covered += occupied + pipeline;
         idleWait += Math.min(u.waitFunded + u.waitOne, u.slots);
+        u.need = !u.skip && u.value > 0 ? room - pipeline : 0;
+        if (u.need >= 0.5) rowNeed += u.need;
       });
       // no new evals while the firm is full and an idle funded account is still waiting for a slot
-      need = free < 1e-9 && idleWait >= 0.5 ? -1 : cap - covered;
+      need = free < 1e-9 && idleWait >= 0.5 ? -1 : Math.min(cap - covered, rowNeed);
       if (need >= 0.5){
         var maxBatch = trading() >= 0.6 * cap - 1e-6 ? cap : 5 * cap;
-        total = Math.min(maxBatch, Math.max(1, Math.round(need / pc)));
-        for (var o = 0; o < order.length; o++){ var v = U[order[o]]; if (!v.skip && v.value > 0 && v.trying + v.fc + v.waitFunded + v.waitOne + v.wait + v.due < v.slots){ pick = order[o]; break; } }
-        if (pick < 0) for (var o2 = 0; o2 < order.length; o2++){ if (!U[order[o2]].skip && U[order[o2]].value > 0){ pick = order[o2]; break; } }
+        // prefer projected demand with room for the accounts that are already waiting
+        for (var o = 0; o < order.length; o++){
+          var j = order[o], v = U[j];
+          if (v.need < 0.5) continue;
+          if (pick < 0) pick = j;
+          if (v.trying + v.fc + v.waitFunded + v.waitOne + v.wait + v.due < v.slots){ pick = j; break; }
+        }
+        if (pick >= 0) total = Math.min(maxBatch, Math.max(1, Math.round(Math.min(need, U[pick].need) / pc)));
       }
     }
     return { n: pick >= 0 ? total : 0, need: need, pc: pc, value: U[pick >= 0 ? pick : order[0]].value };
@@ -873,19 +883,19 @@ var OWNER = OWNER_SETS[FLEET.key] || [];
 var FIRM_NAMES = { luciddaily: 'Lucid Daily' };
 var OWNER_KEYS = ['evalPrice', 'activation', 'pay1', 'pay2', 'idle', 'room'];
 var COUNT_KEYS = ['openEvals', 'passedNow', 'fundedNow', 'inProfitNow'];
-// A firm lets 5 accounts trade at once, shared by its sizes (the owner's "5 max funding per firm"). The Slots box of a firm
-// sets a smaller number for it, 0 to 5 (the owner, 11 Nov 2026): a run then fills that many places there and buys the evals
-// for them. state.slots keeps the firms that have fewer than 5, by firm; it is shared like the tick boxes.
-var SLOTS_MAX = 5, FIRM_RX = /^[a-z]{1,40}$/;
+// Each row sets a limit of 0 to 5 for that account size. The firm can still have at most 5 trading across all sizes.
+// state.slots uses 'firm|size' keys. A legacy firm key supplies the starting value for each of its sizes.
+var SLOTS_MAX = 5, FIRM_RX = /^[a-z]{1,40}$/, KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/;
 function cleanSlots(o){
   var p = {};
-  if (o && typeof o === 'object' && !Array.isArray(o)) Object.keys(o).slice(0, 40).forEach(function(k){ var v = o[k], n = Math.round(v); if (FIRM_RX.test(k) && typeof v === 'number' && n >= 0 && n < SLOTS_MAX) p[k] = n; });
+  if (o && typeof o === 'object' && !Array.isArray(o)) Object.keys(o).slice(0, 40).forEach(function(k){ var v = o[k], n = Math.round(v); if ((KEY_RX.test(k) || FIRM_RX.test(k)) && typeof v === 'number' && n >= 0 && n < SLOTS_MAX) p[k] = n; });
   return p;
 }
-function slotsAt(k){ var v = state.slots ? state.slots[k] : undefined; return typeof v === 'number' && v >= 0 && v < SLOTS_MAX ? Math.round(v) : SLOTS_MAX; }
-function slotsOf(f){ return slotsAt(normFirm(f.firm)); }
-// a row as a run takes it: with its firm's slots
-function slotted(f){ f.firmCap = f.slots = slotsOf(f); return f; }
+function slotsAt(k){
+  var v = state.slots[k];
+  if (v === undefined) v = state.slots[k.split('|')[0]];
+  return typeof v === 'number' ? v : SLOTS_MAX;
+}
 var NEW_FIRM = { firm: 'Firm', size: '', firmCap: SLOTS_MAX, slots: SLOTS_MAX, openEvals: 0, passedNow: 0, fundedNow: 0, inProfitNow: 0, idle: 0, evalPrice: 0, activation: 0, monthly: 0, pay1: 0, pay2: 0, flip: 0, room: 0 };
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
@@ -1111,7 +1121,7 @@ function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } cat
 
 // ---------- edits shared by every browser ----------
 // What a person changes on the page is the same in every browser that opens it, with no key and no sign-in: the firms
-// unticked in a fleet's view, a firm's slots, and what is typed on the 5ers tab. Anyone with the page can change them.
+// unticked in a fleet's view, the slots for each size, and what is typed on the 5ers tab. Anyone with the page can change them.
 // An edit is sent to a public relay (ntfy.sh, which keeps a message for 12 hours). A page asks the relay when it opens, when
 // its tab is shown again and every two minutes. The counter's pass (tools/share.js) writes what the relay holds into
 // shared.json on the "track" branch, and a page reads that too when it opens: it is what is left once the relay has forgotten.
@@ -1119,17 +1129,22 @@ function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } cat
 // A copy of the page somewhere else (a preview on a PC) talks to a relay topic of its own.
 var LIVE_SITE = /^3bdotrades\.github\.io$/i.test(String((window.location && window.location.hostname) || ''));
 var SHARE_URL = 'https://ntfy.sh/funded-slots-roadmap-edits-7c41f9' + (LIVE_SITE ? '' : '-dev'), SHARE_KEY = FLEET.key + (P2 ? '2' : '');
-var KEY_RX = /^[a-z]{1,40}\|\d{1,4}$/;
 function cleanKeys(a){ var o = []; (Array.isArray(a) ? a : []).forEach(function(k){ if (typeof k === 'string' && KEY_RX.test(k) && o.indexOf(k) < 0 && o.length < 40) o.push(k); }); return o; }
 function cleanVersion(o){
   if (!o || typeof o !== 'object') return null;
   var n = o.n;
   if (typeof n !== 'number' || !(n >= 1 && n < 1e12) || Math.floor(n) !== n) return null;
   if (typeof o.t !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(o.t) || typeof o.by !== 'string' || !/^[a-z0-9]{6,16}$/.test(o.by)) return null;
-  return { n: n, t: o.t, by: o.by };
+  var p = { n: n, t: o.t, by: o.by };
+  if (!FIVE && o.slotsV === 2) p.slotsV = 2;
+  return p;
 }
 // is version a newer than version b?
-function ahead(a, b){ return !!a && (!b || (a.n !== b.n ? a.n > b.n : a.t !== b.t ? a.t > b.t : a.by > b.by)); }
+function ahead(a, b){
+  // Once row settings have been saved, a legacy browser's firm settings cannot replace them.
+  if (a && b && a.slotsV !== b.slotsV) return a.slotsV === 2;
+  return !!a && (!b || (a.n !== b.n ? a.n > b.n : a.t !== b.t ? a.t > b.t : a.by > b.by));
+}
 // this view's part as it came from somewhere else, with nothing in it but what the page understands; null when it is not one
 function cleanPart(o){
   var p = cleanVersion(o); if (!p || o.k !== SHARE_KEY) return null;
@@ -1145,6 +1160,7 @@ function cleanPart(o){
 function myPart(){
   var o = { k: SHARE_KEY, n: state.sh.n, t: state.sh.t, by: state.sh.by };
   if (FIVE){ o.five = cleanFive(state.five); return o; }
+  if (state.sh.slotsV === 2) o.slotsV = 2;
   o.skip = cleanKeys(state.skip);
   o.slots = cleanSlots(state.slots);
   return o;
@@ -1155,7 +1171,7 @@ function takePart(p){
     if (p.skip.length) state.skip = p.skip; else delete state.skip;
     state.slots = p.slots;
   }
-  state.sh = { n: p.n, t: p.t, by: p.by };
+  state.sh = cleanVersion(p);
   save();
   if (FIVE) buildFive();
   update();
@@ -1186,7 +1202,7 @@ function sendPart(){
   return fetch(SHARE_URL, { method: 'POST', body: JSON.stringify(myPart()) }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); });
 }
 var shareSeq = 0, shareBusy = false, shareTimer = 0, keptSeen = null, typedAt = 0, TYPING_MS = 5000;
-// A number box (a firm's slots, the 5ers tab's numbers; a date there counts as one) is
+// A number box (a size's slots, the 5ers tab's numbers; a date there counts as one) is
 // being typed in: it has the cursor and a key went into it in the last few seconds. Nothing is put in its place meanwhile.
 // A box that only keeps the cursor holds nothing back.
 function isNumberBox(el){ var t = el && el.tagName === 'INPUT' && el.getAttribute ? el.getAttribute('type') : ''; return t === 'number' || t === 'date'; }
@@ -1223,7 +1239,7 @@ function pullShared(first){
 // is part p what this browser has: the same version, the same firms unticked and the same slots?
 function samePart(p){
   function slots(o){ return JSON.stringify(Object.keys(o || {}).sort().map(function(k){ return [k, o[k]]; })); }
-  return !!state.sh && p.n === state.sh.n && p.t === state.sh.t && p.by === state.sh.by && JSON.stringify(cleanKeys(state.skip).sort()) === JSON.stringify(p.skip.slice().sort()) && slots(cleanSlots(state.slots)) === slots(p.slots);
+  return !!state.sh && p.slotsV === state.sh.slotsV && p.n === state.sh.n && p.t === state.sh.t && p.by === state.sh.by && JSON.stringify(cleanKeys(state.skip).sort()) === JSON.stringify(p.skip.slice().sort()) && slots(cleanSlots(state.slots)) === slots(p.slots);
 }
 function ownChoices(){
   if (FIVE) return JSON.stringify(cleanFive(state.five)) !== JSON.stringify(cleanFive(null));
@@ -1239,7 +1255,9 @@ function shareEdit(){
     relayPart().then(function(relay){
       if (mine !== shareSeq) return;                   // edited again meanwhile: that edit sends
       var top = Math.max(relay.best ? relay.best.n : 0, state.sh ? state.sh.n : 0, keptSeen ? keptSeen.n : 0);
-      state.sh = { n: top + 1, t: new Date().toISOString(), by: state.dev }; save();
+      state.sh = { n: top + 1, t: new Date().toISOString(), by: state.dev };
+      if (!FIVE) state.sh.slotsV = 2;
+      save();
       return sendPart();
     }).catch(function(){}).then(function(){ if (mine === shareSeq) shareBusy = false; });
   }, 1200);
@@ -1488,7 +1506,13 @@ function seats(){ var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.m
 // the fleet's firms as a run at these rates takes them; all = with no firm skipped
 function planFirms(rr, all){
   var on = dayOn(), late = on ? lateShare() : 0;
-  return state.firms.map(function(f){ var x = slotted(boxed(clone(f), rr)); x.idle = idleOf(f); x.dayOn = on; x.lateShare = late; if ((!all && skipped(f)) || !inSet(f)) x.skip = true; return x; });
+  return state.firms.map(function(f){
+    var x = boxed(clone(f), rr);
+    x.firmCap = slotsAt(normFirm(f.firm)); x.slots = slotsAt(unitKey(f));
+    x.idle = idleOf(f); x.dayOn = on; x.lateShare = late;
+    if ((!all && skipped(f)) || !inSet(f)) x.skip = true;
+    return x;
+  });
 }
 // 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
 function outcome(rr, all){
@@ -1575,7 +1599,7 @@ function update(){
       };
       var who = FLEET_LOCK || !ruled ? '<td class="who"><span class="pick"><span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></span></td>'
         : '<td class="who"><label class="pick" title="Untick to see the plan without buying evals here"><input type="checkbox" data-k="' + unitKey(f) + '"' + (no ? '' : ' checked') + ' aria-label="Buy evals at ' + name + '">' + '<span>' + esc(f.firm) + ' ' + quiet(esc(f.size)) + '</span></label></td>';
-      return '<tr' + (no || !ruled ? ' class="off"' : '') + '>' + who + slotsCell(f, name) + (NEXT_WEEK ? ['week', 'ev', 'fu', 'fl', 'w12', 'run'] : ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run']).map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
+      return '<tr' + (no || !ruled ? ' class="off"' : '') + '>' + who + (ruled ? slotsCell(f, name) : '<td class="slots"></td>') + (NEXT_WEEK ? ['week', 'ev', 'fu', 'fl', 'w12', 'run'] : ['buy', 'next', 'ev', 'fu', 'fl', 'w12', 'run']).map(function(c){ return '<td id="c' + i + '-' + c + '">' + td[c] + '</td>'; }).join('') + '</tr>' +
         (no || !ruled || !d0 ? '' : warnRow(f, rr, NEXT_WEEK ? wk.n : d0.buy, cols));
     }).join('') + '</tbody></table>';
   if (back){ var box = firmsEl.querySelector('[data-k="' + back + '"]'); if (box) box.focus(); }
@@ -1594,20 +1618,25 @@ function update(){
   if (res) drawChart(withHistory(res, coinFlip()).rows);
   else { lastRows = []; geom = null; chartEl.innerHTML = '<p class="note">' + (keptFail ? 'Live rates not readable right now.' : 'Reading the live rates…') + '</p>'; var lg = document.getElementById('lg-coin'); if (lg) lg.hidden = true; }
 }
-// Each size can edit the firm's shared slot limit.
 function slotsCell(f, name){
-  var k = normFirm(f.firm);
-  // a name that cannot be kept as a firm, or a firm the fleet has no rules for: no slots
-  if (!FIRM_RX.test(k) || !OWNER.some(function(o){ return normFirm(o.firm) === k; })) return '<td class="slots"></td>';
+  var k = esc(unitKey(f));
   if (FLEET_LOCK && !SLOTS_OPEN) return '<td class="slots">' + slotsAt(k) + '</td>';
-  return '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + SLOTS_MAX + '" step="1" value="' + slotsAt(k) + '" id="slot-' + esc(unitKey(f)) + '" data-s="' + esc(k) + '" aria-label="Slots at ' + name + '" title="Shared limit for all ' + esc(f.firm) + ' sizes: 0 to ' + SLOTS_MAX + '"></td>';
+  return '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + SLOTS_MAX + '" step="1" value="' + slotsAt(k) + '" id="slot-' + k + '" data-s="' + k + '" aria-label="Slots at ' + name + '" title="Limit for this size: 0 to ' + SLOTS_MAX + '. ' + esc(f.firm) + ' can trade up to ' + SLOTS_MAX + ' across all sizes."></td>';
 }
-// a firm's slots typed in its box (emptied to type a new number: nothing yet)
+// a size's slots typed in its box (emptied to type a new number: nothing yet)
 firmsEl.addEventListener('input', function(e){
   var el = e.target, k = el && el.getAttribute ? el.getAttribute('data-s') : null; if (!k || String(el.value).trim() === '') return;
   var v = Math.min(SLOTS_MAX, Math.max(0, Math.round(num(el.value, SLOTS_MAX))));
   if (String(v) !== String(el.value)) el.value = v;
   if (v === slotsAt(k)) return;
+  var firm = k.split('|')[0], legacy = state.slots[firm];
+  if (legacy !== undefined){
+    OWNER.forEach(function(f){
+      var row = unitKey(f);
+      if (normFirm(f.firm) === firm && state.slots[row] === undefined) state.slots[row] = legacy;
+    });
+    delete state.slots[firm];
+  }
   if (v < SLOTS_MAX) state.slots[k] = v; else delete state.slots[k];
   save(); update(); shareEdit();
 });
@@ -1622,7 +1651,7 @@ firmsEl.addEventListener('change', function(e){
   save(); update(); shareEdit();
 });
 
-// a number box being typed in (a firm's slots): see typing()
+// a number box being typed in (a size's slots): see typing()
 firmsEl.addEventListener('input', typed);
 
 // ---------- 5ers tab: one firm, its accounts, record and money typed here (rules: see FIVE_SIZES) ----------
