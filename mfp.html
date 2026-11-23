@@ -115,21 +115,23 @@ html.embed,.embed body{overflow:hidden}
   <p class="note" id="money"></p>
 
   <h2>Accounts</h2>
-  <div class="wrap cells six">
-    <div class="cell"><label for="i-seats" title="Accounts traded each day, one trade each, MFP allows $100,000 of funded Elite at once: 20 of the 5K.">Seats</label><input class="box" id="i-seats" type="number" min="1" max="20" step="1" inputmode="numeric"></div>
+  <div class="wrap cells">
     <div class="cell"><label for="i-evals">Evals open</label><input class="box" id="i-evals" type="number" min="0" max="20" step="1" inputmode="numeric"></div>
     <div class="cell"><label for="i-funded">Funded open</label><input class="box" id="i-funded" type="number" min="0" max="10" step="1" inputmode="numeric"></div>
-    <div class="cell"><label for="i-price">Eval price $</label><input class="box" id="i-price" type="number" min="1" max="5000" step="1" inputmode="decimal"></div>
     <div class="cell"><label for="i-paid">Paid $</label><input class="box" id="i-paid" type="number" min="0" step="0.01" inputmode="decimal"></div>
     <div class="cell"><label for="i-recv">Received $</label><input class="box" id="i-recv" type="number" min="0" step="0.01" inputmode="decimal"></div>
+    <div class="cell" hidden><label for="i-seats" title="Accounts traded each day, one trade each, MFP allows $100,000 of funded Elite at once: 20 of the 5K.">Seats</label><input class="box" id="i-seats" type="number" min="1" max="20" step="1" inputmode="numeric"></div>
+    <div class="cell" hidden><label for="i-price">Eval price $</label><input class="box" id="i-price" type="number" min="1" max="5000" step="1" inputmode="decimal"></div>
   </div>
 
+  <div id="trade-box" hidden>
   <h2 id="trade-h"></h2>
   <div class="wrap"><table>
     <thead id="trade-head"></thead>
     <tbody id="trade"></tbody>
   </table></div>
   <p class="note" id="pairs"></p>
+  </div>
 
   <h2>System</h2>
   <div class="wrap"><table class="sys"><tbody id="system"></tbody></table></div>
@@ -142,7 +144,7 @@ html.embed,.embed body{overflow:hidden}
   </table></div>
   </div>
 
-  <div id="progs-box">
+  <div id="progs-box" hidden>
   <h2>Programs · JJ's way, sale prices of 23 Nov 2026</h2>
   <div class="wrap"><table>
     <thead><tr><th>Program</th><th>Price</th><th>Pass</th><th>Funded pays</th><th>Per eval bought</th><th>Per $1 paid</th><th>Per trade</th></tr></thead>
@@ -181,10 +183,12 @@ var FRR = 1;                                // a funded trade makes what it risk
                                             // payout seems to be like 1,400, maybe 1,300" on $1,333 of risk; his simulation "a 1:1")
 var PAIR_OPP = 0.4;                         // two legs of a pair finish on opposite sides 70% of the time (stocks vs QQQ, 2 years
                                             // hourly, 668 days) against 50% for two separate trades: 0.5 + 0.5 x 0.4
-var SHOW_PROGS = true;                      // the table of other programs (the owner, 23 Nov 2026: not on the Vest tab)
+var SHOW_PROGS = false;                     // the table of other programs (the owner, 23 Nov 2026: not on the Vest tab)
 var MARKET = 'NAS100', CLAIM = 'Request', FIRM_NAME = 'MFP';         // the firm's words for the market traded and for taking profit out
 var HOME = '';                              // the Perps tab is the MFP page alone (the owner: "remove vest and keep mfp only");
                                             // this file is what mfp.html is made from: opened as a page it goes there ('' = stay)
+var LEAN = true;                            // only what the 5ers tab has (the owner: "like 5ers using this system only"): no trade table,
+                                            // no comparison, no other programs, 10 seats at the pick's price
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
@@ -341,7 +345,7 @@ function vestClean(o){
   return p;
 }
 // ---------- VEST ENGINE END ----------
-if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, HOME: HOME, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
 if (typeof document !== 'undefined') (function(){
   'use strict';
   if (HOME) { location.replace(HOME); return; }
@@ -397,8 +401,18 @@ if (typeof document !== 'undefined') (function(){
       ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
       ['Limits', fmax + ' funded and ' + emax + ' evals at once']
     ];
+    // lean, JJ's way: the same system in six short lines
+    if (LEAN && !go) sys = [
+      ['Signal', 'Every G1 / V2 GO · one account a signal, funded ones first · one trade an account a day'],
+      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · stop ' + stop + ' points = ' + money(loss)],
+      ['Eval', 'Target ' + Math.round(ePts) + ' points = +' + money(eWin) + ', passed · ' + tries + (tries > 1 ? ' stops' : ' stop') + ' in the ' + money(s.d) + ' drawdown'],
+      ['Funded', 'Target ' + Math.round(fPts) + ' points = +' + money(fWin) + ' · ' + CLAIM.toLowerCase() + ' every win' + (s.minClaim ? ' of ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours'],
+      ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
+      ['Limits', fmax + ' funded and ' + emax + ' evals at once']
+    ];
     $('system').innerHTML = sys.filter(Boolean).map(function(r){ return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
-    $('progs-box').hidden = !SHOW_PROGS;
+    $('progs-box').hidden = LEAN || !SHOW_PROGS;
+    $('trade-box').hidden = LEAN;
     $('progs').innerHTML = BUILDS.map(function(b, i){
       var x = stats[i];
       return '<tr' + (b.pick ? ' class="pick"' : '') + '><td>' + b.name + '</td><td>' + money(b.price) + '</td><td>' + (x.pass * 100).toFixed(1) + '%</td><td>' + money(x.funded) + '</td><td class="' + (x.ev > 0 ? 'pos' : 'neg') + '">' + signed(x.ev) + '</td><td>$' + x.roi.toFixed(2) + '</td><td class="' + (x.perTrade > 0 ? 'pos' : 'neg') + '">' + signed(x.perTrade) + '</td></tr>';
@@ -437,7 +451,7 @@ if (typeof document !== 'undefined') (function(){
     $('pairs').hidden = !PAIRS;
     $('pairs').innerHTML = 'Wallet 99% in pairs <b>' + money(res.wallet) + '</b> · the same accounts traded one by one <b>' + money(single.wallet) + '</b>';
     drawChart(res.rows);
-    var alt = vestTwin(PICK);
+    var alt = LEAN ? null : vestTwin(PICK);
     $('cmp-box').hidden = !alt;
     if (alt) {
       var ap = vestPlan(alt, state, 0, RUNS, WEEKS), as = vestStat(alt), ms = stats[0];
