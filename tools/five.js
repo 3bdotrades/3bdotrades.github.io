@@ -53,7 +53,8 @@ const S = require('./share.js');
 const POST = 'https://ntfy.sh/' + S.TOPIC, BY = 'pcfeed01', QUIET_MS = 90 * 1000, SETTLE_MS = 5000, MAX_NEW = 10;
 // his record counts from 18 Nov 2026 (his word of 17 Nov: "my record start from zero from tommrow"); nothing older is taken
 const START = '2026-11-18T00:00:00.000+02:00';
-const SIZES = { '50': { list: 100, credit: 10, pay: 1158 }, '25': { list: 59, credit: 5, pay: 579 } };
+// since 23 Nov 2026 the5ers' new list prices, and a new eval is one of the new program ('E'; it passes into 'F'): index.html FIVE_NEW
+const SIZES = { '50': { list: 97, credit: 10, pay: 1158 }, '25': { list: 57, credit: 5, pay: 579 } };
 const DISC = 0.8, WAIT = 14, PAYS = 3, CR_MAX = 9999.99, PRE_DAYS = 30;
 const PLAN_RX = /Daytrade(F?)-(25|50)K/, PAY_RX = /^p([123]):(\d{4}-\d\d-\d\d)(?::(\d+(?:\.\d+)?))?$/;
 const cent2 = v => Math.round(v * 100) / 100;
@@ -119,6 +120,8 @@ function addLine(j, day, kind, n, a){
   j.push(day + ' ' + kind + ' ' + n + ' ' + cent2(a));
 }
 function swap(list, from, to){ const i = list.indexOf(from); if (i >= 0) list[i] = to; return i >= 0; }
+// a new-program account ('E' / 'F', with or without its numbers) to another stage
+function swapNew(list, from, to){ const i = list.findIndex(x => typeof x === 'string' && x.charAt(0) === from); if (i >= 0) list[i] = to; return i >= 0; }
 // the part's numbers with the happenings in; credits: false leaves the hub credits as they are
 function apply(five, list, credits){
   const f = S.cleanFive(five), count = { b: 0, s: 0, x: 0, w: 0, l: 0, known: 0 };
@@ -135,12 +138,12 @@ function apply(five, list, credits){
       const used = credits ? Math.min(cr, z.list) : 0;
       addLine(f.j, h.day, 'b' + h.k, 1, DISC * (z.list - used));
       if (credits) cr = cent2(cr - used + z.credit);
-      swap(acc, '', 'e');
+      swap(acc, '', 'E');
     }
-    else if (h.what === 's'){ addLine(f.j, h.day, 's' + h.k, 1, 0); if (credits) cr = cent2(cr + z.credit); swap(acc, 'e', 'f'); }
-    else if (h.what === 'x'){ addLine(f.j, h.day, 'x' + h.k, 1, 0); swap(acc, 'e', ''); }
+    else if (h.what === 's'){ addLine(f.j, h.day, 's' + h.k, 1, 0); if (credits) cr = cent2(cr + z.credit); if (!swapNew(acc, 'E', 'F')) swap(acc, 'e', 'f'); }
+    else if (h.what === 'x'){ addLine(f.j, h.day, 'x' + h.k, 1, 0); if (!swapNew(acc, 'E', '')) swap(acc, 'e', ''); }
     else if (h.what === 'w'){ addLine(f.j, h.day, 'w', 1, 0); swap(acc, 'f', 'p' + PAYS + ':' + addDays(h.day, WAIT)); }
-    else if (h.what === 'l'){ addLine(f.j, h.day, 'l', 1, 0); swap(acc, 'f', ''); }
+    else if (h.what === 'l'){ addLine(f.j, h.day, 'l', 1, 0); if (!swap(acc, 'f', '')) swapNew(acc, 'F', ''); }
   });
   if (cr > 0) f.cr = Math.min(CR_MAX, cr); else delete f.cr;
   if (list.length){ const last = list[list.length - 1].day; pre = pre.filter(x => x.slice(0, 10) >= addDays(last, -PRE_DAYS)); }

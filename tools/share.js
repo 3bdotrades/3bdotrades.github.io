@@ -32,7 +32,7 @@ const PRE_RX = /^\d{4}-\d\d-\d\d:(?:50|25)$/, PRE_MAX = 20;
 const CR_MAX = 9999.99, FED_RX = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$/;
 const cent2 = v => Math.round(v * 100) / 100;
 const FIVE_V = 4, FIVE_SIZES = [{ k: '50', pay: 1158 }, { k: '25', pay: 579 }], FIVE_MAX = 5;
-const ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
+const ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?|E(?::(-?\d{1,5})(?::([0-5]))?)?|F(?::(-?\d{1,5})(?::([0-5])(?::([0-4]))?)?)?)$/;
 const J_MAX = 100, J_RX = /^(\d{4}-\d\d-\d\d|-) (b50|b25|s50|s25|x50|x25|w|l|m|p|h) (\d{1,4}) (\d{1,7}(?:\.\d\d?)?)$/;
 const J_ORDER = ['b25', 'b50', 'm', 's25', 's50', 'x25', 'x50', 'w', 'l', 'p', 'h'], J_COUNTED = ['b50', 'b25', 's50', 's25', 'x50', 'x25', 'w', 'l'];
 const J_SEED = ['2026-11-17 b50 5 400', '2026-11-17 b25 3 141.6'];

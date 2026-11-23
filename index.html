@@ -919,7 +919,22 @@ function clone(o){ return JSON.parse(JSON.stringify(o)); }
 // go), the balance goes down by what was used and up by what a buy and a pass earn (fiveCost, fiveEarn), and the evals a run
 // buys today cost that much less (fivePlan).
 var FIVE_DISC = 0.8;
-var FIVE_SIZES = [{ k: '50', size: '50K', list: 100, credit: 10, price: 72, pay: 1158, risk: 2000, make: 3000, fmake: 4500 }, { k: '25', size: '25K', list: 59, credit: 5, price: 43.2, pay: 579, risk: 1000, make: 1500, fmake: 2250 }];
+// Since 23 Nov 2026 the list prices are the5ers' new ones, $97 and $57 (the owner: "$97 / $57, same discounts"); pass5 is how
+// often an eval of the new program passes at the backtest's rates (the plan's study of 23 Nov 2026), for the credits of its pass.
+var FIVE_SIZES = [{ k: '50', size: '50K', list: 97, credit: 10, price: 69.6, pay: 1158, risk: 2000, make: 3000, fmake: 4500, pass5: 0.305 }, { k: '25', size: '25K', list: 57, credit: 5, price: 41.6, pay: 579, risk: 1000, make: 1500, fmake: 2250, pass5: 0.285 }];
+// THE NEW PROGRAM (the5ers' rules of 22 Nov 2026; the owner, 23 Nov 2026: "5ers changed the rules so need to re optimize the
+// system for new rules", "New evals only"): every eval bought from now on, and the funded account it becomes, goes by them;
+// the funded accounts and payouts already here keep the plan of before. An eval needs 6% (goal) and 5 profitable days; a
+// funded account is paid when its profit stands at 4% (pgoal) with 5 new profitable days and no day above 40% of all its
+// profit, at most 5 times, each payout capped (caps, before the 80% split and the 3.5% fee: FIVE_CUT), 14 days apart.
+// The day plan (his bot's, tools/ba_days.py): one trade a day. An eval: the money still missing less one small day for each
+// profitable day still owed, in one day, then small days; a loser ends at the account's max loss (4%, trailing the best
+// day's end). A funded account: big days of 40% of the payout target until the rest fits the small days owed; a losing day
+// stops just inside the5ers' daily pause (stop) and the account goes on. A trade wins as often as its sizes say (what it
+// risks over risk plus gain, after FIVE_COST a contract of commission and slip), times the backtest's share of chance.
+var FIVE_NEW = { '50': { start: 50000, goal: 3000, pgoal: 2000, small: 160, big: 800, stop: 1240, nmax: 4, caps: [1250, 1500, 1500, 1750, 1750] },
+                 '25': { start: 25000, goal: 1500, pgoal: 1000, small: 110, big: 400, stop: 595, nmax: 2, caps: [750, 875, 1000, 1000, 1000] } };
+var FIVE_CUT = 0.8 * 0.965, FIVE_NDAYS = 5, FIVE_NPAYS = 5, FIVE_COST = 10, FIVE_NRUNS = 2000;
 var FIVE_MAX = 5, FIVE_WAIT = 14, FIVE_PAYS = 3;
 // The backtest, the plan's rates and chance (the owner, 20 Nov 2026: "My record show my real record and under it the rate of
 // the backtest and also wider like that 91 days and keep update going forward live like the Signals a day", in the dialog
@@ -950,7 +965,9 @@ var FIVE_MIN = 20, CR_MAX = 9999.99;
 // cap: the slots of each size, 0 to 5.
 // acc: the accounts held, five places a size: '' none, 'e' an eval, 'f' a funded account, 'p3:DATE', 'p2:DATE' or 'p1:DATE' a
 // funded win with three, two or one payouts still due (the owner, 17 Nov 2026: "due payout i need to add 3 payouts due"), the
-// next one on DATE; ':AMOUNT' after the day when its payouts are not the usual ones.
+// next one on DATE; ':AMOUNT' after the day when its payouts are not the usual ones. Since 23 Nov 2026 also the new program's:
+// 'E' an eval and 'F' a funded account under the5ers' rules of 22 Nov 2026 (FIVE_NEW), with, when known, ':USD' its profit
+// standing, ':DAYS' its profitable days (0 to 5) and for a funded account ':PAID' its payouts taken (0 to 4).
 // j: the journal, a line 'DATE KIND N AMOUNT' for everything done. DATE is a day, or '-' before the journal. KIND:
 //   b50 / b25   N evals of that size bought, AMOUNT what was paid for them (0 when it is paid in an 'm' line)
 //   m           AMOUNT paid for evals (with no count)
@@ -968,7 +985,7 @@ var FIVE_MIN = 20, CR_MAX = 9999.99;
 // button and a Bought line of the journal add them, taking that line out takes them back, and when the bot then sees a new
 // eval account of that size within 30 days (3 until 20 Nov 2026), tools/five.js takes one off instead of counting the purchase again (the
 // owner, 19 Nov 2026: "add to 5ers expense 40$", for an eval his bot had not seen yet).
-var FIVE_V = 4, ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?)$/;
+var FIVE_V = 4, ACC_RX = /^(?:e|f|p[123]:(\d{4}-\d\d-\d\d)(?::(\d{1,6}(?:\.\d\d?)?))?|E(?::(-?\d{1,5})(?::([0-5]))?)?|F(?::(-?\d{1,5})(?::([0-5])(?::([0-4]))?)?)?)$/;
 var PRE_RX = /^\d{4}-\d\d-\d\d:(?:50|25)$/, PRE_MAX = 20;
 function fivePre(f, day, k, n){ var a = Array.isArray(f.pre) ? f.pre : []; for (var i = 0; i < Math.min(n, PRE_MAX); i++) a.push(day + ':' + k); f.pre = a; }
 var FED_RX = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$/;
@@ -1657,6 +1674,73 @@ firmsEl.addEventListener('input', typed);
 // ---------- 5ers tab: one firm, its accounts, record and money typed here (rules: see FIVE_SIZES) ----------
 var accsEl = document.getElementById('accs'), ratesEl = document.getElementById('rates');
 function fiveZeros(n){ var a = new Array(n); for (var k = 0; k < n; k++) a[k] = 0; return a; }
+// ---- the new program's accounts (FIVE_NEW) ----
+// the backtest's share of chance, for an eval's trades and a funded account's (1 when the rates are chance)
+function fiveKap(p, q){ function k(a, b){ return Math.min(1.05, Math.max(0.85, b > 0 ? a / b : 1)); } return { e: k(p, FIVE_CHANCE), f: k(q, FIVE_FCHANCE) }; }
+// an account's state: k 'E' / 'F', usd its profit standing, peak the best day's end (the max loss trails it), days its
+// profitable days of this cycle, cum all its profit, best its best day, paid its payouts, since the day of its start or last payout
+function fiveFresh(k, day){ return { k: k, usd: 0, peak: 0, days: 0, cum: 0, best: 0, paid: 0, since: day }; }
+function fiveHeld(a, z){
+  var R = FIVE_NEW[z.k], s = fiveFresh(a.s, 0), got = 0;
+  s.usd = a.usd; s.days = Math.min(FIVE_NDAYS, Math.max(0, a.days)); s.paid = Math.min(FIVE_NPAYS - 1, Math.max(0, a.paid || 0)); s.peak = Math.max(0, a.usd);
+  for (var i = 0; i < s.paid; i++) got += R.caps[i];
+  s.cum = Math.max(0, a.usd) + got; s.best = Math.min(R.big, 0.4 * s.cum);
+  return s;
+}
+// One place's path under the new rules from trading day d on, to day H: put(day, amount, bought) gets every payout (+) and
+// every eval bought (-, bought 1). T: the first trading day from a day on; rnd: the run's random numbers; keep: when the
+// account ends a new eval takes its place on the next trading day and trades that day.
+function fiveChain(s, d, z, H, T, rnd, kap, keep, put){
+  var R = FIVE_NEW[z.k], guard = 0, owed, need, G, L, dead, n, c, p, w, day;
+  function end(at){ var nx = T(at + 1); if (!keep || nx > H) return false; put(nx, -z.price, 1); s = fiveFresh('E', nx); d = nx; return true; }
+  while (d <= H && guard++ < 5000){
+    owed = Math.max(FIVE_NDAYS - s.days, 0);
+    if (s.k === 'F'){
+      if (s.paid >= FIVE_NPAYS){ if (!end(d)) return; continue; }
+      if (s.usd >= R.pgoal && s.days >= FIVE_NDAYS && s.best <= 0.4 * s.cum + 1e-9){
+        day = Math.max(d, s.since + FIVE_WAIT); if (day > H) return;
+        w = Math.min(R.caps[s.paid], s.usd); put(day, FIVE_CUT * w, 0);
+        s.usd -= w; s.paid++; s.days = 0; s.peak = s.usd; s.since = day;
+        if (s.paid >= FIVE_NPAYS){ if (!end(day)) return; continue; }
+        d = T(day + 1); continue;
+      }
+      need = R.pgoal - s.usd;
+      G = need <= 0 ? R.small : Math.max(R.small, Math.min(R.big, need - Math.max(owed - 1, 0) * R.small));
+    } else {
+      need = R.goal - s.usd;
+      G = owed <= 1 ? Math.max(R.small, need) : Math.max(R.small, need - (owed - 1) * R.small);
+    }
+    L = s.usd - (s.peak - 0.04 * (R.start + s.peak)); dead = true;
+    if (s.k === 'F' && L > R.stop){ L = R.stop; dead = false; }
+    n = Math.max(1, Math.min(R.nmax, Math.ceil(G / 600))); c = FIVE_COST * n;
+    p = L > c ? (s.k === 'F' ? kap.f : kap.e) * (L - c) / ((L - c) + (G + c)) : 0;
+    if (rnd() < p){
+      s.usd += G; s.cum += G; s.days++; if (G > s.best) s.best = G; if (s.usd > s.peak) s.peak = s.usd;
+      if (s.k === 'E' && s.usd >= R.goal && s.days >= FIVE_NDAYS){ d = T(d + 1); s = fiveFresh('F', d); continue; }
+      d = T(d + 1);
+    } else {
+      s.usd -= L; s.cum -= L;
+      if (dead){ if (!end(d)) return; } else d = T(d + 1);
+    }
+  }
+}
+// The expected cash of one place under the new rules, days 0 to H: fiveChain played FIVE_NRUNS times (a fixed seed) and
+// averaged. spec: k 'N' a new eval bought on day b with its first trade on day d, or 'E' / 'F' an account held (fiveHeld)
+// with its next trade on day d. Kept by its inputs.
+var newMemo = {}, newMemoN = 0;
+function fiveNewFlow(spec, z, H, dow0, kap, keep){
+  var key = JSON.stringify([spec, z.k, z.price, H, dow0, kap, keep]), got = newMemo[key];
+  if (got) return got;
+  var out = fiveZeros(H + 1), inn = fiveZeros(H + 1), buy = fiveZeros(H + 1), rnd = fiveRng(20261123), R = FIVE_NRUNS;
+  function T(c){ var w = (dow0 + c) % 7; return w < 5 ? c : c + 7 - w; }
+  function put(day, amt, b){ if (day > H) return; if (amt < 0) out[day] -= amt / R; else inn[day] += amt / R; if (b) buy[day] += 1 / R; }
+  for (var r = 0; r < R; r++){
+    if (spec.k === 'N'){ put(spec.b, -z.price, 1); fiveChain(fiveFresh('E', spec.d), spec.d, z, H, T, rnd, kap, keep, put); }
+    else fiveChain(fiveHeld({ s: spec.k, usd: spec.usd, days: spec.days, paid: spec.paid }, z), spec.d, z, H, T, rnd, kap, keep, put);
+  }
+  if (++newMemoN > 400){ newMemo = {}; newMemoN = 0; }
+  return (newMemo[key] = { out: out, inn: inn, buy: buy });
+}
 // New York's clock now: its date and the minutes since its midnight (null where the browser cannot tell)
 function nyClock(d){
   try {
@@ -1683,15 +1767,19 @@ var FIVE_LATE = (function(){
 function fiveFlow(seats, p, q, z, H, dow0, late){
   var out = fiveZeros(H + 1), inn = fiveZeros(H + 1), buy = fiveZeros(H + 1);
   function T(c){ var w = (dow0 + c) % 7; return w < 5 ? c : c + 7 - w; }      // the first trading day from day c on
-  var b0 = T(0), t0 = late ? T(b0 + 1) : b0;
+  var b0 = T(0), t0 = late ? T(b0 + 1) : b0, kap = fiveKap(p, q);
+  // m places of the new program from day `from` on (K: their expected cash from the same weekday of the first week)
+  function addNew(K, from, m){ for (var c = 0; c + from <= H; c++){ out[c + from] += m * K.out[c]; inn[c + from] += m * K.inn[c]; buy[c + from] += m * K.buy[c]; } }
   seats.forEach(function(a){
     var E = fiveZeros(H + 1), F = fiveZeros(H + 1), G = fiveZeros(H + 1), c, k;
     function pay(c, m, amt){ if (c <= H) inn[c] += m * (amt > 0 ? amt : z.pay); }
-    function end(c, m){ var n = T(c + 1); if (!a.keep || n > H || !(m > 0)) return; out[n] += m * z.price; buy[n] += m; E[n] += m; }
+    // an account of before that ends: a new eval of the new program takes its place on the next trading day
+    function end(c, m){ var n = T(c + 1); if (!a.keep || n > H || !(m > 0)) return; addNew(fiveNewFlow({ k: 'N', b: n % 7, d: n % 7 }, z, H, dow0, kap, true), n - n % 7, m); }
+    if (a.s === 'n'){ if (b0 <= H) addNew(fiveNewFlow({ k: 'N', b: b0, d: t0 }, z, H, dow0, kap, true), 0, 1); return; }
+    if (a.s === 'E' || a.s === 'F'){ if (t0 <= H) addNew(fiveNewFlow({ k: a.s, d: t0, usd: a.usd, days: a.days, paid: a.paid }, z, H, dow0, kap, !!a.keep), 0, 1); return; }
     // a win on day c, or after a payout on day c: its payouts every FIVE_WAIT days from then, its next trade after the last
     function won(c, m){ for (var i = 1; i <= FIVE_PAYS; i++) pay(c + i * FIVE_WAIT, m); if (c + FIVE_PAYS * FIVE_WAIT <= H) G[c + FIVE_PAYS * FIVE_WAIT] += m; }
-    if (a.s === 'n'){ if (b0 <= H){ out[b0] += z.price; buy[b0] += 1; } if (t0 <= H) E[t0] += 1; }
-    else if (a.s === 'e'){ if (t0 <= H) E[t0] += 1; }
+    if (a.s === 'e'){ if (t0 <= H) E[t0] += 1; }
     else if (a.s === 'f'){ if (t0 <= H) F[t0] += 1; }
     else if (a.s === 'p'){
       var c1 = Math.max(0, Math.round(num(a.c, 0))), left = Math.min(FIVE_PAYS, Math.max(1, Math.round(num(a.left, 1)))), last = c1 + (left - 1) * FIVE_WAIT;
@@ -1711,8 +1799,16 @@ function fiveFlow(seats, p, q, z, H, dow0, late){
 // 10 × FIVE_PAYS + 1 to the next trade when it wins (31: its FIVE_PAYS payouts are 14 days, ten trading days, apart), and
 // 10 × FIVE_PAYS (30) more for every win after that). A win brings FIVE_PAYS payouts.
 function fiveDay(z, p, q){
-  var den = (1 - q) + p * ((1 - q) * (1 - q) + q * ((10 * FIVE_PAYS + 1) * (1 - q) + 1 + (10 * FIVE_PAYS - 1) * q));
-  return den > 0 ? (FIVE_PAYS * p * q * z.pay - z.price * (1 - q)) / den : 0;
+  // since 23 Nov 2026 a new place is the new program's: its expected cash over weeks 24-63 of a long run, a trading day
+  var H = 447, K = fiveNewFlow({ k: 'N', b: 0, d: 0 }, z, H, 0, fiveKap(p, q), true), s = 0;
+  for (var c = 168; c <= H; c++) s += K.inn[c] - K.out[c];
+  return s / (H - 167) * 7 / 5;
+}
+// what one eval of the new program is expected to be paid in all (no eval after it), over 64 weeks
+function fiveEvalPays(z, p, q){
+  var K = fiveNewFlow({ k: 'N', b: 0, d: 0 }, z, 447, 0, fiveKap(p, q), false), s = 0;
+  for (var c = 0; c <= 447; c++) s += K.inn[c];
+  return s;
 }
 // the two rates of a run: My record as the page shows it (a percentage to one decimal) once it has FIVE_MIN results of that
 // kind, the backtest until then (FIVE_REAL: 38.69% for the eval pass, 29.51% for the funded win on 19 Nov 2026)
@@ -1728,6 +1824,8 @@ function fiveSeats(z, i){
   state.five.acc[z.k].forEach(function(x){
     var m = ACC_RX.exec(x);
     if (x === 'e' || x === 'f') held.push({ s: x });
+    else if (m && x.charAt(0) === 'E') held.push({ s: 'E', usd: num(m[3], 0), days: num(m[4], 0), paid: 0 });
+    else if (m && x.charAt(0) === 'F') held.push({ s: 'F', usd: num(m[5], 0), days: num(m[6], 0), paid: num(m[7], 0) });
     else if (m) held.push({ s: 'p', left: +x.charAt(1), c: dayOffset(m[1]), amt: m[2] === undefined ? 0 : Number(m[2]) });
   });
   held.forEach(function(a, j){ a.keep = j < cap; });
@@ -1741,7 +1839,7 @@ function fivePlan(rr, weeks){
   var dow0 = (TODAY.getDay() + 6) % 7, H = 7 * weeks - dow0 - 1, rows = [], per = [], t, crLeft = Math.max(0, num(state.five.cr, 0)), b0 = dow0 < 5 ? 0 : 7 - dow0;
   for (t = 0; t < weeks; t++) rows.push({ t: t, out: 0, inn: 0 });
   FIVE_SIZES.forEach(function(z0, i){
-    var z = { k: z0.k, size: z0.size, price: fivePrice(z0, rr.pass), pay: z0.pay };
+    var z = { k: z0.k, size: z0.size, price: fivePrice(z0, z0.pass5), pay: z0.pay };
     var seats = fiveSeats(z0, i), f = fiveFlow(seats, rr.pass, rr.win, z, H, dow0, FIVE_LATE), pr = [], n = 0;
     seats.forEach(function(a){ if (a.s === 'n') n++; });
     var save = b0 <= H ? Math.min(FIVE_DISC * crLeft, n * z.price) : 0;
@@ -1765,11 +1863,11 @@ function fiveRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79
 // and sum (an array) gets each day's cash added up over the runs (for a check against the plan's own expected days)
 function fiveWallet(rr, weeks, runs, safe, sum){
   runs = runs || FIVE_RUNS; safe = safe || FIVE_SAFE;
-  var dow0 = (TODAY.getDay() + 6) % 7, H = 7 * weeks - 1, rnd = fiveRng(20261120), holes = [];
+  var dow0 = (TODAY.getDay() + 6) % 7, H = 7 * weeks - 1, rnd = fiveRng(20261120), holes = [], kap = fiveKap(rr.pass, rr.win);
   function T(c){ var w = (dow0 + c) % 7; return w < 5 ? c : c + 7 - w; }      // the first trading day from day c on
   var b0 = T(0), t0 = FIVE_LATE ? T(b0 + 1) : b0, crLeft = Math.max(0, num(state.five.cr, 0));
   var sizes = FIVE_SIZES.map(function(z0, i){
-    var z = { price: fivePrice(z0, rr.pass), pay: z0.pay }, seats = fiveSeats(z0, i), n = 0;
+    var z = { k: z0.k, price: fivePrice(z0, z0.pass5), pay: z0.pay }, seats = fiveSeats(z0, i), n = 0;
     seats.forEach(function(a){ if (a.s === 'n') n++; });
     // the hub credits held go into the evals bought today, the 50K first (as fivePlan)
     var save = b0 <= H ? Math.min(FIVE_DISC * crLeft, n * z.price) : 0; crLeft -= save / FIVE_DISC;
@@ -1789,9 +1887,12 @@ function fiveWallet(rr, weeks, runs, safe, sum){
     function buy(d){ if (d <= H) cash[d] -= z.price; }
     function pay(d, amt){ if (d <= H) cash[d] += amt > 0 ? amt : z.pay; }
     function won(c){ for (var i = 1; i <= FIVE_PAYS; i++) pay(c + i * FIVE_WAIT); return { d: c + FIVE_PAYS * FIVE_WAIT, k: 'g' }; }
-    function end(c){ if (!a.keep) return null; var n = T(c + 1); if (n > H) return null; buy(n); return { d: n, k: 'e' }; }
+    function put(d, amt){ if (d <= H) cash[d] += amt; }
+    // an account of before that ends: a new eval of the new program takes its place on the next trading day (fiveChain)
+    function end(c){ if (!a.keep) return null; var n = T(c + 1); if (n > H) return null; buy(n); fiveChain(fiveFresh('E', n), n, z, H, T, rnd, kap, true, put); return null; }
     var ev = null;
-    if (a.s === 'n'){ buy(b0); ev = { d: t0, k: 'e' }; }
+    if (a.s === 'n'){ buy(b0); fiveChain(fiveFresh('E', t0), t0, z, H, T, rnd, kap, true, put); }
+    else if (a.s === 'E' || a.s === 'F') fiveChain(fiveHeld(a, z), t0, z, H, T, rnd, kap, !!a.keep, put);
     else if (a.s === 'e') ev = { d: t0, k: 'e' };
     else if (a.s === 'f') ev = { d: t0, k: 'f' };
     else if (a.s === 'p'){
@@ -1835,15 +1936,22 @@ function fiveShow(rows, week){
 // places make a day in the long run (fiveDay), which is what a day with them empty does not make.
 function fiveWarn(z, rr, n, cols, cost){
   var day = n * fiveDay(z, rr.pass, rr.win); if (!(n > 0) || !(day >= 1)) return '';
-  var one = n === 1, when = BUY_DAY === 'today' ? 'today' : 'on ' + BUY_DAY, pay = rr.win < 1 ? n * rr.pass * FIVE_PAYS * z.pay * rr.win / (1 - rr.win) : 0;
+  var one = n === 1, when = BUY_DAY === 'today' ? 'today' : 'on ' + BUY_DAY, pay = n * fiveEvalPays(z, rr.pass, rr.win);
   return '<tr class="warn"><td colspan="' + cols + '"><div class="w" role="note">⚠ Buy ' + (one ? 'this one ' : 'these ' + n + ' ') + when + ': ' + price(cost) + (pay > 0 ? ' for ' + money(pay) + ' of expected payouts' : '') +
     '. Every day you wait, ' + (one ? 'this place makes' : 'these ' + n + ' places make') + ' nothing instead of ' + money(day) + '.</div></td></tr>';
 }
 function cents(v){ return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 // what evals cost, to the cent when it has cents ($47.20 for one 25K eval)
 function price(v){ return Math.abs(v - Math.round(v)) < 0.005 ? money(v) : cents(v); }
-function accStage(x){ return x === 'e' || x === 'f' ? x : x ? x.slice(0, 2) : ''; }
-var FIVE_STAGES = [['', 'Empty'], ['e', 'Eval'], ['f', 'Funded'], ['p3', '3 payouts due'], ['p2', '2 payouts due'], ['p1', '1 payout due']];
+// a new-program account's progress, when it is known: its profit of its target, its profitable days, its payouts taken
+function newSaid(st, m, z){
+  if (!m || (st !== 'E' && st !== 'F')) return '';
+  var usd = st === 'E' ? m[3] : m[5], days = st === 'E' ? m[4] : m[6], R = FIVE_NEW[z.k];
+  if (usd === undefined) return '';
+  return '<span class="num">' + signed(Number(usd)) + '</span><div class="due">of ' + money(st === 'E' ? R.goal : R.pgoal) + (days !== undefined ? ' · ' + days + ' of ' + FIVE_NDAYS + ' days' : '') + (st === 'F' && m[7] !== undefined ? ' · ' + m[7] + ' of ' + FIVE_NPAYS + ' payouts taken' : '') + '</div>';
+}
+function accStage(x){ return x === 'e' || x === 'f' ? x : x && (x.charAt(0) === 'E' || x.charAt(0) === 'F') ? x.charAt(0) : x ? x.slice(0, 2) : ''; }
+var FIVE_STAGES = [['', 'Empty'], ['e', 'Eval'], ['f', 'Funded'], ['E', 'Eval · new rules'], ['F', 'Funded · new rules'], ['p3', '3 payouts due'], ['p2', '2 payouts due'], ['p1', '1 payout due']];
 // the days the n payouts still due of a funded win come in as a run counts them (fiveFlow): the next one on its day s (today
 // when that day has passed) and each later one FIVE_WAIT days after the one before (the owner, 17 Nov 2026: "why 3 payouts
 // due not shown dates")
@@ -1888,7 +1996,7 @@ function buildAccs(){
         // locked: the stage as words, and for a funded win what each payout still due brings, how many, and their days
         var said = (FIVE_STAGES.filter(function(o){ return o[0] === st; })[0] || ['', 'Empty'])[1], left = st.charAt(0) === 'p' ? +st.charAt(1) : 0;
         body += '<tr><td>' + (j + 1) + '</td><td id="a' + z.k + '-' + j + '-v">' + (st ? said : quiet(said)) + '</td><td>' +
-          (left ? '<span class="num">' + price(m[2] === undefined ? z.pay : Number(m[2])) + (left > 1 ? ' × ' + left : '') + '</span><div class="due" id="u' + z.k + '-' + j + '">' + dueDays(m[1], left) + '</div>' : '') + '</td></tr>';
+          (left ? '<span class="num">' + price(m[2] === undefined ? z.pay : Number(m[2])) + (left > 1 ? ' × ' + left : '') + '</span><div class="due" id="u' + z.k + '-' + j + '">' + dueDays(m[1], left) + '</div>' : newSaid(st, m, z)) + '</td></tr>';
         continue;
       }
       body += '<tr><td>' + (j + 1) + '</td><td><select class="sel" id="a' + z.k + '-' + j + '" data-a="' + key + '" aria-label="Stage of ' + name + '">' +
@@ -2094,9 +2202,9 @@ function updateFive(){
     FIVE_SIZES.map(function(z, i){
       var p = res.per[i], inn = 0, out = 0, n = { e: 0, f: 0, p: 0 };
       p.rows.forEach(function(x){ inn += x.inn; out += x.out; });
-      p.seats.forEach(function(a){ if (n[a.s] !== undefined) n[a.s]++; });
+      p.seats.forEach(function(a){ var kk = a.s === 'E' ? 'e' : a.s === 'F' ? 'f' : a.s; if (n[kk] !== undefined) n[kk]++; });
       return '<tr><td>5ers ' + quiet(z.size) + '</td>' + (FIVE_LOCK ? '<td class="slots" id="f-cap-' + i + '-v">' + f.cap[i] + '</td>' : '<td class="slots"><input class="box s" type="number" inputmode="numeric" min="0" max="' + FIVE_MAX + '" step="1" value="' + f.cap[i] + '" id="f-cap-' + i + '" aria-label="Slots for ' + z.size + ' accounts" title="' + z.size + ' accounts at once: 0 to ' + FIVE_MAX + '"></td>') +
-        '<td id="c' + i + '-buy" title="An eval at ' + cents(p.z.price) + ': $' + z.list + ' less the hub credits of its buy ($' + z.credit + ') and of its pass ($' + z.credit + ', ' + (Math.round(1000 * rr.pass) / 10) + '% of the time), then 20% off">' + (p.buy > 0 ? '<b>' + p.buy + '</b> ' + quiet(price(p.cost)) : quiet('0')) + '</td><td id="c' + i + '-ev">' + count(n.e) + '</td><td id="c' + i + '-fu">' + count(n.f) + '</td><td id="c' + i + '-pa">' + count(n.p) + '</td>' +
+        '<td id="c' + i + '-buy" title="An eval at ' + cents(p.z.price) + ': $' + z.list + ' less the hub credits of its buy ($' + z.credit + ') and of its pass ($' + z.credit + ', ' + (Math.round(1000 * z.pass5) / 10) + '% of the time), then 20% off">' + (p.buy > 0 ? '<b>' + p.buy + '</b> ' + quiet(price(p.cost)) : quiet('0')) + '</td><td id="c' + i + '-ev">' + count(n.e) + '</td><td id="c' + i + '-fu">' + count(n.f) + '</td><td id="c' + i + '-pa">' + count(n.p) + '</td>' +
         '<td id="c' + i + '-w12">' + gain(inn - out) + '</td><td id="c' + i + '-run">' + gain(runs[i]) + quiet('/mo') + '</td></tr>' + fiveWarn(p.z, rr, p.buy, 8, p.cost);
     }).join('') + '</tbody></table>';
   if (back){ var box = document.getElementById(back); if (box && box.focus){ box.focus(); if (box.select) box.select(); } }
