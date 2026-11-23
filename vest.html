@@ -366,7 +366,8 @@ function vestFeed(o, size, price){
 }
 var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 75, paid: 0, recv: 0 };
 function vestClean(o){
-  var p = {}, lim = { seats: [2, 40], evals: [0, EVAL_MAX], funded: [0, FUNDED_MAX], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
+  var fm = BUILDS[0].fundedMax || FUNDED_MAX, em = BUILDS[0].evalMax || EVAL_MAX;      // the planned build's own limits
+  var p = {}, lim = { seats: [Math.min(2, fm), Math.min(40, Math.max(fm, FUNDED_MAX))], evals: [0, em], funded: [0, fm], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
   Object.keys(VEST_SEED).forEach(function(k){
     var raw = o ? o[k] : null, v = raw === null || raw === undefined || raw === '' ? NaN : Number(raw); if (!isFinite(v)) v = VEST_SEED[k];
     v = Math.min(lim[k][1], Math.max(lim[k][0], v));

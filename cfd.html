@@ -100,7 +100,7 @@ html.embed,.embed body{overflow:hidden}
 
   <div class="top">
     <div>
-      <h2>Tradeify FX · Classic 5K</h2>
+      <h2>Tradeify FX · Classic 50K</h2>
       <div class="wrap cells">
         <div class="cell"><span class="k">Buy now</span><span class="v" id="t-buy">–</span></div>
         <div class="cell"><span class="k" title="The deepest your own cash goes before claims cover it: in 99 of 100 plays of the plan, and on the average path">Cash needed</span><span class="v" id="t-need">–</span><span class="v" id="t-need2"></span></div>
@@ -122,11 +122,11 @@ html.embed,.embed body{overflow:hidden}
 
   <h2>Accounts</h2>
   <div class="wrap cells">
-    <div class="cell"><label for="i-evals">Evals open</label><input class="box" id="i-evals" type="number" min="0" max="60" step="1" inputmode="numeric"></div>
+    <div class="cell"><label for="i-evals">Evals open</label><input class="box" id="i-evals" type="number" min="0" max="6" step="1" inputmode="numeric"></div>
     <div class="cell"><label for="i-funded">Funded open</label><input class="box" id="i-funded" type="number" min="0" max="10" step="1" inputmode="numeric"></div>
     <div class="cell"><label for="i-paid">Paid $</label><input class="box" id="i-paid" type="number" min="0" step="0.01" inputmode="decimal"></div>
     <div class="cell"><label for="i-recv">Received $</label><input class="box" id="i-recv" type="number" min="0" step="0.01" inputmode="decimal"></div>
-    <div class="cell" hidden><label for="i-seats" title="Accounts traded each day, one trade each, Tradeify FX allows $300,000 at once: 60 of the 5K.">Seats</label><input class="box" id="i-seats" type="number" min="1" max="60" step="1" inputmode="numeric"></div>
+    <div class="cell" hidden><label for="i-seats" title="Accounts traded each day, one trade each, Tradeify FX allows $300,000 at once: 6 of the 50K.">Seats</label><input class="box" id="i-seats" type="number" min="1" max="6" step="1" inputmode="numeric"></div>
     <div class="cell" hidden><label for="i-price">Eval price $</label><input class="box" id="i-price" type="number" min="1" max="5000" step="1" inputmode="decimal"></div>
   </div>
 
@@ -169,8 +169,9 @@ html.embed,.embed body{overflow:hidden}
 // Tradeify FX (MT5), read on 23 Nov 2026 at help.tradeifyfx.co. Classic (2-Step): 5% then 10%, 3% daily loss from the
 // 22:00 UTC snapshot and 10% static max loss, both checked on live equity; no consistency rule; funded: the same limits,
 // no payout lock, 80%, a payout every 14 days from the first funded trade, $100 or more; no resets; indices 1:30 and
-// commission-free. List $55, $30 on the firm's page that day (the owner's screenshots). The owner, 23 Nov 2026: "make new
-// tab called cfd". Planned JJ's way like the Perps tab: one trade to each target, a 50-point stop, a funded trade 1:1.
+// commission-free. The owner, 23 Nov 2026: "make new tab called cfd", first on the 5K ($30 on the firm's page, list $55),
+// then "switch the cfd tab to 6 x 50K": list $419, taken at $229 (the 5K's 45% off; the 50K's own sale price was NOT read).
+// Planned JJ's way like the Perps tab: one trade to each target, a 50-point stop, a funded trade 1:1.
 // Taken, not read anywhere: the NAS100 spread, 1 point a round trip (feeSide), and $300,000 of accounts at once (a review
 // site's figure). A stop uses 90% of the day limit (dlKeep), because the limit is checked on live equity. The engine pays a
 // funded win at once; the firm pays every 14 days: what an account is worth is the same, the weeks' cash comes later.
@@ -196,7 +197,7 @@ var LEAN = true;                            // only what the 5ers tab has (the o
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
-  { name: 'Classic 5K · 5% + 10% · 10% · 3% · 80%', size: 5000, dd: 0.10, dl: 0.03, dlKeep: 0.90, tg: [0.05, 0.10], split: 0.80, price: 30, tries: 1, pick: true, feeSide: 0.5 / 26000, maxLev: 30, minClaim: 100, fundedMax: 60, evalMax: 60, twin: { go: true, tries: 2, stat: [0.1934, 346.8, 15.63] }, stat: [0.3236, 362.1, 10.2] }
+  { name: 'Classic 50K · 5% + 10% · 10% · 3% · 80%', size: 50000, dd: 0.10, dl: 0.03, dlKeep: 0.90, tg: [0.05, 0.10], split: 0.80, price: 229, tries: 1, pick: true, feeSide: 0.5 / 26000, maxLev: 30, minClaim: 100, fundedMax: 6, evalMax: 6, twin: { go: true, tries: 2, stat: [0.1934, 3476, 15.61] }, stat: [0.3236, 3624, 10.16] }
 ];
 function vestRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 // stat: one account bought and played to its end, 4,000,000 times by vestBuild (how often it passes, what a funded one pays
@@ -349,9 +350,10 @@ function vestFeed(o, size, price){
   if (!ok) return null;
   return { evals: out.evals, funded: out.funded, paid: Math.round(out.bought * price * 100) / 100, at: o.at };
 }
-var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 30, paid: 0, recv: 0 };
+var VEST_SEED = { seats: 6, evals: 0, funded: 0, price: 229, paid: 0, recv: 0 };
 function vestClean(o){
-  var p = {}, lim = { seats: [2, 40], evals: [0, EVAL_MAX], funded: [0, FUNDED_MAX], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
+  var fm = BUILDS[0].fundedMax || FUNDED_MAX, em = BUILDS[0].evalMax || EVAL_MAX;      // the planned build's own limits
+  var p = {}, lim = { seats: [Math.min(2, fm), Math.min(40, Math.max(fm, FUNDED_MAX))], evals: [0, em], funded: [0, fm], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
   Object.keys(VEST_SEED).forEach(function(k){
     var raw = o ? o[k] : null, v = raw === null || raw === undefined || raw === '' ? NaN : Number(raw); if (!isFinite(v)) v = VEST_SEED[k];
     v = Math.min(lim[k][1], Math.max(lim[k][0], v));
@@ -365,7 +367,7 @@ if (typeof document !== 'undefined') (function(){
   'use strict';
   if (HOME) { location.replace(HOME); return; }
   function tell(){}
-  var STORE = 'funded-slots-roadmap-cfd-5k', state;
+  var STORE = 'funded-slots-roadmap-cfd-50k', state;
   try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
   function $(id){ return document.getElementById(id); }
   function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
