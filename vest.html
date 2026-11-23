@@ -95,7 +95,7 @@ html.embed,.embed body{overflow:hidden}
 <body>
 <main>
   <h1 class="sr">Funded Slots Roadmap: Vest</h1>
-  <nav class="tabs" aria-label="Fleet"><a class="tab" href="./?fleet=g1">G1</a><a class="tab" href="./?fleet=v2">V2 fleet</a><a class="tab" href="./?fleet=5ers">5ers</a><a class="tab" href="mfp.html" aria-current="page">Perps</a></nav>
+  <nav class="tabs" aria-label="Fleet"><a class="tab" href="./?fleet=g1">G1</a><a class="tab" href="./?fleet=v2">V2 fleet</a><a class="tab" href="./?fleet=5ers">5ers</a><a class="tab" href="mfp.html" aria-current="page">Perps</a><a class="tab" href="cfd.html">CFD</a></nav>
   <div id="one">
 
   <div class="top">
@@ -202,7 +202,8 @@ var FRR = 1;                                // a funded trade makes what it risk
 var PAIR_OPP = 0.4;                         // two legs of a pair finish on opposite sides 70% of the time (stocks vs QQQ, 2 years
                                             // hourly, 668 days) against 50% for two separate trades: 0.5 + 0.5 x 0.4
 var SHOW_PROGS = false;                     // the table of other programs (the owner, 23 Nov 2026: not on the Vest tab)
-var MARKET = 'NQ', CLAIM = 'Claim', FIRM_NAME = 'Vest';         // the firm's words for the market traded and for taking profit out
+var MARKET = 'NQ', CLAIM = 'Claim', FIRM_NAME = 'Vest';
+var PAYS = '';                              // a firm that pays on a schedule: the words for it (else a claim on every win)         // the firm's words for the market traded and for taking profit out
 var HOME = 'mfp.html';                      // the Perps tab is the MFP page alone (the owner: "remove vest and keep mfp only");
                                             // this file is what mfp.html is made from: opened as a page it goes there ('' = stay)
 var LEAN = true;                            // only what the 5ers tab has (the owner: "like 5ers using this system only"): no trade table,
@@ -232,13 +233,13 @@ function vestSpec(b, stop){
   var d = b.dd * b.size, risk = d / (b.tries || TRIES);       // a build's own number of stops in the drawdown, else 3
   if (b.go) {                                  // our GOs' brackets: a third of the drawdown on the 25-point stop
     var un = risk / GO.stop, feePts = NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, loss = GO.stop + GO.slip + feePts;
-    if (b.dl) un = Math.min(un, b.dl * b.size * 0.97 / loss);          // a stop stays inside the day's loss limit
+    if (b.dl) un = Math.min(un, b.dl * b.size * (b.dlKeep || 0.97) / loss);          // a stop stays inside the day's loss limit
     if (b.maxLev) un = Math.min(un, b.maxLev * b.size / NQ_PX);        // and the position inside the firm's leverage
     return { go: true, d: d, risk: risk, units: un, fee: 0, feePts: feePts, cap: un * loss, eWin: un * (GO.evalWin - feePts), eLoss: un * loss,
       fWin: un * (GO.fundedWin - feePts), fLoss: un * loss, minClaim: b.minClaim || 0, lock: !!b.lock,
       targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
   }
-  if (b.dl) risk = Math.min(risk, b.dl * b.size * 0.97);       // a stop and its fee stay inside the day's loss limit
+  if (b.dl) risk = Math.min(risk, b.dl * b.size * (b.dlKeep || 0.97));       // a stop and its fee stay inside the day's loss limit
   return { d: d, risk: risk, fee: risk / (stop || STOP) * NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, minClaim: b.minClaim || 0, lock: !!b.lock,
     targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
 }
@@ -434,8 +435,8 @@ if (typeof document !== 'undefined') (function(){
     if (LEAN && !go) sys = [
       ['Signal', 'Every G1 / V2 GO · one account a signal, funded ones first · one trade an account a day'],
       ['Size', units.toFixed(2) + ' ' + MARKET + ' units · stop ' + stop + ' points = ' + money(loss)],
-      ['Eval', 'Target ' + Math.round(ePts) + ' points = +' + money(eWin) + ', passed · ' + tries + (tries > 1 ? ' stops' : ' stop') + ' in the ' + money(s.d) + ' drawdown'],
-      ['Funded', 'Target ' + Math.round(fPts) + ' points = +' + money(fWin) + ' · ' + CLAIM.toLowerCase() + ' every win' + (s.minClaim ? ' of ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours'],
+      ['Eval', s.targets.map(function(t, i){ return (s.targets.length > 1 ? 'Step ' + (i + 1) + ': target ' : 'Target ') + Math.round((t + s.fee) / units) + ' points = +' + money(t); }).join(' · ') + ', passed · ' + tries + (tries > 1 ? ' stops' : ' stop') + ' in the ' + money(s.d) + ' drawdown'],
+      ['Funded', 'Target ' + Math.round(fPts) + ' points = +' + money(fWin) + ' · ' + (PAYS || CLAIM.toLowerCase() + ' every win' + (s.minClaim ? ' of ' + money(s.minClaim) + ' or more' : '')) + ' · ' + Math.round(b.split * 100) + '% is yours'],
       ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
       ['Limits', fmax + ' funded and ' + emax + ' evals at once']
     ];

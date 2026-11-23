@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%23171b21%22/%3E%3Cpath d=%22M7 22l6-6 4 4 8-9%22 stroke=%22%236c9cf0%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<title>Funded Slots Roadmap · CFD</title>
+<style>
+/* The Vest tab of the Funded Slots Roadmap: the same look as index.html, a page of its own so the other tabs' code stays as it is. */
+:root{
+  color-scheme:dark;
+  --bg:#0f1216; --card:#171b21; --row:#1c2128; --ink:#e6e9ed; --mute:#8b949e; --line:#262c35;
+  --accent:#6c9cf0; --pos:#4cc27f; --neg:#ef6b5e;
+  --in:#199e70; --out:#d95926; --net:#3987e5; --warn:#e3b341;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,"Segoe UI",sans-serif}
+main{max-width:1180px;margin:0 auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .mute{color:var(--mute)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tab{padding:8px 16px;border-bottom:2px solid transparent;color:var(--mute);text-decoration:none}
+.tab:hover{color:var(--ink)}
+.tab[aria-current="page"]{color:var(--ink);border-color:var(--accent);font-weight:600}
+.note{color:var(--mute);font-size:13px;margin:8px 2px 0}
+.note b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+h2{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;align-items:baseline;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:22px 0 8px;font-weight:600}
+.wrap{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+.top{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:0 14px}
+.top>div{display:flex;flex-direction:column;min-width:0}
+.top .wrap{flex:1}
+.cells{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.cells.six{grid-template-columns:repeat(6,minmax(0,1fr))}
+.cell{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:10px 12px;min-width:0}
+.cell+.cell{border-left:1px solid var(--line)}
+.cell .k,.cell label{font-size:12px;font-weight:600;color:var(--mute)}
+.cell .v{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;font-size:20px;font-weight:600;line-height:1.3;font-variant-numeric:tabular-nums}
+.cell .v small{font-size:13px;font-weight:400;color:var(--mute)}
+.box{width:100%;max-width:6.8em;font:600 20px/1.3 system-ui,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:0 6px;text-align:right;-moz-appearance:textfield;appearance:textfield}
+.box::-webkit-outer-spin-button,.box::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.box:hover{border-color:var(--mute)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 12px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0}
+thead th{font-size:12px;color:var(--mute);font-weight:600;border-bottom:1px solid var(--line);background:var(--row)}
+tbody td:first-child{background:var(--card)}
+tbody tr+tr td{border-top:1px solid var(--line)}
+tbody tr:hover td{background:var(--row)}
+tr.pick td:first-child{color:var(--accent);font-weight:600}
+.sys td{text-align:left;white-space:normal}
+.sys td:first-child{width:9.5em;color:var(--mute);white-space:nowrap}
+.legend{display:inline-flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.legend i.line{width:14px;height:2px;border-radius:1px;vertical-align:3px}
+.chartcard{padding:12px 12px 6px}
+.chartbox svg{display:block;width:100%;height:auto;overflow:visible}
+.chartbox{position:relative;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--row);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,.35);min-width:190px;z-index:2}
+.tip .h{font-weight:600;margin-bottom:4px}
+.tip .r{display:flex;justify-content:space-between;gap:16px}
+.tip .r span:first-child{color:var(--mute)}
+.tip i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.chartbox text{font-size:11.5px;fill:var(--mute);font-variant-numeric:tabular-nums}
+/* the two firms side by side, each this page for one firm in a frame of its own */
+main.wide{max-width:1560px}
+.profiles{margin-top:22px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.profiles iframe{display:block;width:100%;height:1500px;border:0;background:var(--bg);color-scheme:dark}
+.embed main{max-width:none;padding:0;display:flow-root}
+html.embed,.embed body{overflow:hidden}
+.embed .tabs{display:none}
+.embed .top{grid-template-columns:minmax(0,1fr)}
+.embed h2:first-child{margin-top:0}
+@media (max-width:900px){ .profiles{grid-template-columns:minmax(0,1fr);gap:22px 0} }
+@media (max-width:1040px){ .top{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:700px){
+  .cells.six{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cells.six .cell:nth-child(4){border-left:0}
+  .cells.six .cell:nth-child(n+4){border-top:1px solid var(--line)}
+}
+@media (max-width:560px){
+  .cells{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cells:not(.six) .cell:nth-child(3){border-left:0}
+  .cells:not(.six) .cell:nth-child(n+3){border-top:1px solid var(--line)}
+  .cells.six{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cells.six .cell:nth-child(4){border-left:1px solid var(--line)}
+  .cells.six .cell:nth-child(odd){border-left:0}
+  .cells.six .cell:nth-child(n+3){border-top:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<main>
+  <h1 class="sr">Funded Slots Roadmap: Tradeify FX</h1>
+  <nav class="tabs" aria-label="Fleet"><a class="tab" href="./?fleet=g1">G1</a><a class="tab" href="./?fleet=v2">V2 fleet</a><a class="tab" href="./?fleet=5ers">5ers</a><a class="tab" href="mfp.html">Perps</a><a class="tab" href="cfd.html" aria-current="page">CFD</a></nav>
+  <div id="one">
+
+  <div class="top">
+    <div>
+      <h2>Tradeify FX · Classic 5K</h2>
+      <div class="wrap cells">
+        <div class="cell"><span class="k">Buy now</span><span class="v" id="t-buy">–</span></div>
+        <div class="cell"><span class="k" title="The deepest your own cash goes before claims cover it: in 99 of 100 plays of the plan, and on the average path">Cash needed</span><span class="v" id="t-need">–</span><span class="v" id="t-need2"></span></div>
+        <div class="cell"><span class="k">Net after 48 weeks</span><span class="v" id="t-net">–</span></div>
+        <div class="cell"><span class="k">Once running</span><span class="v" id="t-run">–</span></div>
+      </div>
+    </div>
+    <div>
+      <h2 id="rates-h"></h2>
+      <div class="wrap cells">
+        <div class="cell"><span class="k">Eval pass</span><span class="v"><span id="r-pass">–</span><small>%</small></span></div>
+        <div class="cell"><span class="k" title="What a funded account pays you before it is lost">Funded pays</span><span class="v" id="r-fund">–</span></div>
+        <div class="cell"><span class="k">Per eval bought</span><span class="v" id="r-ev">–</span></div>
+        <div class="cell"><span class="k">Per $1 paid</span><span class="v" id="r-roi">–</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="note" id="money"></p>
+
+  <h2>Accounts</h2>
+  <div class="wrap cells">
+    <div class="cell"><label for="i-evals">Evals open</label><input class="box" id="i-evals" type="number" min="0" max="60" step="1" inputmode="numeric"></div>
+    <div class="cell"><label for="i-funded">Funded open</label><input class="box" id="i-funded" type="number" min="0" max="10" step="1" inputmode="numeric"></div>
+    <div class="cell"><label for="i-paid">Paid $</label><input class="box" id="i-paid" type="number" min="0" step="0.01" inputmode="decimal"></div>
+    <div class="cell"><label for="i-recv">Received $</label><input class="box" id="i-recv" type="number" min="0" step="0.01" inputmode="decimal"></div>
+    <div class="cell" hidden><label for="i-seats" title="Accounts traded each day, one trade each, Tradeify FX allows $300,000 at once: 60 of the 5K.">Seats</label><input class="box" id="i-seats" type="number" min="1" max="60" step="1" inputmode="numeric"></div>
+    <div class="cell" hidden><label for="i-price">Eval price $</label><input class="box" id="i-price" type="number" min="1" max="5000" step="1" inputmode="decimal"></div>
+  </div>
+
+  <div id="trade-box" hidden>
+  <h2 id="trade-h"></h2>
+  <div class="wrap"><table>
+    <thead id="trade-head"></thead>
+    <tbody id="trade"></tbody>
+  </table></div>
+  <p class="note" id="pairs"></p>
+  </div>
+
+  <h2>System</h2>
+  <div class="wrap"><table class="sys"><tbody id="system"></tbody></table></div>
+
+  <div id="cmp-box" hidden>
+  <h2>Our signals · JJ's way</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>This account</th><th>Eval pass</th><th>Funded pays</th><th>Per eval bought</th><th>Per $1 paid</th><th title="The deepest your own cash goes in 99 of 100 plays of the plan">Wallet 99%</th><th>Once running</th></tr></thead>
+    <tbody id="cmp"></tbody>
+  </table></div>
+  </div>
+
+  <div id="progs-box" hidden>
+  <h2>Programs</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>Program</th><th>Price</th><th>Pass</th><th>Funded pays</th><th>Per eval bought</th><th>Per $1 paid</th><th>Per trade</th></tr></thead>
+    <tbody id="progs"></tbody>
+  </table></div>
+  </div>
+
+  <h2><span>Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span></span></h2>
+  <div class="wrap chartcard"><div class="chartbox" id="chart" role="img" aria-label="Weekly claims in, evals out and the running total"></div></div>
+  </div>
+</main>
+
+<script>
+// ---------- VEST ENGINE START ----------
+// This page is made from vest.html by D:\projects\vest-capital\study\make_cfd.py: change the engine there, then run it again.
+// Tradeify FX (MT5), read on 23 Nov 2026 at help.tradeifyfx.co. Classic (2-Step): 5% then 10%, 3% daily loss from the
+// 22:00 UTC snapshot and 10% static max loss, both checked on live equity; no consistency rule; funded: the same limits,
+// no payout lock, 80%, a payout every 14 days from the first funded trade, $100 or more; no resets; indices 1:30 and
+// commission-free. List $55, $30 on the firm's page that day (the owner's screenshots). The owner, 23 Nov 2026: "make new
+// tab called cfd". Planned JJ's way like the Perps tab: one trade to each target, a 50-point stop, a funded trade 1:1.
+// Taken, not read anywhere: the NAS100 spread, 1 point a round trip (feeSide), and $300,000 of accounts at once (a review
+// site's figure). A stop uses 90% of the day limit (dlKeep), because the limit is checked on live equity. The engine pays a
+// funded win at once; the firm pays every 14 days: what an account is worth is the same, the weeks' cash comes later.
+// GO: the real G1 + V2 trades of 13 Jul - 20 Nov 2026 taken none at the same time (study\go_rates.py on
+// simulation_data\cme.json: 2,053 trades on the eval bracket, 22.3 a day, and 1,817 on the funded one), 25-point stop,
+// 38.25 target on an eval and 57 on a funded account. How often they won (a coin would win 39.53% / 30.49%) and the points
+// a win made and a stop cost BEFORE any fee (a stop has its slip in); the fee is the firm's rate both ways at today's price.
+var GO = { stop: 25, slip: 0.241, evalTarget: 38.25, fundedTarget: 57, evalWin: 38.188, fundedWin: 56.573, evalP: 0.3892, fundedP: 0.3038 };
+var NQ_PX = 26000, FEE_SIDE = 0.000025;     // NQ near 25,950 on 20 Nov 2026; the fee is on the position's size
+var STOP = 50;                              // points; a tighter stop is a bigger position and so a bigger fee
+var TRIES = 3;                              // full stops in the drawdown: on the 5K, $400 / 3 = $133 a trade (under the $150 day limit)
+var FRR = 1;                                // a funded trade makes what it risks and every win is claimed: JJ's own ("my average
+                                            // payout seems to be like 1,400, maybe 1,300" on $1,333 of risk; his simulation "a 1:1")
+var PAIR_OPP = 0.4;                         // two legs of a pair finish on opposite sides 70% of the time (stocks vs QQQ, 2 years
+                                            // hourly, 668 days) against 50% for two separate trades: 0.5 + 0.5 x 0.4
+var SHOW_PROGS = false;                     // the table of other programs (the owner, 23 Nov 2026: not on the Vest tab)
+var MARKET = 'NAS100', CLAIM = 'Request', FIRM_NAME = 'Tradeify FX';
+var PAYS = 'a payout every 14 days, $100 or more';                              // a firm that pays on a schedule: the words for it (else a claim on every win)         // the firm's words for the market traded and for taking profit out
+var HOME = '';                              // the Perps tab is the MFP page alone (the owner: "remove vest and keep mfp only");
+                                            // this file is what mfp.html is made from: opened as a page it goes there ('' = stay)
+var LEAN = true;                            // only what the 5ers tab has (the owner: "like 5ers using this system only"): no trade table,
+                                            // no comparison, no other programs, 10 seats at the pick's price
+var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
+var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
+var BUILDS = [
+  { name: 'Classic 5K · 5% + 10% · 10% · 3% · 80%', size: 5000, dd: 0.10, dl: 0.03, dlKeep: 0.90, tg: [0.05, 0.10], split: 0.80, price: 30, tries: 1, pick: true, feeSide: 0.5 / 26000, maxLev: 30, minClaim: 100, fundedMax: 60, evalMax: 60, twin: { go: true, tries: 2, stat: [0.1934, 346.8, 15.63] }, stat: [0.3236, 362.1, 10.2] }
+];
+function vestRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+// stat: one account bought and played to its end, 4,000,000 times by vestBuild (how often it passes, what a funded one pays
+// before it is lost, trades taken); kept as numbers so every visit shows the same figures. The kit re-plays them (t50_vest.js).
+function vestStat(b){
+  var x = b.stat, ev = x[0] * x[1] - b.price;
+  return { spec: vestSpec(b), pass: x[0], funded: x[1], ev: ev, roi: x[0] * x[1] / b.price, trades: x[2], perTrade: ev / x[2] };
+}
+// A build's twin: the same account traded the other way (our signals' own brackets when go, JJ's way when not: one trade
+// to the target on the 50-point stop, a funded trade 1:1), with its own number of stops and kept figures, for the
+// comparison the owner asked for ("lets compare jj vs g1 with v2 mixeed").
+// JJ's way takes its entries from our signals too (the owner: "jj way use our signals?"): at his brackets they win like a
+// coin, so the coin-flip odds stand for them. study\jj_signals.py, 12 Jul - 10 Nov 2026, G1 + V2 none at the same time,
+// before fees: stop 50 / target 50 won 50.04% of 1,387 (a coin 50%), stop 50 / target 172.3 won 22.70% of 740 (22.49%).
+var JJ_GO = 'Every G1 / V2 GO for the entry · at these brackets they won like a coin: 50.0% at 50 / 50 and 22.7% at 50 / 172 (a coin 50.0% and 22.5%)';
+function vestTwin(b){ return b.twin ? Object.assign({}, b, { go: b.twin.go, tries: b.twin.tries, stat: b.twin.stat, twin: null }) : null; }
+// a build as the trades see it
+function vestSpec(b, stop){
+  var d = b.dd * b.size, risk = d / (b.tries || TRIES);       // a build's own number of stops in the drawdown, else 3
+  if (b.go) {                                  // our GOs' brackets: a third of the drawdown on the 25-point stop
+    var un = risk / GO.stop, feePts = NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, loss = GO.stop + GO.slip + feePts;
+    if (b.dl) un = Math.min(un, b.dl * b.size * (b.dlKeep || 0.97) / loss);          // a stop stays inside the day's loss limit
+    if (b.maxLev) un = Math.min(un, b.maxLev * b.size / NQ_PX);        // and the position inside the firm's leverage
+    return { go: true, d: d, risk: risk, units: un, fee: 0, feePts: feePts, cap: un * loss, eWin: un * (GO.evalWin - feePts), eLoss: un * loss,
+      fWin: un * (GO.fundedWin - feePts), fLoss: un * loss, minClaim: b.minClaim || 0, lock: !!b.lock,
+      targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
+  }
+  if (b.dl) risk = Math.min(risk, b.dl * b.size * (b.dlKeep || 0.97));       // a stop and its fee stay inside the day's loss limit
+  return { d: d, risk: risk, fee: risk / (stop || STOP) * NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, minClaim: b.minClaim || 0, lock: !!b.lock,
+    targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
+}
+function vestNew(s, funded){ return { stage: funded || !s.targets.length ? -1 : 0, room: s.d, gain: 0, dead: false, wait: false }; }
+// One trade of account a on the uniform draw u (a win when u is under its chance). Returns the cash a claim pays.
+// An eval stage is one trade to its target from wherever it stands (the videos' way), at fair odds for its size; a stop
+// never goes past the floor. A funded account claims its whole profit whenever a trade leaves it ahead (Vest has no minimum).
+// With our GOs' brackets (s.go) a trade wins or loses its average real size at its real rate; an eval trades on until its
+// target or its floor; a trade is cut to the room left.
+function vestStep(a, s, u){
+  if (s.go) {
+    if (a.room < s.cap * 0.02) { a.dead = true; return 0; }
+    var sc = Math.min(1, a.room / s.cap), g, out = 0;
+    if (a.stage >= 0) {
+      g = (u < GO.evalP ? s.eWin : -s.eLoss) * sc;
+      a.room += g; a.gain += g;
+      if (a.gain >= s.targets[a.stage] - 1e-9) { a.stage = a.stage + 1 < s.targets.length ? a.stage + 1 : -1; a.room = s.d; a.gain = 0; if (a.stage < 0) a.wait = true; }
+      else if (a.room < s.cap * 0.02) a.dead = true;
+      return 0;
+    }
+    g = (u < GO.fundedP ? s.fWin : -s.fLoss) * sc;
+    a.room += g; a.gain += g;
+    // a claim takes the whole profit once it is at least the firm's minimum; where the floor locks to the starting balance
+    // on the first withdrawal (s.lock) the account has no room left after it, so it ends there
+    if (a.gain > 1e-9 && a.gain >= s.minClaim - 1e-9) { out = s.split * a.gain; a.room -= a.gain; a.gain = 0; if (s.lock) a.dead = true; }
+    if (a.room < s.cap * 0.02) a.dead = true;
+    return out;
+  }
+  var r = Math.min(s.risk, a.room - s.fee);
+  if (!(r > 1e-9)) { a.dead = true; return 0; }
+  if (a.stage >= 0) {
+    var T = s.targets[a.stage], win = T - a.gain + s.fee, p = r / (r + win);
+    var d = (u < p ? win : -r) - s.fee;
+    a.room += d; a.gain += d;
+    if (a.gain >= T - 1e-6) { a.stage = a.stage + 1 < s.targets.length ? a.stage + 1 : -1; a.room = s.d; a.gain = 0; if (a.stage < 0) a.wait = true; }
+    else if (a.room <= s.fee + 1e-9) a.dead = true;
+    return 0;
+  }
+  var e = (u < 1 / (1 + FRR) ? FRR * r : -r) - s.fee, pay = 0;
+  a.room += e; a.gain += e;
+  if (a.gain > 1e-6 && a.gain >= s.minClaim - 1e-9) { pay = s.split * a.gain; a.room -= a.gain; a.gain = 0; if (s.lock) a.dead = true; }
+  if (a.room <= s.fee + 1e-9) a.dead = true;
+  return pay;
+}
+// One account bought, played to its end, n times: how often it passes, what it pays, how many trades it takes.
+function vestBuild(b, n, stop){
+  var s = vestSpec(b, stop), rnd = vestRng(SEED), pass = 0, paid = 0, trades = 0;
+  for (var i = 0; i < n; i++) {
+    var a = vestNew(s), funded = a.stage < 0;
+    for (var k = 0; k < 5000 && !a.dead; k++) {
+      paid += vestStep(a, s, rnd()); trades++;
+      if (a.stage < 0 && !funded) { funded = true; a.wait = false; }
+    }
+    if (funded) pass++;
+  }
+  var chance = pass / n, fund = pass ? paid / pass : 0;
+  return { spec: s, pass: chance, funded: fund, ev: chance * fund - b.price, roi: chance * fund / b.price, trades: trades / n, perTrade: (chance * fund - b.price) / (trades / n) };
+}
+// The plan: `seats` accounts, one trade each a trading day, in pairs (funded accounts first). An account that ends is
+// replaced by a new eval the next trading day; a passed eval is funded the next trading day while fewer than 10 are; a
+// claim is credited the next trading day. Played `runs` times from today's accounts.
+function vestPlan(b, st, opp, runs, weeks){
+  var s = vestSpec(b), rnd = vestRng(SEED), H = weeks * DAYS, price = st.price;
+  var FMAX = b.fundedMax || FUNDED_MAX, EMAX = b.evalMax || EVAL_MAX;      // how many funded accounts and evals the firm lets this build hold at once
+  var seats = Math.max(1, Math.min(EMAX + FMAX, Math.round(st.seats)));
+  var f0 = Math.max(0, Math.min(FMAX, Math.round(st.funded))), e0 = Math.max(0, Math.min(EMAX, Math.round(st.evals)));
+  var buy0 = Math.max(0, seats - f0 - e0);
+  var inW = new Array(weeks).fill(0), outW = new Array(weeks).fill(0), cumD = new Array(H).fill(0), holes = new Array(runs), nets = 0;
+  var N = Math.max(seats, f0 + e0), first = s.targets.length ? 0 : -1, acc = [];
+  for (var z = 0; z < N; z++) acc.push({ stage: 0, room: 0, gain: 0, dead: true, wait: false });
+  for (var run = 0; run < runs; run++) {
+    // the accounts sit in fixed places; a place whose account ended is empty (dead) until a new eval is bought into it
+    var i, a, cash = 0, low = 0, due = 0;
+    for (i = 0; i < N; i++) {
+      a = acc[i]; a.stage = i < f0 ? -1 : first; a.room = s.d; a.gain = 0; a.wait = false; a.dead = i >= f0 + e0;
+    }
+    for (var day = 0; day < H; day++) {
+      var w = (day / DAYS) | 0;
+      cash += due; inW[w] += due; due = 0;
+      var funded = 0, alive = 0;
+      for (i = 0; i < N; i++) { a = acc[i]; if (!a.dead) { alive++; if (a.stage < 0 && !a.wait) funded++; } }
+      for (i = 0; i < N; i++) { a = acc[i]; if (!a.dead && a.wait && funded < FMAX) { a.wait = false; funded++; } }
+      var need = seats - alive;
+      if (need > 0) {
+        cash -= need * price; outW[w] += need * price; if (cash < low) low = cash;
+        for (i = 0; i < N && need > 0; i++) { a = acc[i]; if (a.dead) { a.stage = first; a.room = s.d; a.gain = 0; a.wait = false; a.dead = false; need--; } }
+      }
+      var u1 = 0, odd = false, u;
+      for (var pass = 0; pass < 2; pass++) for (i = 0; i < N; i++) {      // funded accounts first, then evals: paired in that order
+        a = acc[i];
+        if (a.dead || a.wait || (a.stage < 0) !== (pass === 0)) continue;
+        if (!odd) { u1 = rnd(); u = u1; } else u = rnd() < opp ? 1 - u1 : rnd();
+        odd = !odd;
+        due += vestStep(a, s, u);
+      }
+      cumD[day] += cash;
+    }
+    holes[run] = -low; nets += cash + due;
+  }
+  holes.sort(function(x, y){ return x - y; });
+  var rows = [], run2 = 0, lowMean = 0;
+  for (var k = 0; k < H; k++) lowMean = Math.min(lowMean, cumD[k] / runs);
+  for (var wk = 0; wk < weeks; wk++) { var a1 = inW[wk] / runs, b1 = outW[wk] / runs; run2 += a1 - b1; rows.push({ week: wk, inn: a1, out: b1, total: run2 }); }
+  var late = 0, from = Math.floor(weeks / 2);
+  for (wk = from; wk < weeks; wk++) late += rows[wk].inn - rows[wk].out;
+  return { buy: buy0, cost: buy0 * price, wallet: holes[Math.min(runs - 1, Math.ceil(SAFE * runs) - 1)], need: -lowMean,
+    net: nets / runs, monthly: late / (weeks - from) * 52 / 12, rows: rows };
+}
+// The feed (the owner: "make it update automatically like 5ers"): tools/mfp.js on his PC counts his MFP accounts through
+// MFP's API every 10 minutes and publishes the counts as mfp.json beside the live counts. vestFeed reads one such file for
+// the size this page plans with: evals open, funded open, and Paid = evals bought since the feed began x the eval price.
+// Anything not exactly as expected is no feed (null), and the boxes stay typed. MFP's API shows no payouts: Received is typed.
+var FEED_URL = '';                          // '' = no feed (this file); the MFP page has the address
+function vestFeed(o, size, price){
+  if (!o || o.v !== 1 || !o.counts || typeof o.at !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(o.at)) return null;
+  var out = {}, ok = true;
+  ['evals', 'funded', 'bought'].forEach(function(k){
+    var c = o.counts[k], v = c && typeof c === 'object' ? c[size] : undefined;
+    if (typeof v !== 'number' || !isFinite(v) || v < 0 || v > 5000 || v !== Math.floor(v)) ok = false;
+    out[k] = v;
+  });
+  if (!ok) return null;
+  return { evals: out.evals, funded: out.funded, paid: Math.round(out.bought * price * 100) / 100, at: o.at };
+}
+var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 30, paid: 0, recv: 0 };
+function vestClean(o){
+  var p = {}, lim = { seats: [2, 40], evals: [0, EVAL_MAX], funded: [0, FUNDED_MAX], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
+  Object.keys(VEST_SEED).forEach(function(k){
+    var raw = o ? o[k] : null, v = raw === null || raw === undefined || raw === '' ? NaN : Number(raw); if (!isFinite(v)) v = VEST_SEED[k];
+    v = Math.min(lim[k][1], Math.max(lim[k][0], v));
+    p[k] = k === 'paid' || k === 'recv' || k === 'price' ? Math.round(v * 100) / 100 : Math.round(v);
+  });
+  return p;
+}
+// ---------- VEST ENGINE END ----------
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestFeed: vestFeed, FEED_URL: FEED_URL, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'cfd', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
+if (typeof document !== 'undefined') (function(){
+  'use strict';
+  if (HOME) { location.replace(HOME); return; }
+  function tell(){}
+  var STORE = 'funded-slots-roadmap-cfd-5k', state;
+  try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
+  function $(id){ return document.getElementById(id); }
+  function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
+  function signed(v){ return (v > 0.5 ? '+' : '') + money(v); }
+  function cents(v){ return '$' + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function tone(el, v){ el.className = 'v ' + (v > 0.5 ? 'pos' : v < -0.5 ? 'neg' : ''); }
+  var PICK = BUILDS[0], stats = BUILDS.map(vestStat);
+
+  function drawStatic(){
+    var st = stats[0], s = st.spec;
+    $('r-pass').textContent = (st.pass * 100).toFixed(1);
+    $('r-fund').textContent = money(st.funded);
+    $('r-ev').textContent = signed(st.ev); tone($('r-ev'), st.ev);
+    $('r-roi').textContent = '$' + st.roi.toFixed(2);
+    var small = function(v){ return v < 1000 ? cents(v) : money(v); };
+    var go = !!s.go;
+    var b = PICK, tries = go ? TRIES : Math.max(1, Math.ceil(s.d / (s.risk + s.fee) - 1e-9)), fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0];        // tries: how many stops fit in the drawdown as the trades are really sized
+    var r0 = Math.min(s.risk, s.d - s.fee);            // the videos' way: a stop never goes past the floor, the fee counted
+    var stop = go ? GO.stop : STOP, units = go ? s.units : r0 / STOP, loss = go ? s.eLoss : r0 + s.fee;
+    // an eval win and a funded win after the fee, the points their targets stand at, and how often each wins
+    var eWin = go ? s.eWin : T, fWin = go ? s.fWin : FRR * r0 - s.fee;
+    var ePts = go ? GO.evalTarget : (T + s.fee) / units, fPts = go ? GO.fundedTarget : STOP * FRR;
+    var eP = go ? GO.evalP : r0 / (r0 + T + s.fee), fP = go ? GO.fundedP : 1 / (1 + FRR);
+    var cost = go ? units * (GO.slip + s.feePts) : s.fee, pts = function(v){ return (Math.round(v * 100) / 100) + ' points'; };
+    $('rates-h').textContent = go ? 'Our GOs, fees in' : 'Coin flip, fees in';
+    $('rates-h').title = go ? 'Our real G1/V2 GOs, 13 Jul – 20 Nov 2026, none at the same time: 2,053 eval trades won 38.9% (a coin 39.5%), 1,817 funded trades 30.3% (a coin 30.5%)'
+      : 'Every trade a coin flip at fair odds for its stop and target, less ' + FIRM_NAME + '\'s fee. Our G1 / V2 signals win like a coin at these brackets (12 Jul – 10 Nov 2026: 50.0% of 1,387 at 50 / 50, 22.7% of 740 at 50 / 172)';
+    $('trade-h').textContent = 'The trade · ' + MARKET + ', ' + stop + '-point stop' + (PAIRS ? ', in pairs' : '');
+    $('trade-head').innerHTML = '<tr><th>Account</th><th>' + MARKET + ' units</th><th>Stop</th><th>Target</th><th title="What a stop costs, the fee in">Loss</th><th title="What a target makes, the fee out">Win</th><th title="' + FIRM_NAME + '\'s fee both ways' + (go ? ' and a quarter point of slip' : '') + ', already in Loss and Win">' + (go ? 'Fee + slip' : 'Fee') + '</th><th>Wins</th></tr>';
+    var row = function(name, tgt, win, pr){
+      return '<tr><td>' + name + '</td><td>' + units.toFixed(2) + '</td><td>' + stop + ' pts</td><td>' + (Math.round(tgt * 100) / 100) + ' pts</td><td>' + small(loss) + '</td><td>' + small(win) + '</td><td>' + small(cost) + '</td><td>' + (pr * 100).toFixed(1) + '%</td></tr>'; };
+    $('trade').innerHTML = row('Eval', ePts, eWin, eP) + row('Funded', fPts, fWin, fP);
+    // the system as it is traded, in the numbers of the build this page plans with
+    var sys = [
+      ['Signal', go ? 'Every G1 / V2 GO, never two at the same time · about 22 a day'
+                    : PAIRS ? 'Mark the 9:30 New York open; at 10:00 buy the market below its open and short the one above · counted as a coin flip'
+                    : JJ_GO],
+      ['Accounts', (PAIRS ? (go ? 'Each GO opens two accounts' : 'Each entry opens two accounts') : go ? 'Each GO goes to one account' : 'Each entry goes to one account') + ', funded ones first · one trade an account a day'],
+      PAIRS ? ['Pair', (go ? 'First account: with the GO on ' + MARKET + ' · second account: the opposite way on ES or a stock that moves with it'
+                           : 'One account long, the other short a market that moves with it (' + MARKET + ' against ES or a stock)') + ', the same dollar stop'] : null,
+      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · a stop costs ' + cents(loss) + (b.dl ? ', under the ' + money(b.dl * b.size) + ' day limit' : (tries === 1 ? ', the whole drawdown' : '') + ' · no daily loss limit')],
+      ['Stop', stop + ' points'],
+      ['Target', 'Eval ' + pts(ePts) + ', +' + cents(eWin) + ' · funded ' + pts(fPts) + ', +' + cents(fWin)],
+      ['Eval', go ? 'Trades on until +' + money(T) + ' (passed, funded on a fresh ' + money(b.size) + ') or the ' + money(s.d) + ' drawdown is gone'
+                  : tries === 1 ? 'One trade: a win passes it (funded on a fresh ' + money(b.size) + '), a stop ends it'
+                  : 'One trade to the target: a win passes it (funded on a fresh ' + money(b.size) + ') · ' + tries + ' stops in the ' + money(s.d) + ' drawdown, and after a loss the next target stands further off, to end at +' + money(T)],
+      ['Funded', CLAIM + ' the whole profit whenever a trade leaves it ahead' + (s.minClaim ? ' by ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours' + (!go && tries === 1 ? ' · a stop ends the account' : '')],
+      ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
+      ['Limits', fmax + ' funded and ' + emax + ' evals at once']
+    ];
+    // lean, JJ's way: the same system in six short lines
+    if (LEAN && !go) sys = [
+      ['Signal', 'Every G1 / V2 GO · one account a signal, funded ones first · one trade an account a day'],
+      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · stop ' + stop + ' points = ' + money(loss)],
+      ['Eval', s.targets.map(function(t, i){ return (s.targets.length > 1 ? 'Step ' + (i + 1) + ': target ' : 'Target ') + Math.round((t + s.fee) / units) + ' points = +' + money(t); }).join(' · ') + ', passed · ' + tries + (tries > 1 ? ' stops' : ' stop') + ' in the ' + money(s.d) + ' drawdown'],
+      ['Funded', 'Target ' + Math.round(fPts) + ' points = +' + money(fWin) + ' · ' + (PAYS || CLAIM.toLowerCase() + ' every win' + (s.minClaim ? ' of ' + money(s.minClaim) + ' or more' : '')) + ' · ' + Math.round(b.split * 100) + '% is yours'],
+      ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
+      ['Limits', fmax + ' funded and ' + emax + ' evals at once']
+    ];
+    $('system').innerHTML = sys.filter(Boolean).map(function(r){ return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
+    $('progs-box').hidden = LEAN || !SHOW_PROGS;
+    $('trade-box').hidden = LEAN;
+    $('progs').innerHTML = BUILDS.map(function(b, i){
+      var x = stats[i];
+      return '<tr' + (b.pick ? ' class="pick"' : '') + '><td>' + b.name + '</td><td>' + money(b.price) + '</td><td>' + (x.pass * 100).toFixed(1) + '%</td><td>' + money(x.funded) + '</td><td class="' + (x.ev > 0 ? 'pos' : 'neg') + '">' + signed(x.ev) + '</td><td>$' + x.roi.toFixed(2) + '</td><td class="' + (x.perTrade > 0 ? 'pos' : 'neg') + '">' + signed(x.perTrade) + '</td></tr>';
+    }).join('');
+  }
+  var tipEl = document.createElement('div'), chartRows = [], chartGeo = null; tipEl.className = 'tip'; tipEl.hidden = true;
+  function drawChart(rows){
+    var show = rows.slice(0, 24), W = 1120, Hh = 300, L = 62, R = 84, T = 12, B = 26, n = show.length;
+    var hi = 0, lo = 0;
+    show.forEach(function(r){ hi = Math.max(hi, r.inn, r.total); lo = Math.min(lo, -r.out, r.total); });
+    if (hi - lo < 1) hi = lo + 1;
+    var y = function(v){ return T + (hi - v) / (hi - lo) * (Hh - T - B); }, bw = (W - L - R) / n, svg = [];
+    var step = Math.pow(10, Math.floor(Math.log10((hi - lo) / 4))), m = (hi - lo) / 4 / step; step *= m >= 5 ? 5 : m >= 2 ? 2 : 1;
+    for (var g = Math.ceil(lo / step) * step; g <= hi; g += step)
+      svg.push('<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="var(--line)"/><text x="' + (L - 8) + '" y="' + (y(g) + 4) + '" text-anchor="end">' + money(g) + '</text>');
+    var path = '';
+    show.forEach(function(r, i){
+      var x = L + i * bw, c = x + bw / 2;
+      svg.push('<rect x="' + (x + bw * 0.18) + '" y="' + y(r.inn) + '" width="' + bw * 0.64 + '" height="' + Math.max(0, y(0) - y(r.inn)) + '" fill="var(--in)" rx="2"/>');
+      svg.push('<rect x="' + (x + bw * 0.18) + '" y="' + y(0) + '" width="' + bw * 0.64 + '" height="' + Math.max(0, y(-r.out) - y(0)) + '" fill="var(--out)" rx="2"/>');
+      path += (i ? 'L' : 'M') + c + ' ' + y(r.total);
+      svg.push('<circle cx="' + c + '" cy="' + y(r.total) + '" r="3" fill="var(--net)"/>');
+      if (i % 4 === 0) svg.push('<text x="' + c + '" y="' + (Hh - 8) + '" text-anchor="middle">W' + r.week + '</text>');
+    });
+    svg.push('<path d="' + path + '" fill="none" stroke="var(--net)" stroke-width="2"/>');
+    // the running total at the line's end, and a hair line for the week under the pointer
+    var last = show[n - 1];
+    svg.push('<text id="chart-end" x="' + (L + (n - 0.5) * bw + 10) + '" y="' + (y(last.total) + 4) + '" style="fill:var(--ink);font-weight:600">' + signed(last.total) + '</text>');
+    svg.push('<line id="xhair" x1="0" x2="0" y1="' + T + '" y2="' + (Hh - B) + '" stroke="var(--mute)" visibility="hidden"/>');
+    $('chart').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + Hh + '" xmlns="http://www.w3.org/2000/svg">' + svg.join('') + '</svg>';
+    $('chart').appendChild(tipEl);
+    chartRows = show; chartGeo = { W: W, L: L, bw: bw, n: n };
+  }
+  // the week under the pointer (or finger): its claims in, evals out and running total
+  function showTip(i){
+    var r = chartRows[i], box = $('chart'), k = box.clientWidth / chartGeo.W, cx = chartGeo.L + (i + 0.5) * chartGeo.bw, xh = box.querySelector('#xhair');
+    if (!r) return;
+    if (xh){ xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('visibility', 'visible'); }
+    tipEl.innerHTML = '<div class="h">W' + r.week + '</div>' +
+      '<div class="r"><span><i style="background:var(--in)"></i>' + (CLAIM === 'Request' ? 'Payouts' : 'Claims') + ' in</span><span>' + money(r.inn) + '</span></div>' +
+      '<div class="r"><span><i style="background:var(--out)"></i>Evals out</span><span>' + money(r.out) + '</span></div>' +
+      '<div class="r"><span><i style="background:var(--net)"></i>Running total</span><span>' + signed(r.total) + '</span></div>';
+    tipEl.hidden = false;
+    var tw = tipEl.offsetWidth, left = cx * k + 14;
+    if (left + tw > box.clientWidth) left = cx * k - tw - 14;
+    tipEl.style.left = Math.max(0, left) + 'px'; tipEl.style.top = '6px';
+  }
+  function hideTip(){ tipEl.hidden = true; var xh = $('chart').querySelector('#xhair'); if (xh) xh.setAttribute('visibility', 'hidden'); }
+  function onPoint(e){
+    if (!chartGeo) return;
+    var box = $('chart'), px = (e.clientX - box.getBoundingClientRect().left) * chartGeo.W / box.clientWidth, i = Math.floor((px - chartGeo.L) / chartGeo.bw);
+    if (i < 0 || i >= chartGeo.n) hideTip(); else showTip(i);
+  }
+  $('chart').addEventListener('pointermove', onPoint);
+  $('chart').addEventListener('pointerdown', onPoint);
+  $('chart').addEventListener('pointerleave', hideTip);
+  function update(){
+    var res = vestPlan(PICK, state, PAIRS ? PAIR_OPP : 0, RUNS, WEEKS), single = PAIRS ? vestPlan(PICK, state, 0, RUNS, WEEKS) : res;
+    $('t-buy').innerHTML = res.buy ? res.buy + ' evals <small>' + money(res.cost) + '</small>' : '0 evals';
+    $('t-need').innerHTML = money(res.wallet) + ' <small>wallet 99%</small>';
+    $('t-need2').innerHTML = '<small>' + money(res.need) + ' expected</small>';
+    $('t-net').textContent = signed(res.net); tone($('t-net'), res.net);
+    $('t-run').innerHTML = signed(res.monthly) + '<small>/mo</small>'; tone($('t-run'), res.monthly);
+    var so = state.recv - state.paid;
+    $('money').innerHTML = 'Paid <b>' + cents(state.paid) + '</b> · Received <b>' + cents(state.recv) + '</b> · So far <b class="' + (so > 0 ? 'pos' : so < 0 ? 'neg' : '') + '">' + (so < 0 ? '−' : so > 0 ? '+' : '') + cents(Math.abs(so)) + '</b>';
+    $('pairs').hidden = !PAIRS;
+    $('pairs').innerHTML = 'Wallet 99% in pairs <b>' + money(res.wallet) + '</b> · the same accounts traded one by one <b>' + money(single.wallet) + '</b>';
+    drawChart(res.rows);
+    var alt = LEAN ? null : vestTwin(PICK);
+    $('cmp-box').hidden = !alt;
+    if (alt) {
+      var ap = vestPlan(alt, state, 0, RUNS, WEEKS), as = vestStat(alt), ms = stats[0];
+      var line = function(b, x, pl){
+        var name = b.go ? 'Our signals · G1 + V2, ' + GO.stop + '-point stop' : 'JJ\'s way · one trade to the target, ' + STOP + '-point stop';
+        return '<tr' + (b === PICK ? ' class="pick"' : '') + '><td>' + name + '</td><td>' + (x.pass * 100).toFixed(1) + '%</td><td>' + money(x.funded) + '</td><td class="' + (x.ev > 0 ? 'pos' : 'neg') + '">' + signed(x.ev) + '</td><td>$' + x.roi.toFixed(2) + '</td><td>' + money(pl.wallet) + '</td><td class="' + (pl.monthly > 0 ? 'pos' : 'neg') + '">' + signed(pl.monthly) + '/mo</td></tr>'; };
+      $('cmp').innerHTML = line(PICK, ms, res) + line(alt, as, ap);
+    }
+    tell(res);
+  }
+  var timer = 0;
+  ['seats', 'evals', 'funded', 'price', 'paid', 'recv'].forEach(function(k){
+    var el = $('i-' + k); el.value = state[k];
+    el.addEventListener('input', function(){
+      var o = {}; Object.keys(state).forEach(function(j){ o[j] = state[j]; });
+      if (el.value === '') return;
+      o[k] = el.value; state = vestClean(o);
+      try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+      drawStatic(); clearTimeout(timer); timer = setTimeout(update, 250);
+    });
+    el.addEventListener('change', function(){ el.value = state[k]; });
+  });
+  // the feed: when it is there, Evals open, Funded open and Paid are its numbers and their boxes are locked
+  function takeFeed(o){
+    var f = vestFeed(o, PICK.size, state.price);
+    if (!f) return;
+    var n = vestClean({ seats: state.seats, evals: f.evals, funded: f.funded, price: state.price, paid: f.paid, recv: state.recv });
+    var moved = n.evals !== state.evals || n.funded !== state.funded || n.paid !== state.paid;
+    state = n;
+    ['evals', 'funded', 'paid'].forEach(function(k){ var el = $('i-' + k); el.value = state[k]; el.disabled = true; el.title = 'From your MFP accounts, read ' + f.at.slice(11, 16) + ' UTC'; });
+    if (moved) { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} drawStatic(); update(); }
+  }
+  function loadFeed(){
+    if (!FEED_URL || typeof fetch !== 'function') return;
+    try { fetch(FEED_URL + '?t=' + Date.now(), { cache: 'no-store' }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(takeFeed).catch(function(){}); } catch (e) {}
+  }
+  drawStatic(); update();
+  loadFeed();
+  setInterval(function(){ if (!document.hidden) loadFeed(); }, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) loadFeed(); });
+})();
+</script>
+</body>
+</html>
