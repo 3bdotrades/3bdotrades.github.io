@@ -51,6 +51,8 @@ tbody td:first-child{background:var(--card)}
 tbody tr+tr td{border-top:1px solid var(--line)}
 tbody tr:hover td{background:var(--row)}
 tr.pick td:first-child{color:var(--accent);font-weight:600}
+.sys td{text-align:left;white-space:normal}
+.sys td:first-child{width:9.5em;color:var(--mute);white-space:nowrap}
 .legend{display:inline-flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .legend i.line{width:14px;height:2px;border-radius:1px;vertical-align:3px}
@@ -118,11 +120,16 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
   </table></div>
   <p class="note" id="pairs"></p>
 
+  <h2>System</h2>
+  <div class="wrap"><table class="sys"><tbody id="system"></tbody></table></div>
+
+  <div id="progs-box">
   <h2>Programs · our GOs, sale prices of 23 Nov 2026</h2>
   <div class="wrap"><table>
     <thead><tr><th>Program</th><th>Price</th><th>Pass</th><th>Funded pays</th><th>Per eval bought</th><th>Per $1 paid</th><th>Per trade</th></tr></thead>
     <tbody id="progs"></tbody>
   </table></div>
+  </div>
 
   <h2><span>Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span></span></h2>
   <div class="wrap chartcard"><div class="chartbox" id="chart" role="img" aria-label="Weekly claims in, evals out and the running total"></div></div>
@@ -150,6 +157,8 @@ var TRIES = 3;                              // full stops in the drawdown: on th
 var FRR = 1.5;                              // a funded trade makes 1.5 times its risk, and every win is claimed
 var PAIR_OPP = 0.4;                         // two legs of a pair finish on opposite sides 70% of the time (stocks vs QQQ, 2 years
                                             // hourly, 668 days) against 50% for two separate trades: 0.5 + 0.5 x 0.4
+var SHOW_PROGS = true;                      // the table of other programs (the owner, 23 Nov 2026: not on the Vest tab)
+var MARKET = 'NAS100', CLAIM = 'Request';         // the firm's words for the market traded and for taking profit out
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
@@ -295,7 +304,7 @@ function vestClean(o){
   return p;
 }
 // ---------- VEST ENGINE END ----------
-if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, GO: GO, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, GO: GO, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
 if (typeof document !== 'undefined') (function(){
   'use strict';
   var STORE = 'funded-slots-roadmap-mfp', state;
@@ -316,6 +325,23 @@ if (typeof document !== 'undefined') (function(){
     var small = function(v){ return v < 1000 ? cents(v) : money(v); }, row = function(name, tgt, loss, win, p){
       return '<tr><td>' + name + '</td><td>' + s.units.toFixed(2) + '</td><td>' + GO.stop + ' pts</td><td>' + tgt + ' pts</td><td>' + small(loss) + '</td><td>' + small(win) + '</td><td>' + small(s.units * (GO.slip + s.feePts)) + '</td><td>' + (p * 100).toFixed(1) + '%</td></tr>'; };
     $('trade').innerHTML = row('Eval', GO.evalTarget, s.eLoss, s.eWin, GO.evalP) + row('Funded', GO.fundedTarget, s.fLoss, s.fWin, GO.fundedP);
+    // the system as it is traded, in the numbers of the build this page plans with
+    var b = PICK, fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0];
+    var sys = [
+      ['Signal', 'Every G1 / V2 GO, never two at the same time · about 20 a day'],
+      ['Accounts', PAIRS ? 'Each GO opens two accounts, funded ones first · one trade an account a day'
+                         : 'Each GO goes to one account, funded ones first · one trade an account a day'],
+      PAIRS ? ['Pair', 'First account: with the GO on ' + MARKET + ' · second account: the opposite way on ES or a stock that moves with it, the same dollar stop'] : null,
+      ['Size', s.units.toFixed(2) + ' ' + MARKET + ' units · a stop costs ' + cents(s.eLoss) + ', under the ' + money(b.dl * b.size) + ' day limit'],
+      ['Stop', GO.stop + ' points'],
+      ['Target', 'Eval ' + GO.evalTarget + ' points, +' + cents(s.eWin) + ' · funded ' + GO.fundedTarget + ' points, +' + cents(s.fWin)],
+      ['Eval', 'Trades on until +' + money(T) + ' (passed, funded on a fresh ' + money(b.size) + ') or the ' + money(s.d) + ' drawdown is gone'],
+      ['Funded', CLAIM + ' the whole profit whenever a trade leaves it ahead' + (s.minClaim ? ' by ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours'],
+      ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
+      ['Limits', fmax + ' funded and ' + emax + ' evals at once']
+    ];
+    $('system').innerHTML = sys.filter(Boolean).map(function(r){ return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
+    $('progs-box').hidden = !SHOW_PROGS;
     $('progs').innerHTML = BUILDS.map(function(b, i){
       var x = stats[i];
       return '<tr' + (b.pick ? ' class="pick"' : '') + '><td>' + b.name + '</td><td>' + money(b.price) + '</td><td>' + (x.pass * 100).toFixed(1) + '%</td><td>' + money(x.funded) + '</td><td class="' + (x.ev > 0 ? 'pos' : 'neg') + '">' + signed(x.ev) + '</td><td>$' + x.roi.toFixed(2) + '</td><td class="' + (x.perTrade > 0 ? 'pos' : 'neg') + '">' + signed(x.perTrade) + '</td></tr>';
@@ -363,7 +389,7 @@ if (typeof document !== 'undefined') (function(){
       if (el.value === '') return;
       o[k] = el.value; state = vestClean(o);
       try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
-      clearTimeout(timer); timer = setTimeout(update, 250);
+      drawStatic(); clearTimeout(timer); timer = setTimeout(update, 250);
     });
     el.addEventListener('change', function(){ el.value = state[k]; });
   });
