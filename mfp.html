@@ -157,15 +157,14 @@ html.embed,.embed body{overflow:hidden}
 // 40x, $100,000 of funded Elite and $100,000 of Elite evals at once, $100,000 of payouts per user for life. It has a
 // trading API. Signature (10% / 6%) and Select (9% / 3%) pay 0.005% a fill and lock the floor to the starting balance on the
 // first withdrawal, so a funded account there is played to one withdrawal (Signature at the drawdown, Select at three times
-// it, the best tried) and ends. The owner, 23 Nov 2026: "make other page for mff and get there the best program like vest",
-// then "follow jj target in payouts", "in everything": the videos' way (a build without go) with a stop as big as the 3% day
-// limit allows (tries: 1; the rest of the 5% follows on the next trade) and a 1:1 funded trade. The Elite 10K grows the
-// wallet fastest of every size and plan (study\mfp_rank_jj.js); with our GOs' brackets it made far less (mfp_rank.js).
-// GO: the real G1/V2 trades of 13 Jul - 20 Nov 2026 taken none at the same time (study\replay.py on simulation_data\cme.json),
-// 25-point stop, 38.25 target on an eval and 57 on a funded account: how often they won (2,053 eval trades, 1,817 funded; a
-// coin would win 39.53% / 30.49%). A stop costs the 25 points, a quarter point of slip and the fee; a target makes its
-// points less the fee; the fee is the firm's rate both ways on NQ at today's price.
-var GO = { stop: 25, slip: 0.25, evalTarget: 38.25, fundedTarget: 57, evalP: 0.3892, fundedP: 0.3032 };
+// it) and ends. The owner, 23 Nov 2026: "make other page for mff and get there the best program like vest"; planned the
+// videos' way for a while, then on his word on our real G1 + V2 signals (builds with go: true): the Elite 10K with the
+// drawdown cut into two stops (tries: 2, $258 a trade) is the best of 293 programs of four firms on them (study\rank_go.js).
+// GO: the real G1 + V2 trades of 13 Jul - 20 Nov 2026 taken none at the same time (study\go_rates.py on
+// simulation_data\cme.json: 2,053 trades on the eval bracket, 22.3 a day, and 1,817 on the funded one), 25-point stop,
+// 38.25 target on an eval and 57 on a funded account. How often they won (a coin would win 39.53% / 30.49%) and the points
+// a win made and a stop cost BEFORE any fee (a stop has its slip in); the fee is the firm's rate both ways at today's price.
+var GO = { stop: 25, slip: 0.241, evalTarget: 38.25, fundedTarget: 57, evalWin: 38.188, fundedWin: 56.573, evalP: 0.3892, fundedP: 0.3038 };
 var NQ_PX = 26000, FEE_SIDE = 0.000025;     // NQ near 25,950 on 20 Nov 2026; the fee is on the position's size
 var STOP = 50;                              // points; a tighter stop is a bigger position and so a bigger fee
 var TRIES = 3;                              // full stops in the drawdown: on the 5K, $400 / 3 = $133 a trade (under the $150 day limit)
@@ -179,12 +178,12 @@ var SHELL_HERE = false;                     // this file, opened as a page, show
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
-  { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 1, pick: true, feeSide: 0.00001, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.3301, 386.8, 3.62] },
-  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 1, feeSide: 0.00001, minClaim: 50, fundedMax: 20, evalMax: 20, stat: [0.3301, 193.4, 3.62] },
-  { name: 'Elite 25K · 10% · 5% · 3% · 80%', size: 25000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 186, tries: 1, feeSide: 0.00001, minClaim: 250, fundedMax: 4, evalMax: 4, stat: [0.3301, 967, 3.62] },
-  { name: 'Elite 50K · 10% · 5% · 3% · 80%', size: 50000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 371, tries: 1, feeSide: 0.00001, minClaim: 500, fundedMax: 2, evalMax: 2, stat: [0.3301, 1934, 3.62] },
-  { name: 'Signature 10K · 10% · 6% · 3% · 80%', size: 10000, dd: 0.06, dl: 0.03, tg: [0.10], split: 0.80, price: 65, tries: 1, feeSide: 0.00005, lock: true, minClaim: 600, fundedMax: 10, evalMax: 10, stat: [0.3582, 231.3, 3.85] },
-  { name: 'Select 10K · 9% · 3% · 3% · 80%', size: 10000, dd: 0.03, dl: 0.03, tg: [0.09], split: 0.80, price: 30, tries: 1, feeSide: 0.00005, lock: true, minClaim: 900, fundedMax: 10, evalMax: 10, stat: [0.2375, 150.5, 1.91] }
+  { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 2, go: true, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.2584, 375.6, 7.3] },
+  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 2, go: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, stat: [0.2584, 187.8, 7.3] },
+  { name: 'Elite 25K · 10% · 5% · 3% · 80%', size: 25000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 186, tries: 2, go: true, feeSide: 0.00001, maxLev: 40, minClaim: 250, fundedMax: 4, evalMax: 4, stat: [0.2584, 939, 7.3] },
+  { name: 'Elite 50K · 10% · 5% · 3% · 80%', size: 50000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 371, tries: 2, go: true, feeSide: 0.00001, maxLev: 40, minClaim: 500, fundedMax: 2, evalMax: 2, stat: [0.2584, 1878, 7.3] },
+  { name: 'Signature 10K · 10% · 6% · 3% · 80%', size: 10000, dd: 0.06, dl: 0.03, tg: [0.10], split: 0.80, price: 65, tries: 2, go: true, feeSide: 0.00005, lock: true, minClaim: 600, fundedMax: 10, evalMax: 10, stat: [0.2239, 240.5, 7.95] },
+  { name: 'Select 10K · 9% · 3% · 3% · 80%', size: 10000, dd: 0.03, dl: 0.03, tg: [0.09], split: 0.80, price: 30, tries: 1, go: true, feeSide: 0.00005, lock: true, minClaim: 300, fundedMax: 10, evalMax: 10, stat: [0.1513, 139.1, 4.25] }
 ];
 function vestRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 // stat: one account bought and played to its end, 4,000,000 times by vestBuild (how often it passes, what a funded one pays
@@ -198,8 +197,10 @@ function vestSpec(b, stop){
   var d = b.dd * b.size, risk = d / (b.tries || TRIES);       // a build's own number of stops in the drawdown, else 3
   if (b.go) {                                  // our GOs' brackets: a third of the drawdown on the 25-point stop
     var un = risk / GO.stop, feePts = NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, loss = GO.stop + GO.slip + feePts;
-    return { go: true, d: d, risk: risk, units: un, fee: 0, feePts: feePts, cap: un * loss, eWin: un * (GO.evalTarget - feePts), eLoss: un * loss,
-      fWin: un * (GO.fundedTarget - feePts), fLoss: un * loss, minClaim: b.minClaim || 0, lock: !!b.lock,
+    if (b.dl) un = Math.min(un, b.dl * b.size * 0.97 / loss);          // a stop stays inside the day's loss limit
+    if (b.maxLev) un = Math.min(un, b.maxLev * b.size / NQ_PX);        // and the position inside the firm's leverage
+    return { go: true, d: d, risk: risk, units: un, fee: 0, feePts: feePts, cap: un * loss, eWin: un * (GO.evalWin - feePts), eLoss: un * loss,
+      fWin: un * (GO.fundedWin - feePts), fLoss: un * loss, minClaim: b.minClaim || 0, lock: !!b.lock,
       targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
   }
   if (b.dl) risk = Math.min(risk, b.dl * b.size * 0.97);       // a stop and its fee stay inside the day's loss limit
@@ -338,7 +339,8 @@ if (typeof document !== 'undefined') (function(){
       if (e.origin !== location.origin || !e.data || typeof e.data.perpsH !== 'number') return;
       [f1, f2].forEach(function(f){ if (e.source === f.contentWindow) f.style.height = Math.min(8000, Math.max(300, Math.ceil(e.data.perpsH))) + 'px'; });
     });
-    f1.src = 'vest.html?p=1'; f2.src = 'mfp.html?p=1';
+    var fresh = '&v=' + Math.floor(Date.now() / 6e5);       // a new address every 10 minutes, so a frame is never an old copy for long
+    f1.src = 'vest.html?p=1' + fresh; f2.src = 'mfp.html?p=1' + fresh;
     return;
   }
   document.documentElement.className = 'embed';
@@ -379,7 +381,7 @@ if (typeof document !== 'undefined') (function(){
     $('trade').innerHTML = row('Eval', ePts, eWin, eP) + row('Funded', fPts, fWin, fP);
     // the system as it is traded, in the numbers of the build this page plans with
     var sys = [
-      ['Signal', go ? 'Every G1 / V2 GO, never two at the same time · about 20 a day'
+      ['Signal', go ? 'Every G1 / V2 GO, never two at the same time · about 22 a day'
                     : PAIRS ? 'Mark the 9:30 New York open; at 10:00 buy the market below its open and short the one above · counted as a coin flip'
                     : 'Any entry · counted as a coin flip'],
       ['Accounts', (PAIRS ? (go ? 'Each GO opens two accounts' : 'Each entry opens two accounts') : go ? 'Each GO goes to one account' : 'Each entry goes to one account') + ', funded ones first · one trade an account a day'],
