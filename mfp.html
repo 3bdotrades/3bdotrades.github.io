@@ -178,7 +178,7 @@ function vestStat(b){
 }
 // a build as the trades see it
 function vestSpec(b, stop){
-  var d = b.dd * b.size, risk = d / TRIES;
+  var d = b.dd * b.size, risk = d / (b.tries || TRIES);       // a build's own number of stops in the drawdown, else 3
   if (b.go) {                                  // our GOs' brackets: a third of the drawdown on the 25-point stop
     var un = risk / GO.stop, feePts = NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, loss = GO.stop + GO.slip + feePts;
     return { go: true, d: d, risk: risk, units: un, fee: 0, feePts: feePts, cap: un * loss, eWin: un * (GO.evalTarget - feePts), eLoss: un * loss,
@@ -323,12 +323,13 @@ if (typeof document !== 'undefined') (function(){
     $('r-ev').textContent = signed(st.ev); tone($('r-ev'), st.ev);
     $('r-roi').textContent = '$' + st.roi.toFixed(2);
     var small = function(v){ return v < 1000 ? cents(v) : money(v); };
-    var b = PICK, fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0], go = !!s.go;
-    var stop = go ? GO.stop : STOP, units = go ? s.units : s.risk / STOP, loss = go ? s.eLoss : s.risk + s.fee;
+    var b = PICK, tries = b.tries || TRIES, fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0], go = !!s.go;
+    var r0 = Math.min(s.risk, s.d - s.fee);            // the videos' way: a stop never goes past the floor, the fee counted
+    var stop = go ? GO.stop : STOP, units = go ? s.units : r0 / STOP, loss = go ? s.eLoss : r0 + s.fee;
     // an eval win and a funded win after the fee, the points their targets stand at, and how often each wins
-    var eWin = go ? s.eWin : T, fWin = go ? s.fWin : FRR * s.risk - s.fee;
+    var eWin = go ? s.eWin : T, fWin = go ? s.fWin : FRR * r0 - s.fee;
     var ePts = go ? GO.evalTarget : (T + s.fee) / units, fPts = go ? GO.fundedTarget : STOP * FRR;
-    var eP = go ? GO.evalP : s.risk / (s.risk + T + s.fee), fP = go ? GO.fundedP : 1 / (1 + FRR);
+    var eP = go ? GO.evalP : r0 / (r0 + T + s.fee), fP = go ? GO.fundedP : 1 / (1 + FRR);
     var cost = go ? units * (GO.slip + s.feePts) : s.fee, pts = function(v){ return (Math.round(v * 100) / 100) + ' points'; };
     $('rates-h').textContent = go ? 'Our GOs, fees in' : 'Coin flip, fees in';
     $('rates-h').title = go ? 'Our real G1/V2 GOs, 13 Jul – 20 Nov 2026, none at the same time: 2,053 eval trades won 38.9% (a coin 39.5%), 1,817 funded trades 30.3% (a coin 30.5%)'
@@ -345,12 +346,13 @@ if (typeof document !== 'undefined') (function(){
       ['Accounts', (PAIRS ? (go ? 'Each GO opens two accounts' : 'Each entry opens two accounts') : 'Each GO goes to one account') + ', funded ones first · one trade an account a day'],
       PAIRS ? ['Pair', (go ? 'First account: with the GO on ' + MARKET + ' · second account: the opposite way on ES or a stock that moves with it'
                            : 'One account long, the other short a market that moves with it (' + MARKET + ' against ES or a stock)') + ', the same dollar stop'] : null,
-      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · a stop costs ' + cents(loss) + ', under the ' + money(b.dl * b.size) + ' day limit'],
+      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · a stop costs ' + cents(loss) + (b.dl ? ', under the ' + money(b.dl * b.size) + ' day limit' : (tries === 1 ? ', the whole drawdown' : '') + ' · no daily loss limit')],
       ['Stop', stop + ' points'],
       ['Target', 'Eval ' + pts(ePts) + ', +' + cents(eWin) + ' · funded ' + pts(fPts) + ', +' + cents(fWin)],
       ['Eval', go ? 'Trades on until +' + money(T) + ' (passed, funded on a fresh ' + money(b.size) + ') or the ' + money(s.d) + ' drawdown is gone'
-                  : 'One trade to the target: a win passes it (funded on a fresh ' + money(b.size) + ') · ' + TRIES + ' stops in the ' + money(s.d) + ' drawdown, and after a loss the next target stands further off, to end at +' + money(T)],
-      ['Funded', CLAIM + ' the whole profit whenever a trade leaves it ahead' + (s.minClaim ? ' by ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours'],
+                  : tries === 1 ? 'One trade: a win passes it (funded on a fresh ' + money(b.size) + '), a stop ends it'
+                  : 'One trade to the target: a win passes it (funded on a fresh ' + money(b.size) + ') · ' + tries + ' stops in the ' + money(s.d) + ' drawdown, and after a loss the next target stands further off, to end at +' + money(T)],
+      ['Funded', CLAIM + ' the whole profit whenever a trade leaves it ahead' + (s.minClaim ? ' by ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours' + (!go && tries === 1 ? ' · a stop ends the account' : '')],
       ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
       ['Limits', fmax + ' funded and ' + emax + ' evals at once']
     ];

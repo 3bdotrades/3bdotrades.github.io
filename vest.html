@@ -150,6 +150,11 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 // target on a 50-point stop at coin-flip odds, in hedge pairs, on the 5K 1-Step 10/8/3/80 at $55, the 5K build that grows
 // the wallet fastest traded this way (study\compound_tab.js as it stood then: 187% a month; our GOs' brackets on the 5%
 // target build gave 41%). The GO rule below stays for the MFP page made from this one.
+// That evening Vest changed its accounts: the 1-Step has no daily loss limit any more (the 3%, 4% and 5% options are gone)
+// and the 2-Step is gone, at the prices the no-limit builds had (study\catalog2.json), so the $55 build no longer exists
+// and the edge at a coin flip fell from +135% to about +10%. The owner's picks in the dialog: "5K at $75" (10% target, 6%
+// drawdown, 80% split: the best of the 197 programs left, study\rank2.js) and "One stop": with nothing limiting a day's
+// loss the whole drawdown rides on one trade (tries: 1), which pays the fee on the fewest trades.
 // GO: the real G1/V2 trades of 13 Jul - 20 Nov 2026 taken none at the same time (study\replay.py on simulation_data\cme.json),
 // 25-point stop, 38.25 target on an eval and 57 on a funded account: how often they won (2,053 eval trades, 1,817 funded; a
 // coin would win 39.53% / 30.49%). A stop costs the 25 points, a quarter point of slip and the fee; a target makes its
@@ -166,7 +171,7 @@ var MARKET = 'NQ', CLAIM = 'Claim', FIRM_NAME = 'Vest';         // the firm's wo
 var PAIRS = true;                           // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
-  { name: '5K 1-Step · 10% · 8% · 3% · 80%', size: 5000, dd: 0.08, dl: 0.03, tg: [0.10], split: 0.80, price: 55, pick: true, stat: [0.4353, 296.4, 6.19] }
+  { name: '5K 1-Step · 10% · 6% · none · 80%', size: 5000, dd: 0.06, dl: 0, tg: [0.10], split: 0.80, price: 75, tries: 1, pick: true, stat: [0.3651, 229.8, 1.61] }
 ];
 function vestRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 // stat: one account bought and played to its end, 4,000,000 times by vestBuild (how often it passes, what a funded one pays
@@ -177,7 +182,7 @@ function vestStat(b){
 }
 // a build as the trades see it
 function vestSpec(b, stop){
-  var d = b.dd * b.size, risk = d / TRIES;
+  var d = b.dd * b.size, risk = d / (b.tries || TRIES);       // a build's own number of stops in the drawdown, else 3
   if (b.go) {                                  // our GOs' brackets: a third of the drawdown on the 25-point stop
     var un = risk / GO.stop, feePts = NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, loss = GO.stop + GO.slip + feePts;
     return { go: true, d: d, risk: risk, units: un, fee: 0, feePts: feePts, cap: un * loss, eWin: un * (GO.evalTarget - feePts), eLoss: un * loss,
@@ -292,7 +297,7 @@ function vestPlan(b, st, opp, runs, weeks){
   return { buy: buy0, cost: buy0 * price, wallet: holes[Math.min(runs - 1, Math.ceil(SAFE * runs) - 1)], need: -lowMean,
     net: nets / runs, monthly: late / (weeks - from) * 52 / 12, rows: rows };
 }
-var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 55, paid: 0, recv: 0 };
+var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 75, paid: 0, recv: 0 };
 function vestClean(o){
   var p = {}, lim = { seats: [2, 40], evals: [0, EVAL_MAX], funded: [0, FUNDED_MAX], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
   Object.keys(VEST_SEED).forEach(function(k){
@@ -306,7 +311,7 @@ function vestClean(o){
 if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, GO: GO, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'vest', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
 if (typeof document !== 'undefined') (function(){
   'use strict';
-  var STORE = 'funded-slots-roadmap-vest-jj', state;       // a key of its own: nothing typed for an earlier build carries over
+  var STORE = 'funded-slots-roadmap-vest-75', state;       // a key of its own: nothing typed for an earlier build carries over
   try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
   function $(id){ return document.getElementById(id); }
   function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
@@ -322,12 +327,13 @@ if (typeof document !== 'undefined') (function(){
     $('r-ev').textContent = signed(st.ev); tone($('r-ev'), st.ev);
     $('r-roi').textContent = '$' + st.roi.toFixed(2);
     var small = function(v){ return v < 1000 ? cents(v) : money(v); };
-    var b = PICK, fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0], go = !!s.go;
-    var stop = go ? GO.stop : STOP, units = go ? s.units : s.risk / STOP, loss = go ? s.eLoss : s.risk + s.fee;
+    var b = PICK, tries = b.tries || TRIES, fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0], go = !!s.go;
+    var r0 = Math.min(s.risk, s.d - s.fee);            // the videos' way: a stop never goes past the floor, the fee counted
+    var stop = go ? GO.stop : STOP, units = go ? s.units : r0 / STOP, loss = go ? s.eLoss : r0 + s.fee;
     // an eval win and a funded win after the fee, the points their targets stand at, and how often each wins
-    var eWin = go ? s.eWin : T, fWin = go ? s.fWin : FRR * s.risk - s.fee;
+    var eWin = go ? s.eWin : T, fWin = go ? s.fWin : FRR * r0 - s.fee;
     var ePts = go ? GO.evalTarget : (T + s.fee) / units, fPts = go ? GO.fundedTarget : STOP * FRR;
-    var eP = go ? GO.evalP : s.risk / (s.risk + T + s.fee), fP = go ? GO.fundedP : 1 / (1 + FRR);
+    var eP = go ? GO.evalP : r0 / (r0 + T + s.fee), fP = go ? GO.fundedP : 1 / (1 + FRR);
     var cost = go ? units * (GO.slip + s.feePts) : s.fee, pts = function(v){ return (Math.round(v * 100) / 100) + ' points'; };
     $('rates-h').textContent = go ? 'Our GOs, fees in' : 'Coin flip, fees in';
     $('rates-h').title = go ? 'Our real G1/V2 GOs, 13 Jul – 20 Nov 2026, none at the same time: 2,053 eval trades won 38.9% (a coin 39.5%), 1,817 funded trades 30.3% (a coin 30.5%)'
@@ -344,12 +350,13 @@ if (typeof document !== 'undefined') (function(){
       ['Accounts', (PAIRS ? (go ? 'Each GO opens two accounts' : 'Each entry opens two accounts') : 'Each GO goes to one account') + ', funded ones first · one trade an account a day'],
       PAIRS ? ['Pair', (go ? 'First account: with the GO on ' + MARKET + ' · second account: the opposite way on ES or a stock that moves with it'
                            : 'One account long, the other short a market that moves with it (' + MARKET + ' against ES or a stock)') + ', the same dollar stop'] : null,
-      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · a stop costs ' + cents(loss) + ', under the ' + money(b.dl * b.size) + ' day limit'],
+      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · a stop costs ' + cents(loss) + (b.dl ? ', under the ' + money(b.dl * b.size) + ' day limit' : (tries === 1 ? ', the whole drawdown' : '') + ' · no daily loss limit')],
       ['Stop', stop + ' points'],
       ['Target', 'Eval ' + pts(ePts) + ', +' + cents(eWin) + ' · funded ' + pts(fPts) + ', +' + cents(fWin)],
       ['Eval', go ? 'Trades on until +' + money(T) + ' (passed, funded on a fresh ' + money(b.size) + ') or the ' + money(s.d) + ' drawdown is gone'
-                  : 'One trade to the target: a win passes it (funded on a fresh ' + money(b.size) + ') · ' + TRIES + ' stops in the ' + money(s.d) + ' drawdown, and after a loss the next target stands further off, to end at +' + money(T)],
-      ['Funded', CLAIM + ' the whole profit whenever a trade leaves it ahead' + (s.minClaim ? ' by ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours'],
+                  : tries === 1 ? 'One trade: a win passes it (funded on a fresh ' + money(b.size) + '), a stop ends it'
+                  : 'One trade to the target: a win passes it (funded on a fresh ' + money(b.size) + ') · ' + tries + ' stops in the ' + money(s.d) + ' drawdown, and after a loss the next target stands further off, to end at +' + money(T)],
+      ['Funded', CLAIM + ' the whole profit whenever a trade leaves it ahead' + (s.minClaim ? ' by ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours' + (!go && tries === 1 ? ' · a stop ends the account' : '')],
       ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
       ['Limits', fmax + ' funded and ' + emax + ' evals at once']
     ];
