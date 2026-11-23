@@ -92,7 +92,7 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
       </div>
     </div>
     <div>
-      <h2 title="Our real G1/V2 GOs, 13 Jul – 20 Nov 2026, none at the same time: 2,053 eval trades won 38.9% (a coin 39.5%), 1,817 funded trades 30.3% (a coin 30.5%)">Our GOs, fees in</h2>
+      <h2 id="rates-h"></h2>
       <div class="wrap cells">
         <div class="cell"><span class="k">Eval pass</span><span class="v"><span id="r-pass">–</span><small>%</small></span></div>
         <div class="cell"><span class="k" title="What a funded account pays you before it is lost">Funded pays</span><span class="v" id="r-fund">–</span></div>
@@ -113,9 +113,9 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
     <div class="cell"><label for="i-recv">Received $</label><input class="box" id="i-recv" type="number" min="0" step="0.01" inputmode="decimal"></div>
   </div>
 
-  <h2>The trade · NAS100, 25-point stop</h2>
+  <h2 id="trade-h"></h2>
   <div class="wrap"><table>
-    <thead><tr><th>Account</th><th>NAS100 units</th><th>Stop</th><th>Target</th><th title="What a stop costs, fee and slip in">Loss</th><th title="What a target makes, fee out">Win</th><th title="MFP's fee both ways and a quarter point of slip, already in Loss and Win">Fee + slip</th><th>Wins</th></tr></thead>
+    <thead id="trade-head"></thead>
     <tbody id="trade"></tbody>
   </table></div>
   <p class="note" id="pairs"></p>
@@ -158,7 +158,7 @@ var FRR = 1.5;                              // a funded trade makes 1.5 times it
 var PAIR_OPP = 0.4;                         // two legs of a pair finish on opposite sides 70% of the time (stocks vs QQQ, 2 years
                                             // hourly, 668 days) against 50% for two separate trades: 0.5 + 0.5 x 0.4
 var SHOW_PROGS = true;                      // the table of other programs (the owner, 23 Nov 2026: not on the Vest tab)
-var MARKET = 'NAS100', CLAIM = 'Request';         // the firm's words for the market traded and for taking profit out
+var MARKET = 'NAS100', CLAIM = 'Request', FIRM_NAME = 'MFP';         // the firm's words for the market traded and for taking profit out
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
@@ -322,20 +322,34 @@ if (typeof document !== 'undefined') (function(){
     $('r-fund').textContent = money(st.funded);
     $('r-ev').textContent = signed(st.ev); tone($('r-ev'), st.ev);
     $('r-roi').textContent = '$' + st.roi.toFixed(2);
-    var small = function(v){ return v < 1000 ? cents(v) : money(v); }, row = function(name, tgt, loss, win, p){
-      return '<tr><td>' + name + '</td><td>' + s.units.toFixed(2) + '</td><td>' + GO.stop + ' pts</td><td>' + tgt + ' pts</td><td>' + small(loss) + '</td><td>' + small(win) + '</td><td>' + small(s.units * (GO.slip + s.feePts)) + '</td><td>' + (p * 100).toFixed(1) + '%</td></tr>'; };
-    $('trade').innerHTML = row('Eval', GO.evalTarget, s.eLoss, s.eWin, GO.evalP) + row('Funded', GO.fundedTarget, s.fLoss, s.fWin, GO.fundedP);
+    var small = function(v){ return v < 1000 ? cents(v) : money(v); };
+    var b = PICK, fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0], go = !!s.go;
+    var stop = go ? GO.stop : STOP, units = go ? s.units : s.risk / STOP, loss = go ? s.eLoss : s.risk + s.fee;
+    // an eval win and a funded win after the fee, the points their targets stand at, and how often each wins
+    var eWin = go ? s.eWin : T, fWin = go ? s.fWin : FRR * s.risk - s.fee;
+    var ePts = go ? GO.evalTarget : (T + s.fee) / units, fPts = go ? GO.fundedTarget : STOP * FRR;
+    var eP = go ? GO.evalP : s.risk / (s.risk + T + s.fee), fP = go ? GO.fundedP : 1 / (1 + FRR);
+    var cost = go ? units * (GO.slip + s.feePts) : s.fee, pts = function(v){ return (Math.round(v * 100) / 100) + ' points'; };
+    $('rates-h').textContent = go ? 'Our GOs, fees in' : 'Coin flip, fees in';
+    $('rates-h').title = go ? 'Our real G1/V2 GOs, 13 Jul – 20 Nov 2026, none at the same time: 2,053 eval trades won 38.9% (a coin 39.5%), 1,817 funded trades 30.3% (a coin 30.5%)'
+      : 'Every trade a coin flip at fair odds for its stop and target, less ' + FIRM_NAME + '\'s fee';
+    $('trade-h').textContent = 'The trade · ' + MARKET + ', ' + stop + '-point stop' + (PAIRS ? ', in pairs' : '');
+    $('trade-head').innerHTML = '<tr><th>Account</th><th>' + MARKET + ' units</th><th>Stop</th><th>Target</th><th title="What a stop costs, the fee in">Loss</th><th title="What a target makes, the fee out">Win</th><th title="' + FIRM_NAME + '\'s fee both ways' + (go ? ' and a quarter point of slip' : '') + ', already in Loss and Win">' + (go ? 'Fee + slip' : 'Fee') + '</th><th>Wins</th></tr>';
+    var row = function(name, tgt, win, pr){
+      return '<tr><td>' + name + '</td><td>' + units.toFixed(2) + '</td><td>' + stop + ' pts</td><td>' + (Math.round(tgt * 100) / 100) + ' pts</td><td>' + small(loss) + '</td><td>' + small(win) + '</td><td>' + small(cost) + '</td><td>' + (pr * 100).toFixed(1) + '%</td></tr>'; };
+    $('trade').innerHTML = row('Eval', ePts, eWin, eP) + row('Funded', fPts, fWin, fP);
     // the system as it is traded, in the numbers of the build this page plans with
-    var b = PICK, fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0];
     var sys = [
-      ['Signal', 'Every G1 / V2 GO, never two at the same time · about 20 a day'],
-      ['Accounts', PAIRS ? 'Each GO opens two accounts, funded ones first · one trade an account a day'
-                         : 'Each GO goes to one account, funded ones first · one trade an account a day'],
-      PAIRS ? ['Pair', 'First account: with the GO on ' + MARKET + ' · second account: the opposite way on ES or a stock that moves with it, the same dollar stop'] : null,
-      ['Size', s.units.toFixed(2) + ' ' + MARKET + ' units · a stop costs ' + cents(s.eLoss) + ', under the ' + money(b.dl * b.size) + ' day limit'],
-      ['Stop', GO.stop + ' points'],
-      ['Target', 'Eval ' + GO.evalTarget + ' points, +' + cents(s.eWin) + ' · funded ' + GO.fundedTarget + ' points, +' + cents(s.fWin)],
-      ['Eval', 'Trades on until +' + money(T) + ' (passed, funded on a fresh ' + money(b.size) + ') or the ' + money(s.d) + ' drawdown is gone'],
+      ['Signal', go ? 'Every G1 / V2 GO, never two at the same time · about 20 a day'
+                    : 'Mark the 9:30 New York open; at 10:00 buy the market below its open and short the one above · counted as a coin flip'],
+      ['Accounts', (PAIRS ? (go ? 'Each GO opens two accounts' : 'Each entry opens two accounts') : 'Each GO goes to one account') + ', funded ones first · one trade an account a day'],
+      PAIRS ? ['Pair', (go ? 'First account: with the GO on ' + MARKET + ' · second account: the opposite way on ES or a stock that moves with it'
+                           : 'One account long, the other short a market that moves with it (' + MARKET + ' against ES or a stock)') + ', the same dollar stop'] : null,
+      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · a stop costs ' + cents(loss) + ', under the ' + money(b.dl * b.size) + ' day limit'],
+      ['Stop', stop + ' points'],
+      ['Target', 'Eval ' + pts(ePts) + ', +' + cents(eWin) + ' · funded ' + pts(fPts) + ', +' + cents(fWin)],
+      ['Eval', go ? 'Trades on until +' + money(T) + ' (passed, funded on a fresh ' + money(b.size) + ') or the ' + money(s.d) + ' drawdown is gone'
+                  : 'One trade to the target: a win passes it (funded on a fresh ' + money(b.size) + ') · ' + TRIES + ' stops in the ' + money(s.d) + ' drawdown, and after a loss the next target stands further off, to end at +' + money(T)],
       ['Funded', CLAIM + ' the whole profit whenever a trade leaves it ahead' + (s.minClaim ? ' by ' + money(s.minClaim) + ' or more' : '') + ' · ' + Math.round(b.split * 100) + '% is yours'],
       ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
       ['Limits', fmax + ' funded and ' + emax + ' evals at once']
