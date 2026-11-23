@@ -61,7 +61,7 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 .chartbox text{font-size:11.5px;fill:var(--mute);font-variant-numeric:tabular-nums}
 /* the two firms side by side, each this page for one firm in a frame of its own */
 main.wide{max-width:1560px}
-.profiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.profiles{margin-top:22px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
 .profiles iframe{display:block;width:100%;height:1500px;border:0;background:var(--bg);color-scheme:dark}
 .embed main{max-width:none;padding:0;display:flow-root}
 html.embed,.embed body{overflow:hidden}
@@ -90,7 +90,16 @@ html.embed,.embed body{overflow:hidden}
 <main>
   <h1 class="sr">Funded Slots Roadmap: My Funded Perpetuals</h1>
   <nav class="tabs" aria-label="Fleet"><a class="tab" href="./?fleet=g1">G1</a><a class="tab" href="./?fleet=v2">V2 fleet</a><a class="tab" href="./?fleet=5ers">5ers</a><a class="tab" href="vest.html" aria-current="page">Perps</a></nav>
-  <div id="split" hidden><div class="profiles"><iframe id="pf1" title="Vest"></iframe><iframe id="pf2" title="My Funded Perpetuals"></iframe></div></div>
+  <div id="split" hidden>
+    <h2>Perps · both firms</h2>
+    <div class="wrap cells" id="both">
+      <div class="cell"><span class="k">Buy now</span><span class="v" id="b-buy">–</span></div>
+      <div class="cell"><span class="k" title="The two firms' wallets added: each covers 99 of 100 plays of its own plan, so together they cover more than that">Cash needed</span><span class="v" id="b-need">–</span><span class="v" id="b-need2"></span></div>
+      <div class="cell"><span class="k">Net after 48 weeks</span><span class="v" id="b-net">–</span></div>
+      <div class="cell"><span class="k">Once running</span><span class="v" id="b-run">–</span></div>
+    </div>
+    <div class="profiles"><iframe id="pf1" title="Vest"></iframe><iframe id="pf2" title="My Funded Perpetuals"></iframe></div>
+  </div>
   <div id="one">
 
   <div class="top">
@@ -353,17 +362,37 @@ if (typeof document !== 'undefined') (function(){
     document.getElementById('split').hidden = false;
     document.querySelector('main').className = 'wide';
     document.title = 'Funded Slots Roadmap · Perps';
+    // each frame tells its height and its plan's numbers; the strip above them adds the two plans up
+    var got = [null, null], fmt = function(v){ return (v < -0.5 ? '−$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US'); };
+    var put = function(id, html, v){ var el = document.getElementById(id); el.innerHTML = html; if (v !== undefined) el.className = 'v ' + (v > 0.5 ? 'pos' : v < -0.5 ? 'neg' : ''); };
+    var num = function(o, k){ var v = o && Number(o[k]); return isFinite(v) ? v : null; };
     window.addEventListener('message', function(e){
       if (e.origin !== location.origin || !e.data || typeof e.data.perpsH !== 'number') return;
-      [f1, f2].forEach(function(f){ if (e.source === f.contentWindow) f.style.height = Math.min(8000, Math.max(300, Math.ceil(e.data.perpsH))) + 'px'; });
+      [f1, f2].forEach(function(f, i){
+        if (e.source !== f.contentWindow) return;
+        f.style.height = Math.min(8000, Math.max(300, Math.ceil(e.data.perpsH))) + 'px';
+        var d = e.data.plan, keys = ['buy', 'cost', 'wallet', 'need', 'net', 'monthly'];
+        if (d && keys.every(function(k){ return num(d, k) !== null; })) got[i] = d;
+      });
+      if (!got[0] || !got[1]) return;
+      var t = {}; ['buy', 'cost', 'wallet', 'need', 'net', 'monthly'].forEach(function(k){ t[k] = num(got[0], k) + num(got[1], k); });
+      put('b-buy', t.buy ? t.buy + ' evals <small>' + fmt(t.cost) + '</small>' : '0 evals');
+      put('b-need', fmt(t.wallet) + ' <small>wallet 99%</small>');
+      put('b-need2', '<small>' + fmt(t.need) + ' expected</small>');
+      put('b-net', (t.net > 0.5 ? '+' : '') + fmt(t.net), t.net);
+      put('b-run', (t.monthly > 0.5 ? '+' : '') + fmt(t.monthly) + '<small>/mo</small>', t.monthly);
     });
     var fresh = '&v=' + Math.floor(Date.now() / 6e5);       // a new address every 10 minutes, so a frame is never an old copy for long
     f1.src = 'vest.html?p=1' + fresh; f2.src = 'mfp.html?p=1' + fresh;
     return;
   }
   document.documentElement.className = 'embed';
-  function tell(){ try { window.parent.postMessage({ perpsH: document.querySelector('main').offsetHeight + 4 }, location.origin); } catch (e) {} }
-  window.addEventListener('resize', tell);
+  var lastPlan = null;
+  function tell(res){
+    if (res) lastPlan = { buy: res.buy, cost: res.cost, wallet: res.wallet, need: res.need, net: res.net, monthly: res.monthly };
+    try { window.parent.postMessage({ perpsH: document.querySelector('main').offsetHeight + 4, plan: lastPlan }, location.origin); } catch (e) {}
+  }
+  window.addEventListener('resize', function(){ tell(); });
   var STORE = 'funded-slots-roadmap-mfp-5k', state;
   try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
   function $(id){ return document.getElementById(id); }
@@ -464,7 +493,7 @@ if (typeof document !== 'undefined') (function(){
         return '<tr' + (b === PICK ? ' class="pick"' : '') + '><td>' + name + '</td><td>' + (x.pass * 100).toFixed(1) + '%</td><td>' + money(x.funded) + '</td><td class="' + (x.ev > 0 ? 'pos' : 'neg') + '">' + signed(x.ev) + '</td><td>$' + x.roi.toFixed(2) + '</td><td>' + money(pl.wallet) + '</td><td class="' + (pl.monthly > 0 ? 'pos' : 'neg') + '">' + signed(pl.monthly) + '/mo</td></tr>'; };
       $('cmp').innerHTML = line(PICK, ms, res) + line(alt, as, ap);
     }
-    tell();
+    tell(res);
   }
   var timer = 0;
   ['seats', 'evals', 'funded', 'price', 'paid', 'recv'].forEach(function(k){
