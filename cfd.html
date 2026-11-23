@@ -180,7 +180,11 @@ html.embed,.embed body{overflow:hidden}
 // sells him no more accounts (help centre, The Live Program): the plan ends at the fifth payout (payCap), and the Live
 // accounts that follow are given no value. So each payout is made big: the owner, 24 Nov 2026, "so why tradify funded
 // account we not do 1:5 trades fixed", then, on the study's table (study\tfx_five.js), "so best 1:10": a funded trade
-// risks its 50 points for 500 (frr).
+// risks its 50 points for 500 (frr). Then the firm's fair-play page was read (Trader check-ins, KYT and fair play): "rolling
+// accounts" (blowing accounts at maximum risk and buying new ones until one passes) and gaming the evaluation are
+// violations: profits forfeited, a permanent ban. The owner, 24 Nov 2026, on the study's table (study\tfx_calm.js): "Yes, 1%
+// risk". So the plan is calm: every stop loses 1% of the account (10 units), eval trades 1:3, funded trades 1:10, at
+// coin-flip odds (br); the one-trade way is kept as the build's twin. The plan runs 96 weeks (weeks).
 // GO: the real G1 + V2 trades of 13 Jul - 20 Nov 2026 taken none at the same time (study\go_rates.py on
 // simulation_data\cme.json: 2,053 trades on the eval bracket, 22.3 a day, and 1,817 on the funded one), 25-point stop,
 // 38.25 target on an eval and 57 on a funded account. How often they won (a coin would win 39.53% / 30.49%) and the points
@@ -203,7 +207,10 @@ var LEAN = true;                            // only what the 5ers tab has (the o
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
-  { name: 'Classic 50K · 5% + 10% · 10% · 3% · 80%', size: 50000, dd: 0.10, dl: 0.03, dlKeep: 0.80, tg: [0.05, 0.10], split: 0.80, price: 230, tries: 1, pick: true, frr: 10, payCap: 5, payWait: 10, feeSide: 0.5 / 26000, maxLev: 30, minClaim: 100, fundedMax: 6, evalMax: 6, twin: { go: true, tries: 2, stat: [0.2033, 3439, 18.66] }, stat: [0.3235, 3890, 7.33] }
+  { name: 'Classic 50K · 5% + 10% · 10% · 3% · 80%', size: 50000, dd: 0.10, dl: 0.03, dlKeep: 0.80, tg: [0.05, 0.10], split: 0.80, price: 230, pick: true,
+    go: true, tries: 10, br: { stop: 50, slip: 0, evalTarget: 150, fundedTarget: 500, evalWin: 150, fundedWin: 500, evalP: 1 / 4, fundedP: 1 / 11 },
+    brNote: 'Every trade a coin flip at fair odds for its stop and target, less a point of cost. Our G1 / V2 signals win like a coin at these brackets (12 Jul – 10 Nov 2026: 25.0% of 791 at 50 / 150, 9.3% of 376 at 50 / 500)',
+    weeks: 96, frr: 10, payCap: 5, payWait: 10, feeSide: 0.5 / 26000, maxLev: 30, minClaim: 100, fundedMax: 6, evalMax: 6, twin: { go: false, tries: 1, stat: [0.3235, 3890, 7.33] }, stat: [0.2562, 3871, 47.89] }
 ];
 function vestRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 // stat: one account bought and played to its end, 4,000,000 times by vestBuild (how often it passes, what a funded one pays
@@ -224,11 +231,12 @@ function vestTwin(b){ return b.twin ? Object.assign({}, b, { go: b.twin.go, trie
 function vestSpec(b, stop){
   var d = b.dd * b.size, risk = d / (b.tries || TRIES);       // a build's own number of stops in the drawdown, else 3
   if (b.go) {                                  // our GOs' brackets: a third of the drawdown on the 25-point stop
-    var un = risk / GO.stop, feePts = NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, loss = GO.stop + GO.slip + feePts;
+    var G = b.br || GO;                         // a build's own brackets (stop, targets, odds), else our GOs'
+    var un = risk / G.stop, feePts = NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, loss = G.stop + G.slip + feePts;
     if (b.dl) un = Math.min(un, b.dl * b.size * (b.dlKeep || 0.97) / loss);          // a stop stays inside the day's loss limit
     if (b.maxLev) un = Math.min(un, b.maxLev * b.size / NQ_PX);        // and the position inside the firm's leverage
-    return { go: true, d: d, risk: risk, units: un, fee: 0, feePts: feePts, cap: un * loss, eWin: un * (GO.evalWin - feePts), eLoss: un * loss,
-      fWin: un * (GO.fundedWin - feePts), fLoss: un * loss, minClaim: b.minClaim || 0, lock: !!b.lock,
+    return { go: true, d: d, risk: risk, units: un, fee: 0, feePts: feePts, cap: un * loss, eWin: un * (G.evalWin - feePts), eLoss: un * loss,
+      fWin: un * (G.fundedWin - feePts), fLoss: un * loss, eP: G.evalP, fP: G.fundedP, minClaim: b.minClaim || 0, lock: !!b.lock,
       targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
   }
   if (b.dl) risk = Math.min(risk, b.dl * b.size * (b.dlKeep || 0.97));       // a stop and its fee stay inside the day's loss limit
@@ -246,13 +254,13 @@ function vestStep(a, s, u){
     if (a.room < s.cap * 0.02) { a.dead = true; return 0; }
     var sc = Math.min(1, a.room / s.cap), g, out = 0;
     if (a.stage >= 0) {
-      g = (u < GO.evalP ? s.eWin : -s.eLoss) * sc;
+      g = (u < s.eP ? s.eWin : -s.eLoss) * sc;
       a.room += g; a.gain += g;
       if (a.gain >= s.targets[a.stage] - 1e-9) { a.stage = a.stage + 1 < s.targets.length ? a.stage + 1 : -1; a.room = s.d; a.gain = 0; if (a.stage < 0) a.wait = true; }
       else if (a.room < s.cap * 0.02) a.dead = true;
       return 0;
     }
-    g = (u < GO.fundedP ? s.fWin : -s.fLoss) * sc;
+    g = (u < s.fP ? s.fWin : -s.fLoss) * sc;
     a.room += g; a.gain += g;
     // a claim takes the whole profit once it is at least the firm's minimum; where the floor locks to the starting balance
     // on the first withdrawal (s.lock) the account has no room left after it, so it ends there
@@ -389,7 +397,7 @@ if (typeof document !== 'undefined') (function(){
   'use strict';
   if (HOME) { location.replace(HOME); return; }
   function tell(){}
-  var STORE = 'funded-slots-roadmap-cfd-50k-c', state;
+  var STORE = 'funded-slots-roadmap-cfd-50k-d', state;
   try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
   function $(id){ return document.getElementById(id); }
   function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
@@ -408,14 +416,15 @@ if (typeof document !== 'undefined') (function(){
     var go = !!s.go;
     var b = PICK, tries = go ? TRIES : Math.max(1, Math.ceil(s.d / (s.risk + s.fee) - 1e-9)), fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0];        // tries: how many stops fit in the drawdown as the trades are really sized
     var r0 = Math.min(s.risk, s.d - s.fee);            // the videos' way: a stop never goes past the floor, the fee counted
-    var stop = go ? GO.stop : STOP, units = go ? s.units : r0 / STOP, loss = go ? s.eLoss : r0 + s.fee;
+    var GG = PICK.br || GO, own = go && !!PICK.br;      // own: fixed brackets of the build's own, at coin-flip odds
+    var stop = go ? GG.stop : STOP, units = go ? s.units : r0 / STOP, loss = go ? s.eLoss : r0 + s.fee;
     // an eval win and a funded win after the fee, the points their targets stand at, and how often each wins
     var F0 = s.frr || FRR, eWin = go ? s.eWin : T, fWin = go ? s.fWin : F0 * r0 - s.fee;
-    var ePts = go ? GO.evalTarget : (T + s.fee) / units, fPts = go ? GO.fundedTarget : STOP * F0;
-    var eP = go ? GO.evalP : r0 / (r0 + T + s.fee), fP = go ? GO.fundedP : 1 / (1 + F0);
-    var cost = go ? units * (GO.slip + s.feePts) : s.fee, pts = function(v){ return (Math.round(v * 100) / 100) + ' points'; };
-    $('rates-h').textContent = go ? 'Our GOs, fees in' : 'Coin flip, fees in';
-    $('rates-h').title = go ? 'Our real G1/V2 GOs, 13 Jul – 20 Nov 2026, none at the same time: 2,053 eval trades won 38.9% (a coin 39.5%), 1,817 funded trades 30.3% (a coin 30.5%)'
+    var ePts = go ? GG.evalTarget : (T + s.fee) / units, fPts = go ? GG.fundedTarget : STOP * F0;
+    var eP = go ? GG.evalP : r0 / (r0 + T + s.fee), fP = go ? GG.fundedP : 1 / (1 + F0);
+    var cost = go ? units * (GG.slip + s.feePts) : s.fee, pts = function(v){ return (Math.round(v * 100) / 100) + ' points'; };
+    $('rates-h').textContent = go && !own ? 'Our GOs, fees in' : 'Coin flip, fees in';
+    $('rates-h').title = own ? PICK.brNote || '' : go ? 'Our real G1/V2 GOs, 13 Jul – 20 Nov 2026, none at the same time: 2,053 eval trades won 38.9% (a coin 39.5%), 1,817 funded trades 30.3% (a coin 30.5%)'
       : 'Every trade a coin flip at fair odds for its stop and target, less ' + FIRM_NAME + '\'s fee. Our G1 / V2 signals win like a coin at these brackets (12 Jul – 10 Nov 2026: 50.0% of 1,387 at 50 / 50, 22.7% of 740 at 50 / 172)';
     $('trade-h').textContent = 'The trade · ' + MARKET + ', ' + stop + '-point stop' + (PAIRS ? ', in pairs' : '');
     $('trade-head').innerHTML = '<tr><th>Account</th><th>' + MARKET + ' units</th><th>Stop</th><th>Target</th><th title="What a stop costs, the fee in">Loss</th><th title="What a target makes, the fee out">Win</th><th title="' + FIRM_NAME + '\'s fee both ways' + (go ? ' and a quarter point of slip' : '') + ', already in Loss and Win">' + (go ? 'Fee + slip' : 'Fee') + '</th><th>Wins</th></tr>';
@@ -449,6 +458,15 @@ if (typeof document !== 'undefined') (function(){
       ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
       ['Limits', fmax + ' funded and ' + emax + ' evals at once']
     ];
+    // lean, a calm plan: a small fixed risk a trade at fixed brackets of the build's own
+    if (LEAN && own) sys = [
+      ['Signal', 'Every G1 / V2 GO · one account a signal, funded ones first · one trade an account a day'],
+      ['Size', units.toFixed(2) + ' ' + MARKET + ' units · stop ' + stop + ' points = ' + money(loss) + ' · ' + (loss / b.size * 100).toFixed(1) + '% of the account'],
+      ['Eval', 'Every trade 1:' + Math.round(ePts / stop) + ' · target ' + Math.round(ePts) + ' points = +' + money(eWin) + ' · ' + s.targets.map(function(t, i){ return (s.targets.length > 1 ? 'step ' + (i + 1) + ' ' : '') + 'until +' + money(t); }).join(', ') + ' · about ' + Math.round(st.trades) + ' trades an eval'],
+      ['Funded', 'Every trade 1:' + Math.round(fPts / stop) + ' · target ' + Math.round(fPts) + ' points = +' + money(fWin) + ' · ' + (PAYS || CLAIM.toLowerCase() + ' every win') + ' · ' + Math.round(b.split * 100) + '% is yours'],
+      ['Ended account', 'A new eval the next trading day · ' + money(state.price)],
+      ['Limits', fmax + ' funded and ' + emax + ' evals at once']
+    ];
     $('system').innerHTML = sys.filter(Boolean).map(function(r){ return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
     $('progs-box').hidden = LEAN || !SHOW_PROGS;
     $('trade-box').hidden = LEAN;
@@ -459,7 +477,7 @@ if (typeof document !== 'undefined') (function(){
   }
   var tipEl = document.createElement('div'), chartRows = [], chartGeo = null; tipEl.className = 'tip'; tipEl.hidden = true;
   function drawChart(rows){
-    var show = rows.slice(0, 24), W = 1120, Hh = 300, L = 62, R = 84, T = 12, B = 26, n = show.length;
+    var show = PICK.weeks ? rows : rows.slice(0, 24), W = 1120, Hh = 300, L = 62, R = 84, T = 12, B = 26, n = show.length;
     var hi = 0, lo = 0;
     show.forEach(function(r){ hi = Math.max(hi, r.inn, r.total); lo = Math.min(lo, -r.out, r.total); });
     if (hi - lo < 1) hi = lo + 1;
@@ -474,7 +492,7 @@ if (typeof document !== 'undefined') (function(){
       svg.push('<rect x="' + (x + bw * 0.18) + '" y="' + y(0) + '" width="' + bw * 0.64 + '" height="' + Math.max(0, y(-r.out) - y(0)) + '" fill="var(--out)" rx="2"/>');
       path += (i ? 'L' : 'M') + c + ' ' + y(r.total);
       svg.push('<circle cx="' + c + '" cy="' + y(r.total) + '" r="3" fill="var(--net)"/>');
-      if (i % 4 === 0) svg.push('<text x="' + c + '" y="' + (Hh - 8) + '" text-anchor="middle">W' + r.week + '</text>');
+      if (i % (n > 48 ? 8 : 4) === 0) svg.push('<text x="' + c + '" y="' + (Hh - 8) + '" text-anchor="middle">W' + r.week + '</text>');
     });
     svg.push('<path d="' + path + '" fill="none" stroke="var(--net)" stroke-width="2"/>');
     // the running total at the line's end, and a hair line for the week under the pointer
@@ -509,7 +527,7 @@ if (typeof document !== 'undefined') (function(){
   $('chart').addEventListener('pointerdown', onPoint);
   $('chart').addEventListener('pointerleave', hideTip);
   function update(){
-    var res = vestPlan(PICK, state, PAIRS ? PAIR_OPP : 0, RUNS, WEEKS), single = PAIRS ? vestPlan(PICK, state, 0, RUNS, WEEKS) : res;
+    var res = vestPlan(PICK, state, PAIRS ? PAIR_OPP : 0, RUNS, PICK.weeks || WEEKS), single = PAIRS ? vestPlan(PICK, state, 0, RUNS, WEEKS) : res;
     $('t-buy').innerHTML = res.buy ? res.buy + ' evals <small>' + money(res.cost) + '</small>' : '0 evals';
     $('t-need').innerHTML = money(res.wallet) + ' <small>wallet 99%</small>';
     $('t-need2').innerHTML = '<small>' + money(res.need) + ' expected</small>';
