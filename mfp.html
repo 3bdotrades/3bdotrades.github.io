@@ -334,6 +334,22 @@ function vestPlan(b, st, opp, runs, weeks){
   return { buy: buy0, cost: buy0 * price, wallet: holes[Math.min(runs - 1, Math.ceil(SAFE * runs) - 1)], need: -lowMean,
     net: nets / runs, monthly: late / (weeks - from) * 52 / 12, rows: rows };
 }
+// The feed (the owner: "make it update automatically like 5ers"): tools/mfp.js on his PC counts his MFP accounts through
+// MFP's API every 10 minutes and publishes the counts as mfp.json beside the live counts. vestFeed reads one such file for
+// the size this page plans with: evals open, funded open, and Paid = evals bought since the feed began x the eval price.
+// Anything not exactly as expected is no feed (null), and the boxes stay typed. MFP's API shows no payouts: Received is typed.
+var FEED_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/mfp.json';                          // '' = no feed (this file); the MFP page has the address
+function vestFeed(o, size, price){
+  if (!o || o.v !== 1 || !o.counts || typeof o.at !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(o.at)) return null;
+  var out = {}, ok = true;
+  ['evals', 'funded', 'bought'].forEach(function(k){
+    var c = o.counts[k], v = c && typeof c === 'object' ? c[size] : undefined;
+    if (typeof v !== 'number' || !isFinite(v) || v < 0 || v > 5000 || v !== Math.floor(v)) ok = false;
+    out[k] = v;
+  });
+  if (!ok) return null;
+  return { evals: out.evals, funded: out.funded, paid: Math.round(out.bought * price * 100) / 100, at: o.at };
+}
 var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 36, paid: 0, recv: 0 };
 function vestClean(o){
   var p = {}, lim = { seats: [2, 40], evals: [0, EVAL_MAX], funded: [0, FUNDED_MAX], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
@@ -345,7 +361,7 @@ function vestClean(o){
   return p;
 }
 // ---------- VEST ENGINE END ----------
-if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestFeed: vestFeed, FEED_URL: FEED_URL, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
 if (typeof document !== 'undefined') (function(){
   'use strict';
   if (HOME) { location.replace(HOME); return; }
@@ -474,7 +490,24 @@ if (typeof document !== 'undefined') (function(){
     });
     el.addEventListener('change', function(){ el.value = state[k]; });
   });
+  // the feed: when it is there, Evals open, Funded open and Paid are its numbers and their boxes are locked
+  function takeFeed(o){
+    var f = vestFeed(o, PICK.size, state.price);
+    if (!f) return;
+    var n = vestClean({ seats: state.seats, evals: f.evals, funded: f.funded, price: state.price, paid: f.paid, recv: state.recv });
+    var moved = n.evals !== state.evals || n.funded !== state.funded || n.paid !== state.paid;
+    state = n;
+    ['evals', 'funded', 'paid'].forEach(function(k){ var el = $('i-' + k); el.value = state[k]; el.disabled = true; el.title = 'From your MFP accounts, read ' + f.at.slice(11, 16) + ' UTC'; });
+    if (moved) { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} drawStatic(); update(); }
+  }
+  function loadFeed(){
+    if (!FEED_URL || typeof fetch !== 'function') return;
+    try { fetch(FEED_URL + '?t=' + Date.now(), { cache: 'no-store' }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(takeFeed).catch(function(){}); } catch (e) {}
+  }
   drawStatic(); update();
+  loadFeed();
+  setInterval(function(){ if (!document.hidden) loadFeed(); }, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) loadFeed(); });
 })();
 </script>
 </body>
