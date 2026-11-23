@@ -81,7 +81,7 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 
   <div class="top">
     <div>
-      <h2>Vest · 50K 1-Step</h2>
+      <h2>Vest · 5K 1-Step</h2>
       <div class="wrap cells">
         <div class="cell"><span class="k">Buy now</span><span class="v" id="t-buy">–</span></div>
         <div class="cell"><span class="k" title="The deepest your own cash goes before claims cover it: in 99 of 100 plays of the plan, and on the average path">Cash needed</span><span class="v" id="t-need">–</span><span class="v" id="t-need2"></span></div>
@@ -118,7 +118,7 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
   </table></div>
   <p class="note" id="pairs"></p>
 
-  <h2>Programs · 50K, of 777 priced on 23 Nov 2026</h2>
+  <h2>Programs · of 777 priced on 23 Nov 2026</h2>
   <div class="wrap"><table>
     <thead><tr><th>Program</th><th>Price</th><th>Pass</th><th>Funded pays</th><th>Per eval bought</th><th>Per $1 paid</th><th>Per trade</th></tr></thead>
     <tbody id="progs"></tbody>
@@ -133,22 +133,23 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 // Vest Capital, read on 23 Nov 2026 (prices: its catalog API; rules: docs.vestmarkets.com): static drawdown, a hard daily
 // loss limit from 20:00 New York, profit claimed any time and credited 24 hours later at the split, no minimum, no
 // consistency rule, 10 funded and 100 evals at once, taker fee 0.0025% a side on index perps, no API on funded accounts.
-// The build the owner picked that day: 50K 1-Step, 10% target, 8% drawdown, 3% daily loss, 95% split; a 50-point stop on NQ;
+// The build the owner picked that day: first the 50K 1-Step at 95% ($710), then, for the return on the money put in, the
+// 5K 1-Step, 10% target, 8% drawdown, 3% daily loss, 80% split ($55: "so we go for 5K 1-Step 10/8/3/80"); a 50-point stop on NQ;
 // trades in hedge pairs. The study behind it is in D:\projects\vest-capital\study (ev.py, replay.py, hedge.py).
 var NQ_PX = 26000, FEE_SIDE = 0.000025;     // NQ near 25,950 on 20 Nov 2026; the fee is on the position's size
 var STOP = 50;                              // points; a tighter stop is a bigger position and so a bigger fee
-var TRIES = 3;                              // full stops in the drawdown: $4,000 / 3 = $1,333 a trade (under the $1,500 day limit)
+var TRIES = 3;                              // full stops in the drawdown: on the 5K, $400 / 3 = $133 a trade (under the $150 day limit)
 var FRR = 1.5;                              // a funded trade makes 1.5 times its risk, and every win is claimed
 var PAIR_OPP = 0.4;                         // two legs of a pair finish on opposite sides 70% of the time (stocks vs QQQ, 2 years
                                             // hourly, 668 days) against 50% for two separate trades: 0.5 + 0.5 x 0.4
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
-  { name: '1-Step · 10% · 8% · 3% · 95%', size: 50000, dd: 0.08, dl: 0.03, tg: [0.10], split: 0.95, price: 710, pick: true, stat: [0.4353, 3520, 6.19] },
-  { name: '1-Step · 5% · 8% · 3% · 95%', size: 50000, dd: 0.08, dl: 0.03, tg: [0.05], split: 0.95, price: 1140, stat: [0.6045, 3520, 7.35] },
-  { name: '1-Step · 10% · 8% · 3% · 80%', size: 50000, dd: 0.08, dl: 0.03, tg: [0.10], split: 0.80, price: 560, stat: [0.4353, 2964, 6.19] },
-  { name: '1-Step · 20% · 8% · 3% · 80%', size: 50000, dd: 0.08, dl: 0.03, tg: [0.20], split: 0.80, price: 340, stat: [0.2789, 2968, 5.08] },
-  { name: '2-Step · 10% + 5% · 6% · 3% · 80%', size: 50000, dd: 0.06, dl: 0.03, tg: [0.10, 0.05], split: 0.80, price: 175, stat: [0.1962, 2226, 5.07] },
-  { name: 'Instant · 4% · 95%', size: 50000, dd: 0.04, dl: 0, tg: [], split: 0.95, price: 2000, stat: [1, 1760, 8.61] }
+  { name: '5K 1-Step · 10% · 8% · 3% · 80%', size: 5000, dd: 0.08, dl: 0.03, tg: [0.10], split: 0.80, price: 55, pick: true, stat: [0.4353, 296.4, 6.19] },
+  { name: '5K 1-Step · 10% · 8% · 3% · 95%', size: 5000, dd: 0.08, dl: 0.03, tg: [0.10], split: 0.95, price: 70, stat: [0.4353, 352, 6.19] },
+  { name: '5K 2-Step · 10% + 5% · 6% · 3% · 80%', size: 5000, dd: 0.06, dl: 0.03, tg: [0.10, 0.05], split: 0.80, price: 15, stat: [0.1962, 222.6, 5.07] },
+  { name: '50K 1-Step · 10% · 8% · 3% · 95%', size: 50000, dd: 0.08, dl: 0.03, tg: [0.10], split: 0.95, price: 710, stat: [0.4353, 3520, 6.19] },
+  { name: '50K 2-Step · 10% + 5% · 6% · 3% · 80%', size: 50000, dd: 0.06, dl: 0.03, tg: [0.10, 0.05], split: 0.80, price: 175, stat: [0.1962, 2226, 5.07] },
+  { name: '50K Instant · 4% · 95%', size: 50000, dd: 0.04, dl: 0, tg: [], split: 0.95, price: 2000, stat: [1, 1760, 8.61] }
 ];
 function vestRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 // stat: one account bought and played to its end, 4,000,000 times by vestBuild (how often it passes, what a funded one pays
@@ -247,7 +248,7 @@ function vestPlan(b, st, opp, runs, weeks){
   return { buy: buy0, cost: buy0 * price, wallet: holes[Math.min(runs - 1, Math.ceil(SAFE * runs) - 1)], need: -lowMean,
     net: nets / runs, monthly: late / (weeks - from) * 52 / 12, rows: rows };
 }
-var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 710, paid: 0, recv: 0 };
+var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 55, paid: 0, recv: 0 };
 function vestClean(o){
   var p = {}, lim = { seats: [2, 40], evals: [0, EVAL_MAX], funded: [0, FUNDED_MAX], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
   Object.keys(VEST_SEED).forEach(function(k){
@@ -261,7 +262,7 @@ function vestClean(o){
 if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
 if (typeof document !== 'undefined') (function(){
   'use strict';
-  var STORE = 'funded-slots-roadmap-vest', state;
+  var STORE = 'funded-slots-roadmap-vest-5k', state;       // a key of its own: nothing typed for the 50K build carries over
   try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
   function $(id){ return document.getElementById(id); }
   function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
@@ -278,8 +279,8 @@ if (typeof document !== 'undefined') (function(){
     $('r-roi').textContent = '$' + st.roi.toFixed(2);
     var units = s.risk / STOP, T = s.targets[0], rr = T / s.risk;
     $('trade').innerHTML =
-      '<tr><td>Eval</td><td>' + units.toFixed(1) + '</td><td>' + STOP + ' pts</td><td>' + (STOP * rr).toFixed(1) + ' pts</td><td>' + money(s.risk) + '</td><td>' + money(T) + '</td><td>' + money(s.fee) + '</td><td>' + (100 / (1 + rr)).toFixed(1) + '%</td></tr>' +
-      '<tr><td>Funded</td><td>' + units.toFixed(1) + '</td><td>' + STOP + ' pts</td><td>' + (STOP * FRR).toFixed(1) + ' pts</td><td>' + money(s.risk) + '</td><td>' + money(FRR * s.risk) + '</td><td>' + money(s.fee) + '</td><td>' + (100 / (1 + FRR)).toFixed(1) + '%</td></tr>';
+      '<tr><td>Eval</td><td>' + units.toFixed(2) + '</td><td>' + STOP + ' pts</td><td>' + (STOP * rr).toFixed(1) + ' pts</td><td>' + money(s.risk) + '</td><td>' + money(T) + '</td><td>' + (s.fee < 100 ? cents(s.fee) : money(s.fee)) + '</td><td>' + (100 / (1 + rr)).toFixed(1) + '%</td></tr>' +
+      '<tr><td>Funded</td><td>' + units.toFixed(2) + '</td><td>' + STOP + ' pts</td><td>' + (STOP * FRR).toFixed(1) + ' pts</td><td>' + money(s.risk) + '</td><td>' + money(FRR * s.risk) + '</td><td>' + (s.fee < 100 ? cents(s.fee) : money(s.fee)) + '</td><td>' + (100 / (1 + FRR)).toFixed(1) + '%</td></tr>';
     $('progs').innerHTML = BUILDS.map(function(b, i){
       var x = stats[i];
       return '<tr' + (b.pick ? ' class="pick"' : '') + '><td>' + b.name + '</td><td>' + money(b.price) + '</td><td>' + (x.pass * 100).toFixed(1) + '%</td><td>' + money(x.funded) + '</td><td class="' + (x.ev > 0 ? 'pos' : 'neg') + '">' + signed(x.ev) + '</td><td>$' + x.roi.toFixed(2) + '</td><td class="' + (x.perTrade > 0 ? 'pos' : 'neg') + '">' + signed(x.perTrade) + '</td></tr>';
