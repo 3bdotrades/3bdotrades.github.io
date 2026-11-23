@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "1e25c2e2a3f956390321624f7de297a6d689ab68",
- "built": "2026-11-23T19:07:01.000Z",
+ "at": "8a068340ade259a94a82dfe988e2b380a7f3abda",
+ "built": "2026-11-23T22:16:48.000Z",
  "day": "Mon 23 Nov",
  "counts": {"pass":[43,181],"win":[12,46],"flip":[90,201],"flip25":[47,74]},
  "flipDone": {"flip":[87,195],"flip25":[46,73]},
@@ -86,7 +86,7 @@
   "08ff6c2ab834": {"p":"e","f":"Blue Guardian","gone":"2026-11-18","z":1,"u":1},
   "d3226f988c9c": {"p":"e","f":"Blue Guardian","gone":"2026-11-18","z":1,"u":1},
   "af32059fae07": {"p":"f","f":"Blue Guardian","z":1,"gone":"2026-11-18"},
-  "6d9dffe3a84d": {"p":"e","f":"Topstep","z":1},
+  "6d9dffe3a84d": {"p":"e","f":"Topstep","z":1,"gone":"2026-11-23"},
   "938d16ab1202": {"p":"e","f":"Topstep","z":1,"gone":"2026-11-19"},
   "58bbd8d8c702": {"p":"e","f":"Topstep","gone":"2026-11-23","z":1,"u":1},
   "8ff3075f4068": {"p":"e","f":"Blue Guardian"},
@@ -117,7 +117,9 @@
   "0020227928b0": {"p":"e","f":"LUCID_DAILY"},
   "1be31faf2dc0": {"p":"e","f":"Topstep","gone":"2026-11-23","z":1,"u":1},
   "cae50e345f13": {"p":"e","f":"Topstep","gone":"2026-11-23","z":1,"u":1},
-  "8defdb5b22a5": {"p":"f","f":"Topstep"}
+  "8defdb5b22a5": {"p":"f","f":"Topstep"},
+  "88339d141259": {"p":"e","f":"Topstep"},
+  "d5ba1d1ce9b6": {"p":"e","f":"Topstep"}
  },
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
