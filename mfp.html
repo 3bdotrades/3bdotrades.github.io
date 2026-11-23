@@ -59,6 +59,16 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 .chartcard{padding:12px 12px 6px}
 .chartbox svg{display:block;width:100%;height:auto;overflow:visible}
 .chartbox text{font-size:11.5px;fill:var(--mute);font-variant-numeric:tabular-nums}
+/* the two firms side by side, each this page for one firm in a frame of its own */
+main.wide{max-width:1560px}
+.profiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.profiles iframe{display:block;width:100%;height:1500px;border:0;background:var(--bg);color-scheme:dark}
+.embed main{max-width:none;padding:0;display:flow-root}
+html.embed,.embed body{overflow:hidden}
+.embed .tabs{display:none}
+.embed .top{grid-template-columns:minmax(0,1fr)}
+.embed h2:first-child{margin-top:0}
+@media (max-width:900px){ .profiles{grid-template-columns:minmax(0,1fr);gap:22px 0} }
 @media (max-width:1040px){ .top{grid-template-columns:minmax(0,1fr)} }
 @media (max-width:700px){
   .cells.six{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -79,7 +89,9 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 <body>
 <main>
   <h1 class="sr">Funded Slots Roadmap: My Funded Perpetuals</h1>
-  <nav class="tabs" aria-label="Fleet"><a class="tab" href="./?fleet=g1">G1</a><a class="tab" href="./?fleet=v2">V2 fleet</a><a class="tab" href="./?fleet=5ers">5ers</a><a class="tab" href="vest.html">Vest</a><a class="tab" href="mfp.html" aria-current="page">MFP</a></nav>
+  <nav class="tabs" aria-label="Fleet"><a class="tab" href="./?fleet=g1">G1</a><a class="tab" href="./?fleet=v2">V2 fleet</a><a class="tab" href="./?fleet=5ers">5ers</a><a class="tab" href="vest.html" aria-current="page">Vest · MFP</a></nav>
+  <div id="split" hidden><div class="profiles"><iframe id="pf1" title="Vest"></iframe><iframe id="pf2" title="My Funded Perpetuals"></iframe></div></div>
+  <div id="one">
 
   <div class="top">
     <div>
@@ -133,6 +145,7 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 
   <h2><span>Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span></span></h2>
   <div class="wrap chartcard"><div class="chartbox" id="chart" role="img" aria-label="Weekly claims in, evals out and the running total"></div></div>
+  </div>
 </main>
 
 <script>
@@ -159,6 +172,7 @@ var PAIR_OPP = 0.4;                         // two legs of a pair finish on oppo
                                             // hourly, 668 days) against 50% for two separate trades: 0.5 + 0.5 x 0.4
 var SHOW_PROGS = true;                      // the table of other programs (the owner, 23 Nov 2026: not on the Vest tab)
 var MARKET = 'NAS100', CLAIM = 'Request', FIRM_NAME = 'MFP';         // the firm's words for the market traded and for taking profit out
+var SHELL_HERE = false;                     // this file, opened as a page, shows both firms (false: it goes to vest.html)
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
@@ -304,9 +318,28 @@ function vestClean(o){
   return p;
 }
 // ---------- VEST ENGINE END ----------
-if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, GO: GO, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, GO: GO, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, SHELL_HERE: SHELL_HERE, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
 if (typeof document !== 'undefined') (function(){
   'use strict';
+  // Opened with ?p=1 this page is one firm inside the shell's frame; opened as a page it is the shell (see SHELL_HERE).
+  var EMBED = /[?&]p=1(&|$)/.test(location.search || '');
+  if (!EMBED) {
+    if (!SHELL_HERE) { location.replace('vest.html'); return; }
+    var f1 = document.getElementById('pf1'), f2 = document.getElementById('pf2');
+    document.getElementById('one').hidden = true;
+    document.getElementById('split').hidden = false;
+    document.querySelector('main').className = 'wide';
+    document.title = 'Funded Slots Roadmap · Vest · MFP';
+    window.addEventListener('message', function(e){
+      if (e.origin !== location.origin || !e.data || typeof e.data.perpsH !== 'number') return;
+      [f1, f2].forEach(function(f){ if (e.source === f.contentWindow) f.style.height = Math.min(8000, Math.max(300, Math.ceil(e.data.perpsH))) + 'px'; });
+    });
+    f1.src = 'vest.html?p=1'; f2.src = 'mfp.html?p=1';
+    return;
+  }
+  document.documentElement.className = 'embed';
+  function tell(){ try { window.parent.postMessage({ perpsH: document.querySelector('main').offsetHeight + 4 }, location.origin); } catch (e) {} }
+  window.addEventListener('resize', tell);
   var STORE = 'funded-slots-roadmap-mfp', state;
   try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
   function $(id){ return document.getElementById(id); }
@@ -396,6 +429,7 @@ if (typeof document !== 'undefined') (function(){
     $('pairs').hidden = !PAIRS;
     $('pairs').innerHTML = 'Wallet 99% in pairs <b>' + money(res.wallet) + '</b> · the same accounts traded one by one <b>' + money(single.wallet) + '</b>';
     drawChart(res.rows);
+    tell();
   }
   var timer = 0;
   ['seats', 'evals', 'funded', 'price', 'paid', 'recv'].forEach(function(k){
