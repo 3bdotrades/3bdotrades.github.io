@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "2ef603a6fb2eea53cbceed0662125d5742060a8a",
- "built": "2026-11-23T14:57:04.000Z",
+ "at": "25a7de1608d547e1722b2811e7445b7d639c20d2",
+ "built": "2026-11-23T15:07:04.000Z",
  "day": "Mon 23 Nov",
- "counts": {"pass":[33,127],"win":[10,25],"flip":[38,85],"flip25":[19,40]},
+ "counts": {"pass":[33,127],"win":[12,27],"flip":[38,85],"flip25":[19,40]},
  "flipDone": {"flip":[36,80],"flip25":[19,40]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"b2b210b8e64c":[0,-1],"0818c51c6877":[0,1],"e0028132017c":[0,-1],"6d5033218423":[0,-1],"78f6aeb38ea0":[0,1]},
@@ -93,7 +93,7 @@
   "a1067797add3": {"p":"e","f":"Topstep","gone":"2026-11-18","z":1,"u":1},
   "1cbdabd77517": {"p":"e","f":"Topstep"},
   "1c13b692ea8f": {"p":"e","f":"Blue Guardian","gone":"2026-11-18","z":1,"u":1},
-  "6c3e6db0ad49": {"p":"f","f":"FuturesElite"},
+  "6c3e6db0ad49": {"p":"f","f":"FuturesElite","z":1},
   "cf30f33d0eb1": {"p":"e","f":"FuturesElite","gone":"2026-11-18","z":1,"u":1},
   "a87b60cd78fe": {"p":"e","f":"FuturesElite"},
   "b4e679d38387": {"p":"e","f":"FuturesElite","gone":"2026-11-20","z":1,"u":1},
@@ -115,7 +115,7 @@
   "a7d8bdbac59b": {"p":"f","f":"Blue Guardian","z":1},
   "2dc2e3e6ab93": {"p":"f","f":"Blue Guardian","z":1},
   "7ca44dd35650": {"p":"f","f":"Blue Guardian","z":1},
-  "92815eb89cc4": {"p":"f","f":"Topstep"},
+  "92815eb89cc4": {"p":"f","f":"Topstep","z":1},
   "183287b9e603": {"p":"e","f":"Blue Guardian"},
   "466fc8d0cfda": {"p":"e","f":"Blue Guardian"},
   "20d0106febe9": {"p":"e","f":"Topstep"},
@@ -209,6 +209,8 @@
   "2026-11-23 08:07 eval passed · Tradeify dd9066",
   "2026-11-23 14:47 funded account lost · Blue Guardian a7d8bd",
   "2026-11-23 14:57 funded account lost · Blue Guardian 2dc2e3",
-  "2026-11-23 14:57 funded account lost · Blue Guardian 7ca44d"
+  "2026-11-23 14:57 funded account lost · Blue Guardian 7ca44d",
+  "2026-11-23 15:07 funded account won · FuturesElite 6c3e6d",
+  "2026-11-23 15:07 funded account won · Topstep 92815e"
  ]
 }
