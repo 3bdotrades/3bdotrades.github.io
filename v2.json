@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "23da66d3fc3d6d623036c5a503ccec367b7f6aa7",
- "built": "2026-11-23T06:17:00.000Z",
+ "at": "805a9ac58c468a02da0081e6b05894d76caf9e82",
+ "built": "2026-11-23T07:07:03.000Z",
  "day": "Mon 23 Nov",
- "counts": {"pass":[40,173],"win":[12,45],"flip":[88,196],"flip25":[47,74]},
+ "counts": {"pass":[40,174],"win":[12,45],"flip":[88,196],"flip25":[47,74]},
  "flipDone": {"flip":[87,195],"flip25":[46,73]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"939ef825819d":[1,1],"6dcd002486dc":[0,1]},
@@ -108,7 +108,7 @@
   "e59f25d425a8": {"p":"e","f":"Tradeify"},
   "59d16e3bd835": {"p":"e","f":"Tradeify","gone":"2026-11-23","z":1,"u":1},
   "533b959f68ba": {"p":"e","f":"Tradeify"},
-  "8714583b3d7f": {"p":"e","f":"Tradeify"},
+  "8714583b3d7f": {"p":"e","f":"Tradeify","gone":"2026-11-23","z":1,"u":1},
   "0ae0c80d0e8e": {"p":"e","f":"Lucid"},
   "0020227928b0": {"p":"e","f":"LUCID_DAILY"},
   "1be31faf2dc0": {"p":"e","f":"Topstep","gone":"2026-11-23","z":1,"u":1},
@@ -189,6 +189,7 @@
   "2026-11-23 01:47 eval left the dashboard without a pass: blown · Topstep 58bbd8",
   "2026-11-23 01:57 eval left the dashboard without a pass: blown · Topstep 1be31f",
   "2026-11-23 02:17 eval left the dashboard without a pass: blown · Topstep cae50e",
-  "2026-11-23 06:17 eval left the dashboard without a pass: blown · Tradeify 59d16e"
+  "2026-11-23 06:17 eval left the dashboard without a pass: blown · Tradeify 59d16e",
+  "2026-11-23 07:07 eval left the dashboard without a pass: blown · Tradeify 871458"
  ]
 }
