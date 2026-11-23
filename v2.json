@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "805a9ac58c468a02da0081e6b05894d76caf9e82",
- "built": "2026-11-23T07:07:03.000Z",
+ "at": "a2867ac189de99652e6bfb8fff6fb03849ef509b",
+ "built": "2026-11-23T08:27:08.000Z",
  "day": "Mon 23 Nov",
- "counts": {"pass":[40,174],"win":[12,45],"flip":[88,196],"flip25":[47,74]},
+ "counts": {"pass":[40,174],"win":[12,46],"flip":[88,196],"flip25":[47,74]},
  "flipDone": {"flip":[87,195],"flip25":[46,73]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"939ef825819d":[1,1],"6dcd002486dc":[0,1]},
@@ -58,7 +58,7 @@
   "3ab5601545f6": {"p":"e","f":"Blue Guardian","gone":"2026-11-16","z":1,"u":1},
   "b9b9609abe17": {"p":"e","f":"Blue Guardian","z":1,"gone":"2026-11-13"},
   "fbbedfcb69fb": {"p":"e","f":"Blue Guardian","z":1,"gone":"2026-11-13"},
-  "4232c46cda92": {"p":"e","f":"Blue Guardian","z":1},
+  "4232c46cda92": {"p":"e","f":"Blue Guardian","z":1,"gone":"2026-11-23"},
   "ccf1f85d2d35": {"p":"e","f":"Blue Guardian","z":1,"gone":"2026-11-17"},
   "0572e7116f7d": {"p":"x","f":"Aqua"},
   "97747fe74f77": {"p":"f","f":"Blue Guardian","z":1,"gone":"2026-11-16"},
@@ -103,7 +103,7 @@
   "4361baea11bf": {"p":"e","f":"Blue Guardian"},
   "f4f579d84511": {"p":"e","f":"Blue Guardian"},
   "19144aa61a7d": {"p":"f","f":"Topstep","z":1,"gone":"2026-11-20"},
-  "9af7c4bb8bdd": {"p":"f","f":"Blue Guardian"},
+  "9af7c4bb8bdd": {"p":"f","f":"Blue Guardian","z":1},
   "e21c9eb48e2b": {"p":"e","f":"Tradeify"},
   "e59f25d425a8": {"p":"e","f":"Tradeify"},
   "59d16e3bd835": {"p":"e","f":"Tradeify","gone":"2026-11-23","z":1,"u":1},
@@ -190,6 +190,7 @@
   "2026-11-23 01:57 eval left the dashboard without a pass: blown · Topstep 1be31f",
   "2026-11-23 02:17 eval left the dashboard without a pass: blown · Topstep cae50e",
   "2026-11-23 06:17 eval left the dashboard without a pass: blown · Tradeify 59d16e",
-  "2026-11-23 07:07 eval left the dashboard without a pass: blown · Tradeify 871458"
+  "2026-11-23 07:07 eval left the dashboard without a pass: blown · Tradeify 871458",
+  "2026-11-23 08:27 funded account lost · Blue Guardian 9af7c4"
  ]
 }
