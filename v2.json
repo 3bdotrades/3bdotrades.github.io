@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "a2867ac189de99652e6bfb8fff6fb03849ef509b",
- "built": "2026-11-23T08:27:08.000Z",
+ "at": "aae3b298b1a0d9a2123c33045fee24a6828a0efc",
+ "built": "2026-11-23T09:47:02.000Z",
  "day": "Mon 23 Nov",
  "counts": {"pass":[40,174],"win":[12,46],"flip":[88,196],"flip25":[47,74]},
  "flipDone": {"flip":[87,195],"flip25":[46,73]},
@@ -28,7 +28,8 @@
   ["2026-11-19T22:17","wired","blueguardian|50"],
   ["2026-11-20T11:17","wired","futureselite|50"],
   ["2026-11-20T11:17","wired","futureselite|50"],
-  ["2026-11-23T01:07","pass","topstep|50"]
+  ["2026-11-23T01:07","pass","topstep|50"],
+  ["2026-11-23T09:47","wired","topstep|50"]
  ],
  "acc": {
   "4d0abf093dc9": {"p":"e","f":"Topstep","gone":"2026-11-13","z":1,"u":1},
@@ -112,7 +113,8 @@
   "0ae0c80d0e8e": {"p":"e","f":"Lucid"},
   "0020227928b0": {"p":"e","f":"LUCID_DAILY"},
   "1be31faf2dc0": {"p":"e","f":"Topstep","gone":"2026-11-23","z":1,"u":1},
-  "cae50e345f13": {"p":"e","f":"Topstep","gone":"2026-11-23","z":1,"u":1}
+  "cae50e345f13": {"p":"e","f":"Topstep","gone":"2026-11-23","z":1,"u":1},
+  "8defdb5b22a5": {"p":"f","f":"Topstep"}
  },
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
