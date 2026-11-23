@@ -925,8 +925,9 @@ var FIVE_SIZES = [{ k: '50', size: '50K', list: 97, credit: 10, price: 69.6, pay
 // THE NEW PROGRAM (the5ers' rules of 22 Nov 2026; the owner, 23 Nov 2026: "5ers changed the rules so need to re optimize the
 // system for new rules", "New evals only"): every eval bought from now on, and the funded account it becomes, goes by them;
 // the funded accounts and payouts already here keep the plan of before. An eval needs 6% (goal) and 5 profitable days; a
-// funded account is paid when its profit stands at 4% (pgoal) with 5 new profitable days and no day above 40% of all its
-// profit, at most 5 times, each payout capped (caps, before the 80% split and the 3.5% fee: FIVE_CUT), 14 days apart.
+// funded account is paid when it has made a NEW 4% (pgoal) since its last payout (the owner, 23 Nov 2026, confirmed with
+// the5ers: "it is now for all payouts you have to make 4%"; the first day of this code read it as the profit standing at 4%
+// again), with 5 new profitable days and no day above 40% of that profit, at most 5 times, each payout capped (caps, before the 80% split and the 3.5% fee: FIVE_CUT), 14 days apart.
 // The day plan (his bot's, tools/ba_days.py): one trade a day. An eval: the money still missing less one small day for each
 // profitable day still owed, in one day, then small days; a loser ends at the account's max loss (4%, trailing the best
 // day's end). A funded account: big days of 40% of the payout target until the rest fits the small days owed; a losing day
@@ -1679,12 +1680,12 @@ function fiveZeros(n){ var a = new Array(n); for (var k = 0; k < n; k++) a[k] = 
 function fiveKap(p, q){ function k(a, b){ return Math.min(1.05, Math.max(0.85, b > 0 ? a / b : 1)); } return { e: k(p, FIVE_CHANCE), f: k(q, FIVE_FCHANCE) }; }
 // an account's state: k 'E' / 'F', usd its profit standing, peak the best day's end (the max loss trails it), days its
 // profitable days of this cycle, cum all its profit, best its best day, paid its payouts, since the day of its start or last payout
-function fiveFresh(k, day){ return { k: k, usd: 0, peak: 0, days: 0, cum: 0, best: 0, paid: 0, since: day }; }
+function fiveFresh(k, day){ return { k: k, usd: 0, base: 0, peak: 0, days: 0, cum: 0, best: 0, paid: 0, since: day }; }
 function fiveHeld(a, z){
-  var R = FIVE_NEW[z.k], s = fiveFresh(a.s, 0), got = 0;
+  // a funded account's USD is its profit since its last payout (since its start before the first): a payout needs a new 4%
+  var R = FIVE_NEW[z.k], s = fiveFresh(a.s, 0);
   s.usd = a.usd; s.days = Math.min(FIVE_NDAYS, Math.max(0, a.days)); s.paid = Math.min(FIVE_NPAYS - 1, Math.max(0, a.paid || 0)); s.peak = Math.max(0, a.usd);
-  for (var i = 0; i < s.paid; i++) got += R.caps[i];
-  s.cum = Math.max(0, a.usd) + got; s.best = Math.min(R.big, 0.4 * s.cum);
+  s.cum = Math.max(0, a.usd); s.best = Math.min(R.big, 0.4 * s.cum);
   return s;
 }
 // One place's path under the new rules from trading day d on, to day H: put(day, amount, bought) gets every payout (+) and
@@ -1697,14 +1698,14 @@ function fiveChain(s, d, z, H, T, rnd, kap, keep, put){
     owed = Math.max(FIVE_NDAYS - s.days, 0);
     if (s.k === 'F'){
       if (s.paid >= FIVE_NPAYS){ if (!end(d)) return; continue; }
-      if (s.usd >= R.pgoal && s.days >= FIVE_NDAYS && s.best <= 0.4 * s.cum + 1e-9){
+      if (s.usd - s.base >= R.pgoal && s.days >= FIVE_NDAYS && s.best <= 0.4 * s.cum + 1e-9){
         day = Math.max(d, s.since + FIVE_WAIT); if (day > H) return;
         w = Math.min(R.caps[s.paid], s.usd); put(day, FIVE_CUT * w, 0);
-        s.usd -= w; s.paid++; s.days = 0; s.peak = s.usd; s.since = day;
+        s.usd -= w; s.paid++; s.days = 0; s.peak = s.usd; s.since = day; s.base = s.usd; s.cum = 0; s.best = 0;
         if (s.paid >= FIVE_NPAYS){ if (!end(day)) return; continue; }
         d = T(day + 1); continue;
       }
-      need = R.pgoal - s.usd;
+      need = R.pgoal - (s.usd - s.base);
       G = need <= 0 ? R.small : Math.max(R.small, Math.min(R.big, need - Math.max(owed - 1, 0) * R.small));
     } else {
       need = R.goal - s.usd;
