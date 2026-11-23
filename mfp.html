@@ -95,7 +95,7 @@ html.embed,.embed body{overflow:hidden}
 
   <div class="top">
     <div>
-      <h2>My Funded Perps · Elite 10K</h2>
+      <h2>My Funded Perps · Elite 5K</h2>
       <div class="wrap cells">
         <div class="cell"><span class="k">Buy now</span><span class="v" id="t-buy">–</span></div>
         <div class="cell"><span class="k" title="The deepest your own cash goes before claims cover it: in 99 of 100 plays of the plan, and on the average path">Cash needed</span><span class="v" id="t-need">–</span><span class="v" id="t-need2"></span></div>
@@ -117,8 +117,8 @@ html.embed,.embed body{overflow:hidden}
 
   <h2>Accounts</h2>
   <div class="wrap cells six">
-    <div class="cell"><label for="i-seats" title="Accounts traded each day, one trade each, MFP allows $100,000 of funded Elite at once: 10 of the 10K.">Seats</label><input class="box" id="i-seats" type="number" min="1" max="20" step="1" inputmode="numeric"></div>
-    <div class="cell"><label for="i-evals">Evals open</label><input class="box" id="i-evals" type="number" min="0" max="10" step="1" inputmode="numeric"></div>
+    <div class="cell"><label for="i-seats" title="Accounts traded each day, one trade each, MFP allows $100,000 of funded Elite at once: 20 of the 5K.">Seats</label><input class="box" id="i-seats" type="number" min="1" max="20" step="1" inputmode="numeric"></div>
+    <div class="cell"><label for="i-evals">Evals open</label><input class="box" id="i-evals" type="number" min="0" max="20" step="1" inputmode="numeric"></div>
     <div class="cell"><label for="i-funded">Funded open</label><input class="box" id="i-funded" type="number" min="0" max="10" step="1" inputmode="numeric"></div>
     <div class="cell"><label for="i-price">Eval price $</label><input class="box" id="i-price" type="number" min="1" max="5000" step="1" inputmode="decimal"></div>
     <div class="cell"><label for="i-paid">Paid $</label><input class="box" id="i-paid" type="number" min="0" step="0.01" inputmode="decimal"></div>
@@ -134,6 +134,14 @@ html.embed,.embed body{overflow:hidden}
 
   <h2>System</h2>
   <div class="wrap"><table class="sys"><tbody id="system"></tbody></table></div>
+
+  <div id="cmp-box" hidden>
+  <h2>Our signals · JJ's way</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>This account</th><th>Eval pass</th><th>Funded pays</th><th>Per eval bought</th><th>Per $1 paid</th><th title="The deepest your own cash goes in 99 of 100 plays of the plan">Wallet 99%</th><th>Once running</th></tr></thead>
+    <tbody id="cmp"></tbody>
+  </table></div>
+  </div>
 
   <div id="progs-box">
   <h2>Programs · sale prices of 23 Nov 2026</h2>
@@ -158,8 +166,8 @@ html.embed,.embed body{overflow:hidden}
 // trading API. Signature (10% / 6%) and Select (9% / 3%) pay 0.005% a fill and lock the floor to the starting balance on the
 // first withdrawal, so a funded account there is played to one withdrawal (Signature at the drawdown, Select at three times
 // it) and ends. The owner, 23 Nov 2026: "make other page for mff and get there the best program like vest"; planned the
-// videos' way for a while, then on his word on our real G1 + V2 signals (builds with go: true): the Elite 10K with the
-// drawdown cut into two stops (tries: 2, $258 a trade) is the best of 293 programs of four firms on them (study\rank_go.js).
+// videos' way for a while, then on his word on our real G1 + V2 signals (builds with go: true). The Elite 10K is a hair
+// better on them (study\rank_go.js); he chose the Elite 5K ("mfp go for MFP Elite 5K, $36"), two stops in the drawdown.
 // GO: the real G1 + V2 trades of 13 Jul - 20 Nov 2026 taken none at the same time (study\go_rates.py on
 // simulation_data\cme.json: 2,053 trades on the eval bracket, 22.3 a day, and 1,817 on the funded one), 25-point stop,
 // 38.25 target on an eval and 57 on a funded account. How often they won (a coin would win 39.53% / 30.49%) and the points
@@ -178,8 +186,8 @@ var SHELL_HERE = false;                     // this file, opened as a page, show
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 var BUILDS = [
-  { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 2, go: true, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.2584, 375.6, 7.3] },
-  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 2, go: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, stat: [0.2584, 187.8, 7.3] },
+  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 2, go: true, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, jj: { tries: 1, stat: [0.3301, 193.4, 3.62] }, stat: [0.2584, 187.8, 7.3] },
+  { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 2, go: true, feeSide: 0.00001, maxLev: 40, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.2584, 375.6, 7.3] },
   { name: 'Elite 25K · 10% · 5% · 3% · 80%', size: 25000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 186, tries: 2, go: true, feeSide: 0.00001, maxLev: 40, minClaim: 250, fundedMax: 4, evalMax: 4, stat: [0.2584, 939, 7.3] },
   { name: 'Elite 50K · 10% · 5% · 3% · 80%', size: 50000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 371, tries: 2, go: true, feeSide: 0.00001, maxLev: 40, minClaim: 500, fundedMax: 2, evalMax: 2, stat: [0.2584, 1878, 7.3] },
   { name: 'Signature 10K · 10% · 6% · 3% · 80%', size: 10000, dd: 0.06, dl: 0.03, tg: [0.10], split: 0.80, price: 65, tries: 2, go: true, feeSide: 0.00005, lock: true, minClaim: 600, fundedMax: 10, evalMax: 10, stat: [0.2239, 240.5, 7.95] },
@@ -192,6 +200,10 @@ function vestStat(b){
   var x = b.stat, ev = x[0] * x[1] - b.price;
   return { spec: vestSpec(b), pass: x[0], funded: x[1], ev: ev, roi: x[0] * x[1] / b.price, trades: x[2], perTrade: ev / x[2] };
 }
+// A build's jj: the same account traded JJ's way instead of on our signals (the videos: one trade to the target on the
+// 50-point stop at coin-flip odds, a funded trade 1:1), with its own number of stops and kept figures, for the comparison
+// the owner asked for ("lets compare jj vs g1 with v2 mixeed").
+function vestJJ(b){ return b.jj ? Object.assign({}, b, { go: false, tries: b.jj.tries, stat: b.jj.stat, jj: null }) : null; }
 // a build as the trades see it
 function vestSpec(b, stop){
   var d = b.dd * b.size, risk = d / (b.tries || TRIES);       // a build's own number of stops in the drawdown, else 3
@@ -312,7 +324,7 @@ function vestPlan(b, st, opp, runs, weeks){
   return { buy: buy0, cost: buy0 * price, wallet: holes[Math.min(runs - 1, Math.ceil(SAFE * runs) - 1)], need: -lowMean,
     net: nets / runs, monthly: late / (weeks - from) * 52 / 12, rows: rows };
 }
-var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 71, paid: 0, recv: 0 };
+var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 36, paid: 0, recv: 0 };
 function vestClean(o){
   var p = {}, lim = { seats: [2, 40], evals: [0, EVAL_MAX], funded: [0, FUNDED_MAX], price: [1, 5000], paid: [0, 1e8], recv: [0, 1e8] };
   Object.keys(VEST_SEED).forEach(function(k){
@@ -323,7 +335,7 @@ function vestClean(o){
   return p;
 }
 // ---------- VEST ENGINE END ----------
-if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, SHELL_HERE: SHELL_HERE, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestJJ: vestJJ, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, SHELL_HERE: SHELL_HERE, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
 if (typeof document !== 'undefined') (function(){
   'use strict';
   // Opened with ?p=1 this page is one firm inside the shell's frame; opened as a page it is the shell (see SHELL_HERE).
@@ -346,7 +358,7 @@ if (typeof document !== 'undefined') (function(){
   document.documentElement.className = 'embed';
   function tell(){ try { window.parent.postMessage({ perpsH: document.querySelector('main').offsetHeight + 4 }, location.origin); } catch (e) {} }
   window.addEventListener('resize', tell);
-  var STORE = 'funded-slots-roadmap-mfp', state;
+  var STORE = 'funded-slots-roadmap-mfp-5k', state;
   try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
   function $(id){ return document.getElementById(id); }
   function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
@@ -437,6 +449,13 @@ if (typeof document !== 'undefined') (function(){
     $('pairs').hidden = !PAIRS;
     $('pairs').innerHTML = 'Wallet 99% in pairs <b>' + money(res.wallet) + '</b> · the same accounts traded one by one <b>' + money(single.wallet) + '</b>';
     drawChart(res.rows);
+    var alt = vestJJ(PICK);
+    $('cmp-box').hidden = !alt;
+    if (alt) {
+      var jp = vestPlan(alt, state, 0, RUNS, WEEKS), js = vestStat(alt), ms = stats[0];
+      var line = function(name, x, pl){ return '<tr><td>' + name + '</td><td>' + (x.pass * 100).toFixed(1) + '%</td><td>' + money(x.funded) + '</td><td class="' + (x.ev > 0 ? 'pos' : 'neg') + '">' + signed(x.ev) + '</td><td>$' + x.roi.toFixed(2) + '</td><td>' + money(pl.wallet) + '</td><td class="' + (pl.monthly > 0 ? 'pos' : 'neg') + '">' + signed(pl.monthly) + '/mo</td></tr>'; };
+      $('cmp').innerHTML = line('Our signals · G1 + V2, 25-point stop', ms, res) + line('JJ\'s way · one trade to the target, ' + STOP + '-point stop, coin flip', js, jp);
+    }
     tell();
   }
   var timer = 0;
