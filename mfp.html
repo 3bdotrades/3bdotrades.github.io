@@ -58,6 +58,12 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 .legend i.line{width:14px;height:2px;border-radius:1px;vertical-align:3px}
 .chartcard{padding:12px 12px 6px}
 .chartbox svg{display:block;width:100%;height:auto;overflow:visible}
+.chartbox{position:relative;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--row);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,.35);min-width:190px;z-index:2}
+.tip .h{font-weight:600;margin-bottom:4px}
+.tip .r{display:flex;justify-content:space-between;gap:16px}
+.tip .r span:first-child{color:var(--mute)}
+.tip i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
 .chartbox text{font-size:11.5px;fill:var(--mute);font-variant-numeric:tabular-nums}
 /* the two firms side by side, each this page for one firm in a frame of its own */
 main.wide{max-width:1560px}
@@ -434,8 +440,9 @@ if (typeof document !== 'undefined') (function(){
       return '<tr' + (b.pick ? ' class="pick"' : '') + '><td>' + b.name + '</td><td>' + money(b.price) + '</td><td>' + (x.pass * 100).toFixed(1) + '%</td><td>' + money(x.funded) + '</td><td class="' + (x.ev > 0 ? 'pos' : 'neg') + '">' + signed(x.ev) + '</td><td>$' + x.roi.toFixed(2) + '</td><td class="' + (x.perTrade > 0 ? 'pos' : 'neg') + '">' + signed(x.perTrade) + '</td></tr>';
     }).join('');
   }
+  var tipEl = document.createElement('div'), chartRows = [], chartGeo = null; tipEl.className = 'tip'; tipEl.hidden = true;
   function drawChart(rows){
-    var show = rows.slice(0, 24), W = 1120, Hh = 300, L = 62, R = 10, T = 12, B = 26, n = show.length;
+    var show = rows.slice(0, 24), W = 1120, Hh = 300, L = 62, R = 84, T = 12, B = 26, n = show.length;
     var hi = 0, lo = 0;
     show.forEach(function(r){ hi = Math.max(hi, r.inn, r.total); lo = Math.min(lo, -r.out, r.total); });
     if (hi - lo < 1) hi = lo + 1;
@@ -446,15 +453,44 @@ if (typeof document !== 'undefined') (function(){
     var path = '';
     show.forEach(function(r, i){
       var x = L + i * bw, c = x + bw / 2;
-      svg.push('<rect x="' + (x + bw * 0.18) + '" y="' + y(r.inn) + '" width="' + bw * 0.64 + '" height="' + Math.max(0, y(0) - y(r.inn)) + '" fill="var(--in)" rx="2"><title>W' + r.week + ' claims in ' + money(r.inn) + '</title></rect>');
-      svg.push('<rect x="' + (x + bw * 0.18) + '" y="' + y(0) + '" width="' + bw * 0.64 + '" height="' + Math.max(0, y(-r.out) - y(0)) + '" fill="var(--out)" rx="2"><title>W' + r.week + ' evals out ' + money(r.out) + '</title></rect>');
+      svg.push('<rect x="' + (x + bw * 0.18) + '" y="' + y(r.inn) + '" width="' + bw * 0.64 + '" height="' + Math.max(0, y(0) - y(r.inn)) + '" fill="var(--in)" rx="2"/>');
+      svg.push('<rect x="' + (x + bw * 0.18) + '" y="' + y(0) + '" width="' + bw * 0.64 + '" height="' + Math.max(0, y(-r.out) - y(0)) + '" fill="var(--out)" rx="2"/>');
       path += (i ? 'L' : 'M') + c + ' ' + y(r.total);
-      svg.push('<circle cx="' + c + '" cy="' + y(r.total) + '" r="3" fill="var(--net)"><title>W' + r.week + ' running total ' + signed(r.total) + '</title></circle>');
+      svg.push('<circle cx="' + c + '" cy="' + y(r.total) + '" r="3" fill="var(--net)"/>');
       if (i % 4 === 0) svg.push('<text x="' + c + '" y="' + (Hh - 8) + '" text-anchor="middle">W' + r.week + '</text>');
     });
     svg.push('<path d="' + path + '" fill="none" stroke="var(--net)" stroke-width="2"/>');
+    // the running total at the line's end, and a hair line for the week under the pointer
+    var last = show[n - 1];
+    svg.push('<text id="chart-end" x="' + (L + (n - 0.5) * bw + 10) + '" y="' + (y(last.total) + 4) + '" style="fill:var(--ink);font-weight:600">' + signed(last.total) + '</text>');
+    svg.push('<line id="xhair" x1="0" x2="0" y1="' + T + '" y2="' + (Hh - B) + '" stroke="var(--mute)" visibility="hidden"/>');
     $('chart').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + Hh + '" xmlns="http://www.w3.org/2000/svg">' + svg.join('') + '</svg>';
+    $('chart').appendChild(tipEl);
+    chartRows = show; chartGeo = { W: W, L: L, bw: bw, n: n };
   }
+  // the week under the pointer (or finger): its claims in, evals out and running total
+  function showTip(i){
+    var r = chartRows[i], box = $('chart'), k = box.clientWidth / chartGeo.W, cx = chartGeo.L + (i + 0.5) * chartGeo.bw, xh = box.querySelector('#xhair');
+    if (!r) return;
+    if (xh){ xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('visibility', 'visible'); }
+    tipEl.innerHTML = '<div class="h">W' + r.week + '</div>' +
+      '<div class="r"><span><i style="background:var(--in)"></i>' + (CLAIM === 'Request' ? 'Payouts' : 'Claims') + ' in</span><span>' + money(r.inn) + '</span></div>' +
+      '<div class="r"><span><i style="background:var(--out)"></i>Evals out</span><span>' + money(r.out) + '</span></div>' +
+      '<div class="r"><span><i style="background:var(--net)"></i>Running total</span><span>' + signed(r.total) + '</span></div>';
+    tipEl.hidden = false;
+    var tw = tipEl.offsetWidth, left = cx * k + 14;
+    if (left + tw > box.clientWidth) left = cx * k - tw - 14;
+    tipEl.style.left = Math.max(0, left) + 'px'; tipEl.style.top = '6px';
+  }
+  function hideTip(){ tipEl.hidden = true; var xh = $('chart').querySelector('#xhair'); if (xh) xh.setAttribute('visibility', 'hidden'); }
+  function onPoint(e){
+    if (!chartGeo) return;
+    var box = $('chart'), px = (e.clientX - box.getBoundingClientRect().left) * chartGeo.W / box.clientWidth, i = Math.floor((px - chartGeo.L) / chartGeo.bw);
+    if (i < 0 || i >= chartGeo.n) hideTip(); else showTip(i);
+  }
+  $('chart').addEventListener('pointermove', onPoint);
+  $('chart').addEventListener('pointerdown', onPoint);
+  $('chart').addEventListener('pointerleave', hideTip);
   function update(){
     var res = vestPlan(PICK, state, PAIRS ? PAIR_OPP : 0, RUNS, WEEKS), single = PAIRS ? vestPlan(PICK, state, 0, RUNS, WEEKS) : res;
     $('t-buy').innerHTML = res.buy ? res.buy + ' evals <small>' + money(res.cost) + '</small>' : '0 evals';
