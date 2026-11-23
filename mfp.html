@@ -114,7 +114,7 @@ html.embed,.embed body{overflow:hidden}
         <div class="cell"><span class="k">Eval pass</span><span class="v"><span id="r-pass">–</span><small>%</small></span></div>
         <div class="cell"><span class="k" id="k-fund" title="What a funded account pays you before it is lost">Funded pays</span><span class="v" id="r-fund">–</span></div>
         <div class="cell"><span class="k">Per eval bought</span><span class="v" id="r-ev">–</span></div>
-        <div class="cell"><span class="k">Per $1 paid</span><span class="v" id="r-roi">–</span></div>
+        <div class="cell"><span class="k" title="What comes back above the eval fees, as a share of them">EV on fees</span><span class="v" id="r-roi">–</span></div>
       </div>
     </div>
   </div>
@@ -398,6 +398,7 @@ if (typeof document !== 'undefined') (function(){
   function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
   function signed(v){ return (v > 0.5 ? '+' : '') + money(v); }
   function cents(v){ return '$' + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function evPct(roi){ var v = Math.round((roi - 1) * 100); return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + '%'; }
   function tone(el, v){ el.className = 'v ' + (v > 0.5 ? 'pos' : v < -0.5 ? 'neg' : ''); }
   var PICK = BUILDS[0], stats = BUILDS.map(vestStat);
 
@@ -406,7 +407,7 @@ if (typeof document !== 'undefined') (function(){
     $('r-pass').textContent = (st.pass * 100).toFixed(1);
     $('r-fund').textContent = money(st.funded);
     $('r-ev').textContent = signed(st.ev); tone($('r-ev'), st.ev);
-    $('r-roi').textContent = '$' + st.roi.toFixed(2);
+    $('r-roi').innerHTML = evPct(st.roi) + ' <small>$' + st.roi.toFixed(2) + ' per $1</small>'; tone($('r-roi'), (st.roi - 1) * 100);
     var small = function(v){ return v < 1000 ? cents(v) : money(v); };
     var go = !!s.go;
     var b = PICK, tries = go ? TRIES : Math.max(1, Math.ceil(s.d / (s.risk + s.fee) - 1e-9)), fmax = b.fundedMax || FUNDED_MAX, emax = b.evalMax || EVAL_MAX, T = s.targets[0];        // tries: how many stops fit in the drawdown as the trades are really sized
@@ -537,7 +538,9 @@ if (typeof document !== 'undefined') (function(){
       $('k-fund').textContent = (res.left === res.cap ? res.cap : Math.max(0, res.left)) + ' payouts pay'; $('k-fund').title = 'What the payouts left before the firm ends the plan pay you in all, on average';
       $('r-fund').textContent = money(res.paid);
       $('r-ev').textContent = signed(per); tone($('r-ev'), per);
-      $('r-roi').textContent = '$' + (res.fees ? res.paid / res.fees : 0).toFixed(2);
+      var back = res.fees ? res.paid / res.fees : 1;
+      $('r-roi').innerHTML = evPct(back) + ' <small>$' + back.toFixed(2) + ' per $1</small>'; tone($('r-roi'), (back - 1) * 100);
+      if (res.wallet > 0.5) $('t-net').innerHTML = signed(res.net) + ' <small>' + evPct(1 + res.net / res.wallet) + ' on the cash</small>';
     }
     var so = state.recv - state.paid;
     $('money').innerHTML = 'Paid <b>' + cents(state.paid) + '</b> · Received <b>' + cents(state.recv) + '</b> · So far <b class="' + (so > 0 ? 'pos' : so < 0 ? 'neg' : '') + '">' + (so < 0 ? '−' : so > 0 ? '+' : '') + cents(Math.abs(so)) + '</b>';
