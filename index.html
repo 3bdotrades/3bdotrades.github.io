@@ -137,6 +137,8 @@ span.pick{cursor:default}
   .jour th,.jour td{padding:8px 6px;font-size:13px}
   .jour td:first-child{white-space:normal}
 }
+.sys td{text-align:left;white-space:normal}
+.sys td:first-child{width:7em;color:var(--mute);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -172,6 +174,8 @@ span.pick{cursor:default}
       </div>
       <h2 id="sig-h" hidden></h2>
       <div class="wrap cells" id="sig" hidden></div>
+      <h2 id="sys5-h" hidden>System</h2>
+      <div class="wrap" id="sys5-w" hidden><table class="sys"><tbody id="sys5"></tbody></table></div>
     </div>
   </div>
 
@@ -1676,6 +1680,26 @@ firmsEl.addEventListener('input', typed);
 var accsEl = document.getElementById('accs'), ratesEl = document.getElementById('rates');
 function fiveZeros(n){ var a = new Array(n); for (var k = 0; k < n; k++) a[k] = 0; return a; }
 // ---- the new program's accounts (FIVE_NEW) ----
+// The System box (the owner, 23 Nov 2026: "apply the best system to 5ers and update the github and lets use it"): the day
+// plan the bot trades (tools/ba_days.py of the bot), in six lines, every number worked from FIVE_NEW: a day's contracts are
+// enough for its target to lie within 30 points, a target is the day's money plus the $5 a contract of commission, up to
+// the tick; the funded stop is R.stop with commission in. One line per size and stage, the payouts, the order of trading.
+function fiveSysTrade(G, nmax){ var q = Math.max(1, Math.min(nmax, Math.ceil(G / 600))); return { q: q, pts: Math.ceil((G + 5 * q) / (20 * q) / 0.25) * 0.25 }; }
+function fiveSystem(){
+  var rows = [], usd0 = function(n){ return '$' + Math.round(n).toLocaleString('en-US'); };
+  ['50', '25'].forEach(function(k){
+    var R = FIVE_NEW[k], bigE = R.goal - (FIVE_NDAYS - 1) * R.small, b = fiveSysTrade(bigE, R.nmax), sm = fiveSysTrade(R.small, R.nmax);
+    rows.push(['Eval ' + k + 'K', 'Day 1: ' + b.q + ' NQ, target ' + b.pts.toFixed(2) + ' points (+' + usd0(bigE) + '), no stop. Then ' + (FIVE_NDAYS - 1) + ' days of ' + sm.q + ' NQ, target ' + sm.pts.toFixed(2) + ' (+' + usd0(R.small) + ')']);
+  });
+  ['50', '25'].forEach(function(k){
+    var R = FIVE_NEW[k], b = fiveSysTrade(R.big, R.nmax), sm = fiveSysTrade(R.small, R.nmax), st = (R.stop - 5 * b.q) / (20 * b.q);
+    rows.push(['Funded ' + k + 'K', b.q + ' NQ, target ' + b.pts.toFixed(2) + ' points (+' + usd0(R.big) + '), stop ' + st.toFixed(2) + ' (−' + usd0(R.stop) + '). Last days ' + sm.q + ' NQ, target ' + sm.pts.toFixed(2) + ' (+' + usd0(R.small) + ')']);
+  });
+  rows.push(['Payout', 'A new 4% and ' + FIVE_NDAYS + ' profitable days, 14 days apart, ' + FIVE_NPAYS + ' a funded account. Net 50K ' + FIVE_NEW['50'].caps.map(function(c){ return usd0(c * FIVE_CUT); }).join(', ') + '; 25K ' + FIVE_NEW['25'].caps.map(function(c){ return usd0(c * FIVE_CUT); }).join(', ')]);
+  rows.push(['Trading', 'One trade a day an account, one account at a time, on the G1 and V2 signals']);
+  document.getElementById('sys5').innerHTML = rows.map(function(r){ return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
+  document.getElementById('sys5-h').hidden = document.getElementById('sys5-w').hidden = false;
+}
 // the backtest's share of chance, for an eval's trades and a funded account's (1 when the rates are chance)
 function fiveKap(p, q){ function k(a, b){ return Math.min(1.05, Math.max(0.85, b > 0 ? a / b : 1)); } return { e: k(p, FIVE_CHANCE), f: k(q, FIVE_FCHANCE) }; }
 // an account's state: k 'E' / 'F', usd its profit standing, peak the best day's end (the max loss trails it), days its
@@ -2187,6 +2211,7 @@ function updateFive(){
   // Nov 2026: "don't show 1 of 1 or 3 of 9").
   var rec = fiveRecord(f);
   document.getElementById('rates-h').textContent = 'My record · backtest ' + SIG.bt.period;
+  fiveSystem();
   [['pass', rec.pass, rec.lost, 'evals passed', 'lost'], ['win', rec.won, rec.flost, 'funded trades won', 'lost']].forEach(function(x){
     var k = x[0], done = x[1] + x[2], m = document.getElementById('f-' + k + '-m'), mc = document.getElementById('f-' + k + '-mc');
     document.getElementById('f-' + k + '-r').textContent = (Math.round(10000 * FIVE_REAL[k]) / 100) + '%';
