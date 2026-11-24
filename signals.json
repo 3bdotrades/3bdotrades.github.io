@@ -35,5 +35,25 @@
    "rate": 29.19,
    "chance": 30.49
   }
+ },
+ "btf": {
+  "eval": {
+   "stop": 25,
+   "target": 38.25,
+   "won": 1199,
+   "lost": 1754,
+   "flat": 6,
+   "rate": 40.6,
+   "chance": 39.53
+  },
+  "funded": {
+   "stop": 25,
+   "target": 57,
+   "won": 930,
+   "lost": 2018,
+   "flat": 11,
+   "rate": 31.55,
+   "chance": 30.49
+  }
  }
 }
