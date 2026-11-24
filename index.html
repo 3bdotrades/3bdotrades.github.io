@@ -1108,7 +1108,7 @@ function firmRows(saved){
   });
   return rows;
 }
-// what a browser keeps: the last account counts and live counts read (g1), the firms the plan buys no evals at (skip) and the cash log
+// what a browser keeps: the last account counts and live counts read (g1), the firms the plan buys no evals at (skip)
 var state = { firms: [] };
 // a Lifetime table as it is kept: for each rate [won, finished]
 function lifeOf(x){
@@ -1139,15 +1139,13 @@ function liveRates(){ var c = liveCounts(), o = {}; if (!c) return null; RATE_KE
   // is dropped, with its version
   var fresh = FIVE && !(s.five && s.five.v === FIVE_V);
   if (FIVE) state.five = cleanFive(s.five);
-  else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); }
+  else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); state.g1.kc = cashOf(s.g1.kc); }
   // for the edits shared by every browser (see shareEdit): a name for this browser, and the version of this view's part it holds
   state.dev = typeof s.dev === 'string' && /^[a-z0-9]{6,16}$/.test(s.dev) ? s.dev : (Math.random().toString(36) + '00000000').slice(2, 10);
   var held = cleanVersion(s.sh); if (held && !fresh) state.sh = held;
   state.slots = cleanSlots(s.slots);
   if (FIVE){ delete state.firms; return; }
   if (Array.isArray(s.skip)){ var sk = s.skip.filter(function(k){ return typeof k === 'string' && k.length < 60; }).slice(0, 40); if (sk.length) state.skip = sk; }
-  if (Array.isArray(s.cashLog)) state.cashLog = s.cashLog;
-  if (s.cashSeen && isFinite(s.cashSeen.inn) && isFinite(s.cashSeen.out)) state.cashSeen = s.cashSeen;
   state.firms = firmRows(s.firms);
 })();
 function save(){ try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
@@ -1483,38 +1481,63 @@ var ACTUALS = FLEET.key !== 'g1' ? [] : [
   ['2026-11-04','Aqua','fee',648.98], ['2026-11-04','Lucid','payout',891.23], ['2026-11-06','Topstep','fee',312.75], ['2026-11-08','Futureselite','fee',845.61],
   ['2026-11-08','BG','fee',443.74], ['2026-11-09','Topstep','fee',425.00], ['2026-11-09','Lucid','payout',870.00]
 ];
-// G1's dashboard totals that the typed history above already covers; cash beyond them is new
-var CASH0 = FLEET.key === 'g1' ? { inn: 1761, out: 8420 } : null;
+// The cash since the typed history: what tools/track.js keeps of the dashboard's Cash box, a day at a time (its payouts and
+// buys on their own dates), the same in every browser. (Until 24 Nov 2026 a browser booked a rise of the dashboard's totals
+// on the day it first saw it: a fresh browser put everything since 9 Nov in this week. The owner: "the cash by week is not
+// real".) CASH0 = G1's dashboard totals that the typed history above already covers, CASH_CUT = its last day.
+var CASH0 = FLEET.key === 'g1' ? { inn: 1761, out: 8420 } : null, CASH_CUT = '2026-11-09';
 function ymd(d){ return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
-// the dashboard gives totals only, so a rise is logged on the day this browser first sees it
-function logCash(c){
-  if (!CASH0 || !c) return;
-  var seen = state.cashSeen || CASH0, dIn = c.inn - seen.inn, dOut = c.out - seen.out;
-  if (dIn > 0 || dOut > 0) (state.cashLog = state.cashLog || []).push({ d: ymd(new Date()), inn: Math.max(0, dIn), out: Math.max(0, dOut) });
-  state.cashSeen = { inn: Math.max(seen.inn, c.inn), out: Math.max(seen.out, c.out) };
+// the kept cash as the page takes it: { open, sum: [received, spent], days: [[date, received, spent], ...] oldest first }, or null
+function cashOf(c){
+  if (!c || typeof c !== 'object' || !c.days || typeof c.days !== 'object' || !/^\d{4}-\d\d-\d\d$/.test(c.open || '')) return null;
+  var src = Array.isArray(c.days) ? c.days : Object.keys(c.days).map(function(d){ var r = c.days[d]; return Array.isArray(r) ? [d, r[0], r[1]] : null; });
+  var days = [], sum = [0, 0];
+  src.slice(0, 2000).forEach(function(r){
+    if (!Array.isArray(r) || !/^\d{4}-\d\d-\d\d$/.test(r[0]) || !isFinite(r[1]) || !isFinite(r[2]) || Math.abs(r[1]) > 1e8 || Math.abs(r[2]) > 1e8) return;
+    days.push([r[0], +r[1], +r[2]]); sum[0] += +r[1]; sum[1] += +r[2];
+  });
+  days.sort(function(p, q){ return p[0] < q[0] ? -1 : p[0] > q[0] ? 1 : 0; });
+  return days.length ? { open: c.open, sum: sum, days: days } : null;
 }
-function cashNew(){
-  var a = { inn: 0, out: 0, rows: [] };
-  if (CASH0) (state.cashLog || []).forEach(function(c){ if (c.inn > 0){ a.inn += c.inn; a.rows.push([c.d, 'Dashboard', 'payout', c.inn]); } if (c.out > 0){ a.out += c.out; a.rows.push([c.d, 'Dashboard', 'fee', c.out]); } });
-  return a;
+// The history's cash events ([date, who, kind, amount]) and base, the cash from before the first of them (not drawn).
+// With the kept cash: the typed history up to CASH_CUT, then the kept days (a fleet with no typed history: the kept days
+// after the first one read, which carries everything before). What the kept cash holds up to CASH_CUT against what is typed
+// is a correction on that day (the dashboard dated a buy later than it first counted it), and what the dashboard
+// shows above the kept cash is of today (the counter reads a build some minutes after it is out).
+// Without it (not read yet): the typed history and, on top, the dashboard's totals as of today.
+function cashPast(){
+  var kc = state.g1 && state.g1.kc, dc = state.g1 && state.g1.cash, typed = ACTUALS.length > 0, o = { rows: ACTUALS.slice(), base: 0, fix: null };
+  var today = ymd(new Date()), cut = typed ? CASH_CUT : kc ? kc.open : '', before = [0, 0];
+  function add(d, inn, out){ if (inn >= 1) o.rows.push([d, 'Dashboard', 'payout', inn]); if (out >= 1) o.rows.push([d, 'Dashboard', 'fee', out]); }
+  if (kc){
+    kc.days.forEach(function(r){ if (r[0] > cut) add(r[0], r[1], r[2]); else { before[0] += r[1]; before[1] += r[2]; } });
+    if (typed){ var ti = 0, to = 0; ACTUALS.forEach(function(a){ if (a[2] === 'payout') ti += a[3]; else to += a[3]; }); o.fix = { d: cut, inn: before[0] - ti, out: before[1] - to }; }
+    else o.base = before[0] - before[1];
+    if (dc) add(today, dc.inn - kc.sum[0], dc.out - kc.sum[1]);
+  } else if (dc){
+    if (typed) add(today, dc.inn - CASH0.inn, dc.out - CASH0.out); else o.base = dc.inn - dc.out;
+  }
+  return o;
 }
 function itemText(e){ return e.firm + (e.kind === 'payout' ? ' payout +' : ' fee −') + money(e.amt); }
 // The chart's rows: the weeks of the history, then the weeks of the run on top of the cash so far. coin = the same run at
 // Chance rates (see coinFlip): each week of the run also gets its running total, from the same cash so far.
 function withHistory(res, coin){
-  var n = res.per.length, h = [], w0 = { out: 0, inn: 0, items: [] }, minT = 0, totOut = 0, totIn = 0;
-  var ev = ACTUALS.concat(cashNew().rows).map(function(a){ var p = a[0].split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]); return { t: Math.floor(Math.round((d - START) / 864e5) / 7), firm: a[1], kind: a[2], amt: a[3] }; })
-    .filter(function(e){ return e.t <= 0; });
+  var n = res.per.length, h = [], w0 = { out: 0, inn: 0, items: [] }, minT = 0, totOut = 0, totIn = 0, past = cashPast();
+  function week(s){ var p = s.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]); return Math.floor(Math.round((d - START) / 864e5) / 7); }
+  var ev = past.rows.map(function(a){ return { t: week(a[0]), firm: a[1], kind: a[2], amt: a[3] }; }).filter(function(e){ return e.t <= 0; });
   ev.forEach(function(e){ if (e.t < minT) minT = e.t; });
   for (var t = minT; t < 0; t++){ var z = []; for (var k = 0; k < n; k++) z.push(0); h.push({ t: t, actual: true, items: [], out: 0, inn: 0, buy: 0, buys: z }); }
   ev.forEach(function(e){ var row = e.t < 0 ? h[e.t - minT] : w0; if (e.kind === 'payout'){ row.inn += e.amt; totIn += e.amt; } else { row.out += e.amt; totOut += e.amt; } row.items.push(e); });
-  var cum = 0; h.forEach(function(r){ cum += r.inn - r.out; r.cum = cum; });
+  // the correction on the typed history's last day (see cashPast): on its week, no line of its own
+  if (past.fix && (Math.abs(past.fix.inn) >= 1 || Math.abs(past.fix.out) >= 1)){
+    var ft = week(past.fix.d), fr = ft < 0 ? h[ft - minT] : w0;
+    if (fr){ if (Math.abs(past.fix.inn) >= 1){ fr.inn += past.fix.inn; totIn += past.fix.inn; } if (Math.abs(past.fix.out) >= 1){ fr.out += past.fix.out; totOut += past.fix.out; } }
+  }
+  var cum = past.base; h.forEach(function(r){ cum += r.inn - r.out; r.cum = cum; });
   var base = cum + w0.inn - w0.out;
-  // a fleet with no typed history starts from the cash totals on its dashboard
-  var dc = !ACTUALS.length && state.g1 && state.g1.cash;
-  if (dc){ base = dc.inn - dc.out; totOut = dc.out; totIn = dc.inn; }
   var proj = res.rows.map(function(r, i){ var o = {}; for (var key in r) o[key] = r[key]; if (i === 0){ o.out += w0.out; o.inn += w0.inn; o.items = w0.items; } o.cum = r.cum + base; if (coin && coin.rows[i]) o.coin = coin.rows[i].cum + base; return o; });
-  return { rows: h.concat(proj), past: h.length, base: base, totOut: totOut, totIn: totIn, first: minT, dash: !!dc };
+  return { rows: h.concat(proj), past: h.length, base: base, totOut: totOut, totIn: totIn, first: minT };
 }
 
 // ---------- the page: four totals, the firm table, the chart ----------
@@ -2329,7 +2352,7 @@ function counted(k){
         var o = m[1] === 'wired' ? came.wired : m[1] === 'pass' ? came.passes : null;
         if (o) o[m[2]] = (o[m[2]] || 0) + 1;
       });
-      return { life: life, came: cameOf(came), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
+      return { life: life, came: cameOf(came), cash: cashOf(j.cash), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
     })
     .catch(function(){ return null; });
 }
@@ -2481,9 +2504,8 @@ function applyG1(g){
     f.openEvals = 0; f.passedNow = 0; f.passedDone = 0; f.fundedNow = 0; f.inProfitNow = 0; f.g1Flips = []; f.g1Evals = []; f.g1Funded = [];
     return inSet(f);
   });
-  logCash(g.cash);
   // a dashboard without its Lifetime table leaves the last counts read in place
-  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
+  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, kc: (state.g1 && state.g1.kc) || null, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
   save(); syncRates(); update(); drawG1(false);
 }
 var g1El = document.getElementById('g1'), g1Fail = false, keptFail = false, lastSync = 0;
@@ -2519,7 +2541,7 @@ function syncG1(){
     if (c){
       if (!state.g1) state.g1 = { life: {}, came: cameOf(null) };
       if (!(g && g.life)) state.g1.life = c.life;
-      state.g1.came = c.came; unreadAt = c.unread;
+      state.g1.came = c.came; unreadAt = c.unread; if (c.cash) state.g1.kc = c.cash;
       save(); syncRates(); update();
     } else if (!liveCounts()) update();
     drawG1();
