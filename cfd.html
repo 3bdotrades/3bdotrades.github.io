@@ -301,6 +301,9 @@ function vestBuild(b, n, stop){
 // The plan: `seats` accounts, one trade each a trading day, in pairs (funded accounts first). An account that ends is
 // replaced by a new eval the next trading day; a passed eval is funded the next trading day while fewer than 10 are; a
 // claim is credited the next trading day. Played `runs` times from today's accounts.
+// A build with a pace (b.pace: trades a day, one list entry a day seen) holds one position at a time, as its bot does: a
+// day has room for one of those counts, drawn evenly, and the accounts take turns, funded ones first, then whoever
+// waited longest (the bot's own order); the rest wait for another day.
 function vestPlan(b, st, opp, runs, weeks){
   var s = vestSpec(b), rnd = vestRng(SEED), H = weeks * DAYS, price = st.price;
   var FMAX = b.fundedMax || FUNDED_MAX, EMAX = b.evalMax || EVAL_MAX;      // how many funded accounts and evals the firm lets this build hold at once
@@ -311,6 +314,8 @@ function vestPlan(b, st, opp, runs, weeks){
   var N = Math.max(seats, f0 + e0), first = s.targets.length ? 0 : -1, acc = [];
   // a firm that ends the plan at a number of payouts (payCap; those already taken are st.pays) and pays some trading days
   // after the win, the account sitting out meanwhile (payWait)
+  var PACE = b.pace && b.pace.length ? b.pace : null, ord = [];
+  for (var o = 0; o < N; o++) ord.push(o);
   var CAP = b.payCap || 0, WAIT = b.payWait || 0, had = CAP ? Math.min(CAP, Math.max(0, Math.round(st.pays || 0))) : 0, paidT = 0, feeT = 0, evalT = 0, endT = 0, hit = 0;
   if (CAP && had >= CAP) buy0 = 0;
   for (var z = 0; z < N; z++) acc.push({ stage: 0, room: 0, gain: 0, dead: true, wait: false });
@@ -318,7 +323,7 @@ function vestPlan(b, st, opp, runs, weeks){
     // the accounts sit in fixed places; a place whose account ended is empty (dead) until a new eval is bought into it
     var i, a, q, cash = 0, low = 0, due = 0, pays = had, over = CAP > 0 && had >= CAP, pend = [], got;
     for (i = 0; i < N; i++) {
-      a = acc[i]; a.stage = i < f0 ? -1 : first; a.room = s.d; a.gain = 0; a.wait = false; a.hold = 0; a.dead = i >= f0 + e0;
+      a = acc[i]; a.stage = i < f0 ? -1 : first; a.room = s.d; a.gain = 0; a.wait = false; a.hold = 0; a.last = -1; a.dead = i >= f0 + e0;
     }
     for (var day = 0; day < H; day++) {
       var w = (day / DAYS) | 0;
@@ -331,14 +336,17 @@ function vestPlan(b, st, opp, runs, weeks){
       var need = seats - alive;
       if (need > 0) {
         cash -= need * price; outW[w] += need * price; feeT += need * price; evalT += need; if (cash < low) low = cash;
-        for (i = 0; i < N && need > 0; i++) { a = acc[i]; if (a.dead) { a.stage = first; a.room = s.d; a.gain = 0; a.wait = false; a.hold = 0; a.dead = false; need--; } }
+        for (i = 0; i < N && need > 0; i++) { a = acc[i]; if (a.dead) { a.stage = first; a.room = s.d; a.gain = 0; a.wait = false; a.hold = 0; a.last = -1; a.dead = false; need--; } }
       }
-      var u1 = 0, odd = false, u;
-      for (var pass = 0; pass < 2; pass++) for (i = 0; i < N; i++) {      // funded accounts first, then evals: paired in that order
+      var u1 = 0, odd = false, u, left = Infinity;
+      if (PACE) { left = PACE[(rnd() * PACE.length) | 0]; ord.sort(function(x, y){ return acc[x].last - acc[y].last || x - y; }); }
+      for (var pass = 0; pass < 2; pass++) for (var j = 0; j < N; j++) {      // funded accounts first, then evals: paired in that order
         if (over) break;
-        a = acc[i];
+        i = ord[j]; a = acc[i];
         if (!a.dead && a.hold > 0) { if (pass === 0) a.hold--; continue; }
         if (a.dead || a.wait || (a.stage < 0) !== (pass === 0)) continue;
+        if (left < 1) continue;
+        left--; a.last = day;
         if (!odd) { u1 = rnd(); u = u1; } else u = rnd() < opp ? 1 - u1 : rnd();
         odd = !odd;
         got = vestStep(a, s, u);
@@ -454,7 +462,8 @@ if (typeof document !== 'undefined') (function(){
     ];
     // lean, JJ's way: the same system in six short lines
     if (LEAN && !go) sys = [
-      ['Signal', 'Every G1 / V2 GO · one account a signal, funded ones first · one trade an account a day'],
+      ['Signal', b.pace ? 'A G1 / V2 GO while no trade is open · one position at a time, about ' + Math.round(b.pace.reduce(function(x, y){ return x + y; }, 0) / b.pace.length) + ' trades a day in all · funded accounts first, then the one that waited longest'
+        : 'Every G1 / V2 GO · one account a signal, funded ones first · one trade an account a day'],
       ['Size', units.toFixed(2) + ' ' + MARKET + ' units · stop ' + stop + ' points = ' + money(loss)],
       ['Eval', s.targets.map(function(t, i){ return (s.targets.length > 1 ? 'Step ' + (i + 1) + ': target ' : 'Target ') + Math.round((t + s.fee) / units) + ' points = +' + money(t); }).join(' · ') + ', passed · ' + tries + (tries > 1 ? ' stops' : ' stop') + ' in the ' + money(s.d) + ' drawdown'],
       ['Funded', 'Target ' + Math.round(fPts) + ' points = +' + money(fWin) + ' · ' + (PAYS || CLAIM.toLowerCase() + ' every win' + (s.minClaim ? ' of ' + money(s.minClaim) + ' or more' : '')) + ' · ' + Math.round(b.split * 100) + '% is yours'],
