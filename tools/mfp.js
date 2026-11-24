@@ -16,6 +16,8 @@
 // A payout and a new fill between two passes is not seen, so the number can run under, never over.
 // The state file remembers every account id seen and its last stage and status, so an account MFP archives later is still
 // counted as bought, and a result is counted once.
+// Only accounts MFP names Elite are the plan's (the owner's old Select 10K is not): the bot's own rule. An account seen
+// before this rule is counted again only once it is read with an Elite name.
 const fs = require('fs'), path = require('path'), https = require('https');
 
 const HOST = 'developers.myfundedperpetuals.com', V = 1, SIZES = [5000, 10000, 25000, 50000, 100000];
@@ -47,6 +49,7 @@ function clean(answer){
   rows.slice(0, 2000).forEach(function(a){
     if (!a || typeof a.id !== 'string' || !/^[\w.:|-]{1,80}$/.test(a.id)) return;
     if (a.stage !== 'evaluation' && a.stage !== 'funded') return;
+    if (!/elite/i.test(String(a.name || '') + ' ' + String(a.display_name || ''))) return;      // another program: not the plan's
     if (['active', 'passed', 'failed', 'closed'].indexOf(a.status) < 0) return;
     const size = Math.round(Number(a.starting_balance));
     if (SIZES.indexOf(size) < 0) return;                       // a sandbox or prize account of another size is not part of the plan
@@ -61,13 +64,13 @@ function zero(){ const o = {}; SIZES.forEach(function(s){ o[s] = 0; }); return o
 // state: { v, seen: { id: [stage, status, size] } }. Returns the counts and the state to keep.
 function count(accounts, state){
   const seen = state && state.v === V && state.seen && typeof state.seen === 'object' ? JSON.parse(JSON.stringify(state.seen)) : {};
-  accounts.forEach(function(a){ seen[a.id] = [a.stage, a.status, a.size]; });
+  accounts.forEach(function(a){ seen[a.id] = [a.stage, a.status, a.size, 1]; });
   const c = { evals: zero(), funded: zero(), bought: zero(), passed: zero(), failed: zero(), issued: zero(), lost: zero() };
   const now = {};
   accounts.forEach(function(a){ now[a.id] = true; });
   Object.keys(seen).forEach(function(id){
     const r = seen[id], stage = r[0], status = r[1], size = r[2];
-    if (SIZES.indexOf(size) < 0) return;
+    if (SIZES.indexOf(size) < 0 || r[3] !== 1) return;
     if (stage === 'evaluation') {
       c.bought[size]++;
       if (status === 'passed') c.passed[size]++;
