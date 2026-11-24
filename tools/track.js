@@ -28,11 +28,20 @@
 // unread = the time of the first build of the ones it could not read since the last one it read (none while it reads them):
 // the page says the rates are not being counted when that lasts (from 16 Nov 2026 21:56 UTC to 20 Nov the dashboard's footer
 // had no trading day, every build was not readable and the rates stood still with no word of it).
+// cash = the fleet's real cash by day, for the page's Cash by week: days = for each New York date [received, spent] on it.
+// A payout or a buy the dashboard lists with its date (the "Latest" lists of its Cash box) is booked on that date; a rise of
+// "Received" or "Spent" that no listed line explains is booked on the day of the build that first shows it (or, when the
+// full list is there and does not have it, on the list's oldest date: it is older than that). open = the first day read:
+// what it carries is everything from before. rest = the part of each day that came from the totals and not from a dated
+// line (a dated line that turns up later takes its amount back out of it). seen = the dated lines booked, by a hash.
+// The cash is kept only in a file that has it: `node tools/track.js <folder> <clone> --cash` reads every build once and
+// writes it (one time, by hand).
 const fs = require('fs'), path = require('path'), crypto = require('crypto'), cp = require('child_process');
 
 const FLEETS = ['g1', 'v2'], KEYS = ['pass', 'win', 'flip', 'flip25'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', times: '×', minus: '-' };
+const OTHERS = ['rm'], FULL_LIST = 7, KEEP_SEEN_DAYS = 120;
 const KEEP_GONE_DAYS = 10, LOG_LINES = 400, MARK_LINES = 400, SAVE_EVERY = 200;
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -70,6 +79,78 @@ function pane(sec, k, name){
       dayPnl: money(c[2]), pnl: money(total), target: of ? int(of[1]) : null, room: money(c[4]), day: d ? d[1] : '' };
   });
 }
+
+// a fleet's part of a build ('' when it has none)
+function section(html, k){
+  const a = html.indexOf('id="eng-' + k + '"'); if (a < 0) return '';
+  let b = html.length;
+  FLEETS.concat(OTHERS).forEach(o => { const i = o === k ? -1 : html.indexOf('id="eng-' + o + '"', a + 1); if (i > a && i < b) b = i; });
+  const f = html.indexOf('class="foot"', a); if (f > a && f < b) b = f;
+  return html.slice(a, b);
+}
+// New York's date at a moment, 'YYYY-MM-DD'
+function nyDate(iso){ const p = nyAt(Date.parse(iso)); return p.y + '-' + ('0' + p.m).slice(-2) + '-' + ('0' + p.d).slice(-2); }
+// The fleet's Cash box in a build: { inn, out, pays, buys } (the two totals, and the dated lines of the two "Latest" lists as
+// { d: 'YYYY-MM-DD', h: a hash of the line, amt }), or null when the two totals are not there.
+function cashOf(html, k, built){
+  const sec = section(html, k), day = nyDate(built), o = { inn: null, out: null, pays: [], buys: [] };
+  [['Received', 'inn', 'pays'], ['Spent', 'out', 'buys']].forEach(x => {
+    const a = sec.indexOf('<th>' + x[0] + '</th>'); if (a < 0) return;
+    const e = sec.indexOf('</tr>', a), row = sec.slice(a, e < 0 ? sec.length : e), m = /<td[^>]*>(?:\s*<span[^>]*>)?\s*[-\u2212]?\$([\d,]+(?:\.\d+)?)/.exec(row);
+    if (!m) return;
+    o[x[1]] = Number(m[1].replace(/,/g, ''));
+    const la = row.indexOf('class="tipg a"'); if (la < 0) return;
+    const lb = row.indexOf('class="tipg b"', la), list = row.slice(la, lb < 0 ? row.length : lb), n = {};
+    list.replace(/<span class="td">([^<]*)<\/span><span class="tx">([\s\S]*?)<\/span><span class="ta">([^<]*)<\/span>/g, (all, d, tx, ta) => {
+      const dm = /^(\d{1,2}) ([A-Za-z]{3})$/.exec(text(d)), mon = dm ? MONTHS.indexOf(dm[2].toLowerCase()) : -1, amt = money(ta);
+      if (mon < 0 || !(amt > 0)) return '';
+      // the year: the newest one that does not put the line after the build's day
+      let y = Number(day.slice(0, 4)), date = y + '-' + ('0' + (mon + 1)).slice(-2) + '-' + ('0' + dm[1]).slice(-2);
+      if (date > day) date = (y - 1) + date.slice(4);
+      const id = x[1] + '|' + date + '|' + text(tx) + '|' + amt.toFixed(2); n[id] = (n[id] || 0) + 1;
+      o[x[2]].push({ d: date, h: key(id + '|' + n[id]), amt: amt });
+      return '';
+    });
+  });
+  return o.inn === null || o.out === null ? null : o;
+}
+// One build's cash into the kept cash (see the top). C = st.cash, c = cashOf's, day = the build's New York date.
+function cashStep(C, c, day){
+  const cents = v => Math.round(v * 100) / 100;
+  const put = (o, d, col, amt) => { const r = o[d] || (o[d] = [0, 0]); r[col] = cents(r[col] + amt); if (!r[0] && !r[1]) delete o[d]; };
+  if (!C.open) C.open = day;
+  [['inn', c.pays, 0], ['out', c.buys, 1]].forEach(x => {
+    const col = x[2], items = x[1];
+    let oldest = day; const fresh = [];
+    items.forEach(it => {
+      if (it.d < oldest) oldest = it.d;
+      if (C.seen[it.h]) return;
+      C.seen[it.h] = it.d; put(C.days, it.d, col, it.amt); C.sum[col] = cents(C.sum[col] + it.amt); fresh.push(it);
+    });
+    const diff = cents(c[x[0]] - C.sum[col]);
+    if (Math.abs(diff) < 1) return;                              // (the totals are in whole dollars, the lines in cents)
+    if (diff > 0){ const d = items.length >= FULL_LIST ? oldest : day; put(C.days, d, col, diff); put(C.rest, d, col, diff); C.sum[col] = cents(C.sum[col] + diff); return; }
+    // more booked than the total says: dated lines came for cash that was booked from the totals. Each new line takes its
+    // amount back from the first such days on or after its own date (the total rose on the day of the line or later); what
+    // is then still over comes off the newest ones.
+    let back = -diff;
+    const take = (d, most) => {
+      const t = Math.min(back, most, C.rest[d] ? C.rest[d][col] : 0); if (!(t > 0)) return 0;
+      put(C.rest, d, col, -t); put(C.days, d, col, -t); C.sum[col] = cents(C.sum[col] - t); back = cents(back - t); return t;
+    };
+    const rests = () => Object.keys(C.rest).filter(d => C.rest[d][col] > 0).sort();
+    fresh.slice().sort((p, q) => p.d < q.d ? 1 : p.d > q.d ? -1 : 0).forEach(it => {
+      let left = it.amt + 0.99;                                  // (a day booked from a total is in whole dollars)
+      rests().filter(d => d >= it.d).forEach(d => { if (left > 1 && back >= 0.005) left -= take(d, left); });
+    });
+    rests().reverse().forEach(d => { if (back >= 0.005) take(d, back); });
+    // (a total that fell with nothing to take it from: the dashboard corrected itself, the day of the build carries it)
+    if (back >= 1){ put(C.days, day, col, -back); C.sum[col] = cents(C.sum[col] - back); }
+  });
+  // the dated lines are remembered for as long as a list can still show them
+  Object.keys(C.seen).forEach(h => { if (dayNo(day) - dayNo(C.seen[h]) > KEEP_SEEN_DAYS) delete C.seen[h]; });
+}
+function cashNew(){ return { open: '', sum: [0, 0], days: {}, rest: {}, seen: {} }; }
 
 // What one build of the dashboard shows for a fleet, or null when its section cannot be trusted:
 // the three tables have to be there with as many rows as the tabs above them say. built: the build's time (its commit's),
@@ -247,7 +328,7 @@ function step(st, snap, meta){
 // one remembered account and one log line per line, so a change shows as a short diff
 function dump(st){
   const rows = Object.keys(st.acc).map(h => '  ' + JSON.stringify(h) + ': ' + JSON.stringify(st.acc[h])).join(',\n');
-  const head = ['v', 'at', 'built', 'unread', 'day', 'counts', 'flipDone', 'base', 'today'].filter(k => st[k] !== undefined).map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
+  const head = ['v', 'at', 'built', 'unread', 'day', 'counts', 'flipDone', 'base', 'today', 'cash'].filter(k => st[k] !== undefined).map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
   const lines = a => a.length ? '\n' + a.map(l => '  ' + JSON.stringify(l)).join(',\n') + '\n ' : '';
   return '{\n' + head + ',\n "marks": [' + lines(st.marks || []) + '],\n "acc": {' + (rows ? '\n' + rows + '\n ' : '') + '},\n "log": [' + lines(st.log) + ']\n}\n';
 }
@@ -265,9 +346,26 @@ function page(dir, sha){ return git(dir, ['show', sha + ':index.html']); }
 function reaches(dir, sha){ try { git(dir, ['merge-base', '--is-ancestor', sha, 'HEAD']); return true; } catch (e){ return false; } }
 
 function main(){
-  const dir = process.argv[2], dash = process.argv[3];
+  const dir = process.argv[2], dash = process.argv[3], refill = process.argv[4] === '--cash';
   if (!dir || !dash){ console.error('usage: node tools/track.js <folder> <clone of the dashboard repository>'); process.exit(2); }
   const cache = {}, shown = sha => cache[sha] || (cache[sha] = page(dash, sha));
+  if (refill){
+    // every build once, oldest first, up to the one each counts file has read: its cash from the start
+    const sts = {}, all = builds(dash);
+    FLEETS.forEach(k => { try { const st = JSON.parse(fs.readFileSync(path.join(dir, k + '.json'), 'utf8')); if (st && st.v === 2 && st.at){ st.cash = cashNew(); sts[k] = { st: st, done: false }; } } catch (e) {} });
+    for (const b of all){
+      const live = Object.keys(sts).filter(k => !sts[k].done); if (!live.length) break;
+      let html = ''; try { html = page(dash, b.sha); } catch (e) {}
+      live.forEach(k => { const c = html && cashOf(html, k, b.built); if (c) cashStep(sts[k].st.cash, c, nyDate(b.built)); if (b.sha === sts[k].st.at) sts[k].done = true; });
+    }
+    Object.keys(sts).forEach(k => {
+      const C = sts[k].st.cash;
+      if (!sts[k].done){ console.log(k + ': the history does not reach the build read last: cash not written'); return; }
+      fs.writeFileSync(path.join(dir, k + '.json'), dump(sts[k].st));
+      console.log(k + ': cash from ' + C.open + ' | received ' + C.sum[0] + ', spent ' + C.sum[1] + ' | ' + Object.keys(C.days).length + ' days');
+    });
+    return;
+  }
   for (const k of FLEETS){
     const file = path.join(dir, k + '.json');
     let st = null, old = '', list;
@@ -290,6 +388,8 @@ function main(){
       const snap = read(shown(b.sha), k, b.built);
       if (snap){ st = step(st, snap, b); delete st.unread; }
       else { unread++; if (st && !st.unread) st.unread = b.built; }
+      // the cash box is read on its own: a build whose tables cannot be trusted still shows it
+      if (st && st.cash){ const c = cashOf(shown(b.sha), k, b.built); if (c) cashStep(st.cash, c, nyDate(b.built)); }
       if (st){ st.at = b.sha; st.built = b.built; }
     }
     if (!st){ console.log(k + ': nothing readable'); continue; }
@@ -300,4 +400,4 @@ function main(){
   }
 }
 if (require.main === module) main();
-module.exports = { read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
+module.exports = { cashOf: cashOf, cashStep: cashStep, cashNew: cashNew, nyDate: nyDate, read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
