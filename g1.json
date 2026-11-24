@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "8e5d7cf15d7cb4a52ccd70bcad873748745f654a",
- "built": "2026-11-24T23:37:01.000Z",
+ "at": "2870a84010cab4894dca00e52891b21a8c441433",
+ "built": "2026-11-24T23:47:03.000Z",
  "day": "Wed 25 Nov",
- "counts": {"pass":[36,136],"win":[16,31],"flip":[42,97],"flip25":[19,40]},
+ "counts": {"pass":[36,137],"win":[16,31],"flip":[42,97],"flip25":[19,40]},
  "flipDone": {"flip":[41,96],"flip25":[19,40]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"6c3e6db0ad49":[0,1]},
@@ -134,7 +134,7 @@
   "753326a0ccda": {"p":"e","f":"Blue Guardian"},
   "5256c1d0ac83": {"p":"e","f":"Tradeify","gone":"2026-11-24","z":1,"u":1},
   "982b3885d318": {"p":"e","f":"Tradeify"},
-  "886609d814f7": {"p":"e","f":"Tradeify"},
+  "886609d814f7": {"p":"e","f":"Tradeify","gone":"2026-11-24","z":1,"u":1},
   "c8d0c3fb7254": {"p":"e","f":"Tradeify"},
   "d50bf570cedf": {"p":"e","f":"Tradeify"},
   "237431a0bbc7": {"p":"e","f":"Blue Guardian"},
@@ -249,6 +249,7 @@
   "2026-11-24 15:07 eval left the dashboard without a pass: blown · FuturesElite a87b60",
   "2026-11-24 15:17 eval left the dashboard without a pass: blown · Topstep 1cbdab",
   "2026-11-24 23:37 back on the dashboard: its count is taken back · Topstep 1cbdab",
-  "2026-11-24 23:37 eval left the dashboard without a pass: blown · Tradeify 5256c1"
+  "2026-11-24 23:37 eval left the dashboard without a pass: blown · Tradeify 5256c1",
+  "2026-11-24 23:47 eval left the dashboard without a pass: blown · Tradeify 886609"
  ]
 }
