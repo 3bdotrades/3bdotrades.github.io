@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "793ad1b2e371173a96eb68e5cfd5a506b9bb80f8",
- "built": "2026-11-24T00:07:00.000Z",
+ "at": "348b9369a8be627ad2386d00428255413425453b",
+ "built": "2026-11-24T00:47:01.000Z",
  "day": "Tue 24 Nov",
  "counts": {"pass":[43,181],"win":[12,46],"flip":[90,202],"flip25":[47,75]},
  "flipDone": {"flip":[90,201],"flip25":[47,74]},
@@ -108,7 +108,12 @@
   "cae50e345f13": {"p":"e","f":"Topstep","gone":"2026-11-23","z":1,"u":1},
   "8defdb5b22a5": {"p":"f","f":"Topstep"},
   "88339d141259": {"p":"e","f":"Topstep"},
-  "d5ba1d1ce9b6": {"p":"e","f":"Topstep"}
+  "d5ba1d1ce9b6": {"p":"e","f":"Topstep"},
+  "5b67b6bc5265": {"p":"e","f":"Lucid"},
+  "5ac0bfc63068": {"p":"e","f":"Lucid"},
+  "0c4c80aff543": {"p":"e","f":"Lucid"},
+  "883c1e2410cf": {"p":"e","f":"Lucid"},
+  "d9e4679c66c5": {"p":"e","f":"Lucid"}
  },
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
