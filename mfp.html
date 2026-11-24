@@ -200,9 +200,10 @@ var LEAN = true;                            // only what the 5ers tab has (the o
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 5, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 // The owner, 24 Nov 2026, on study/mfp_flip.js ("1:2 or 1:3 idk u choose"): the 5K's funded trade risks its stop for three
-// times it (frr: 3): the same EV on fees, about a third more net a month than JJ's 1:1, for about $570 more cash.
+// times it (frr: 3): the same EV on fees, about a third more net a month than JJ's 1:1, for about $570 more cash. Then, the same
+// evening, on the funded win rates (study/mfp_winrate.js: 33.3% a trade at 1:2, 24.9% at 1:3): "i would like go for 1:2 trades" (frr: 2).
 var BUILDS = [
-  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 1, frr: 3, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, twin: { go: true, tries: 2, stat: [0.2584, 187.8, 7.3] }, stat: [0.3299, 196.8, 2.8] },
+  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 1, frr: 2, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, twin: { go: true, tries: 2, stat: [0.2584, 187.8, 7.3] }, stat: [0.3299, 196, 3.01] },
   { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 1, feeSide: 0.00001, maxLev: 40, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.3301, 386.8, 3.62] },
   { name: 'Elite 25K · 10% · 5% · 3% · 80%', size: 25000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 186, tries: 1, feeSide: 0.00001, maxLev: 40, minClaim: 250, fundedMax: 4, evalMax: 4, stat: [0.3301, 967, 3.62] },
   { name: 'Elite 50K · 10% · 5% · 3% · 80%', size: 50000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 371, tries: 1, feeSide: 0.00001, maxLev: 40, minClaim: 500, fundedMax: 2, evalMax: 2, stat: [0.3301, 1934, 3.62] },
