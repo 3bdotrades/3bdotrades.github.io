@@ -376,7 +376,9 @@ function vestFeed(o, size, price){
     out[k] = v;
   });
   if (!ok) return null;
-  return { evals: out.evals, funded: out.funded, paid: Math.round(out.bought * price * 100) / 100, at: o.at };
+  var rc = o.counts.received, rv = rc && typeof rc === 'object' ? rc[size] : undefined;      // Received: only a feed that reads payouts has it
+  if (rv !== undefined && (typeof rv !== 'number' || !isFinite(rv) || rv < 0 || rv > 1e8)) return null;
+  return { evals: out.evals, funded: out.funded, paid: Math.round(out.bought * price * 100) / 100, recv: rv === undefined ? null : Math.round(rv * 100) / 100, at: o.at };
 }
 var VEST_SEED = { seats: 10, evals: 0, funded: 0, price: 36, paid: 0, recv: 0, pays: 0 };
 function vestClean(o){
@@ -574,14 +576,14 @@ if (typeof document !== 'undefined') (function(){
     });
     el.addEventListener('change', function(){ el.value = state[k]; });
   });
-  // the feed: when it is there, Evals open, Funded open and Paid are its numbers and their boxes are locked
+  // the feed: when it is there, Evals open, Funded open, Paid and (when it reads payouts) Received are its numbers and their boxes are locked
   function takeFeed(o){
     var f = vestFeed(o, PICK.size, state.price);
     if (!f) return;
-    var n = vestClean({ seats: state.seats, evals: f.evals, funded: f.funded, price: state.price, paid: f.paid, recv: state.recv });
-    var moved = n.evals !== state.evals || n.funded !== state.funded || n.paid !== state.paid;
+    var n = vestClean({ seats: state.seats, evals: f.evals, funded: f.funded, price: state.price, paid: f.paid, recv: f.recv === null ? state.recv : f.recv, pays: state.pays });
+    var moved = n.evals !== state.evals || n.funded !== state.funded || n.paid !== state.paid || n.recv !== state.recv;
     state = n;
-    ['evals', 'funded', 'paid'].forEach(function(k){ var el = $('i-' + k); el.value = state[k]; el.disabled = true; el.title = 'From your MFP accounts, read ' + f.at.slice(11, 16) + ' UTC'; });
+    ['evals', 'funded', 'paid'].concat(f.recv === null ? [] : ['recv']).forEach(function(k){ var el = $('i-' + k); el.value = state[k]; el.disabled = true; el.title = 'From your MFP accounts, read ' + f.at.slice(11, 16) + ' UTC'; });
     if (moved) { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} drawStatic(); update(); }
   }
   function loadFeed(){
