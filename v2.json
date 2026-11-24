@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "6804e75fdc0713c40aa11c3831ac4e4726917977",
- "built": "2026-11-24T08:57:00.000Z",
+ "at": "749cc2f24f296cd2432bf2cac6d781e85274d692",
+ "built": "2026-11-24T09:07:08.000Z",
  "day": "Tue 24 Nov",
  "counts": {"pass":[43,183],"win":[12,48],"flip":[90,202],"flip25":[47,75]},
  "flipDone": {"flip":[90,201],"flip25":[47,74]},
@@ -32,7 +32,9 @@
   ["2026-11-23T09:47","wired","topstep|50"],
   ["2026-11-23T14:37","pass","blueguardian|50"],
   ["2026-11-23T14:57","pass","blueguardian|50"],
-  ["2026-11-23T18:07","pass","futureselite|50"]
+  ["2026-11-23T18:07","pass","futureselite|50"],
+  ["2026-11-24T09:07","wired","blueguardian|50"],
+  ["2026-11-24T09:07","wired","blueguardian|50"]
  ],
  "acc": {
   "a8432161ac22": {"p":"e","f":"FuturesElite","gone":"2026-11-18","z":1,"u":1},
@@ -93,8 +95,8 @@
   "65f26fb2beb3": {"p":"e","f":"Blue Guardian","gone":"2026-11-24","z":1,"u":1},
   "7002fbe7dcda": {"p":"e","f":"Blue Guardian","gone":"2026-11-24","z":1,"u":1},
   "0d13d0ad0f3b": {"p":"e","f":"Blue Guardian","gone":"2026-11-23","z":1,"u":1},
-  "4361baea11bf": {"p":"e","f":"Blue Guardian","z":1},
-  "f4f579d84511": {"p":"e","f":"Blue Guardian","z":1},
+  "4361baea11bf": {"p":"e","f":"Blue Guardian","z":1,"gone":"2026-11-24"},
+  "f4f579d84511": {"p":"e","f":"Blue Guardian","z":1,"gone":"2026-11-24"},
   "19144aa61a7d": {"p":"f","f":"Topstep","z":1,"gone":"2026-11-20"},
   "9af7c4bb8bdd": {"p":"f","f":"Blue Guardian","z":1,"gone":"2026-11-23"},
   "e21c9eb48e2b": {"p":"e","f":"Tradeify"},
@@ -113,7 +115,14 @@
   "5ac0bfc63068": {"p":"e","f":"Lucid"},
   "0c4c80aff543": {"p":"e","f":"Lucid"},
   "883c1e2410cf": {"p":"e","f":"Lucid"},
-  "d9e4679c66c5": {"p":"e","f":"Lucid"}
+  "d9e4679c66c5": {"p":"e","f":"Lucid"},
+  "4e18543b5160": {"p":"e","f":"Blue Guardian"},
+  "ae2232612a5e": {"p":"e","f":"Blue Guardian"},
+  "4349893dd061": {"p":"e","f":"Blue Guardian"},
+  "278b1f4870dc": {"p":"e","f":"Blue Guardian"},
+  "36d069ef62cc": {"p":"e","f":"Blue Guardian"},
+  "9a36dc89befa": {"p":"f","f":"Blue Guardian"},
+  "98cc19c5cc4e": {"p":"f","f":"Blue Guardian"}
  },
  "log": [
   "2026-11-10 20:07 eval blown · Aqua 610af3",
