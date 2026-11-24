@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "6ce3a0a41155ec6b0566034a62b684f0483625c5",
- "built": "2026-11-24T15:17:02.000Z",
+ "at": "d4d7939f7d1eca32fde5c3c05d54bff851085258",
+ "built": "2026-11-24T21:27:01.000Z",
  "day": "Tue 24 Nov",
  "counts": {"pass":[36,136],"win":[16,31],"flip":[41,96],"flip25":[19,40]},
  "flipDone": {"flip":[38,85],"flip25":[19,40]},
@@ -140,7 +140,12 @@
   "0f629aa5a411": {"p":"e","f":"Blue Guardian"},
   "6da1e688e4c4": {"p":"e","f":"Blue Guardian"},
   "78d958bd1aae": {"p":"f","f":"Tradeify","z":1},
-  "5272e323eeb1": {"p":"f","f":"Lucid","z":1}
+  "5272e323eeb1": {"p":"f","f":"Lucid","z":1},
+  "73e9e2188fe2": {"p":"e","f":"Blue Guardian"},
+  "dfa0569c34f0": {"p":"e","f":"Blue Guardian"},
+  "21eb109faddf": {"p":"e","f":"Blue Guardian"},
+  "324f9d811ce5": {"p":"e","f":"Blue Guardian"},
+  "2946d1566b3a": {"p":"e","f":"Blue Guardian"}
  },
  "log": [
   "2026-11-10 22:17 eval left the dashboard without a pass: blown · FuturesElite 9a7523",

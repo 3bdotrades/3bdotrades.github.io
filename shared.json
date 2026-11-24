@@ -1,29 +1,28 @@
 {
  "v": 1,
  "g1": {
-  "n": 94,
-  "t": "2026-11-24T00:53:08.722Z",
+  "n": 99,
+  "t": "2026-11-24T21:25:01.228Z",
   "by": "jbtyloyt",
   "slotsV": 2,
   "skip": [],
   "slots": {
    "aqua": 3,
-   "tradeify|25": 0,
-   "tradeify|50": 0,
+   "tradeify|25": 1,
+   "tradeify|50": 1,
    "lucid|25": 1,
-   "futureselite|50": 3,
-   "lucid|50": 4,
-   "topstep|50": 4,
-   "blueguardian|50": 1
+   "lucid|50": 4
   }
  },
  "v2": {
-  "n": 3,
-  "t": "2026-11-14T00:01:39.386Z",
+  "n": 5,
+  "t": "2026-11-24T21:24:06.115Z",
   "by": "vjdccqtw",
+  "slotsV": 2,
   "skip": [],
   "slots": {
-   "aqua": 2
+   "aqua": 2,
+   "lucid|25": 1
   }
  },
  "5ers": {
