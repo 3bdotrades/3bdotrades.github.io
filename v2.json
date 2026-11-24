@@ -1,7 +1,7 @@
 {
  "v": 2,
- "at": "27e08aaeb5a04fb1d02374d190425ff3d94c7dcc",
- "built": "2026-11-24T21:37:01.000Z",
+ "at": "a303d8597b5e2f4461e1575a3372790988e81e0c",
+ "built": "2026-11-24T22:17:02.000Z",
  "day": "Tue 24 Nov",
  "counts": {"pass":[43,183],"win":[13,49],"flip":[92,207],"flip25":[47,75]},
  "flipDone": {"flip":[90,201],"flip25":[47,74]},
@@ -35,7 +35,8 @@
   ["2026-11-23T14:57","pass","blueguardian|50"],
   ["2026-11-23T18:07","pass","futureselite|50"],
   ["2026-11-24T09:07","wired","blueguardian|50"],
-  ["2026-11-24T09:07","wired","blueguardian|50"]
+  ["2026-11-24T09:07","wired","blueguardian|50"],
+  ["2026-11-24T22:14","wired","futureselite|50"]
  ],
  "acc": {
   "a8432161ac22": {"p":"e","f":"FuturesElite","gone":"2026-11-18","z":1,"u":1},
@@ -92,7 +93,7 @@
   "fd0d548da848": {"p":"e","f":"FuturesElite","gone":"2026-11-20","z":1,"u":1},
   "67589a9d1bc0": {"p":"e","f":"FuturesElite","gone":"2026-11-23","z":1,"u":1},
   "cc269762e239": {"p":"e","f":"FuturesElite","gone":"2026-11-23","z":1,"u":1},
-  "45c5ecbfbf21": {"p":"e","f":"FuturesElite","z":1},
+  "45c5ecbfbf21": {"p":"f","f":"FuturesElite"},
   "65f26fb2beb3": {"p":"e","f":"Blue Guardian","gone":"2026-11-24","z":1,"u":1},
   "7002fbe7dcda": {"p":"e","f":"Blue Guardian","gone":"2026-11-24","z":1,"u":1},
   "0d13d0ad0f3b": {"p":"e","f":"Blue Guardian","gone":"2026-11-23","z":1,"u":1},
