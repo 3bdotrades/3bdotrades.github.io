@@ -1,38 +1,38 @@
 {
  "v": 1,
  "first": "2026-07-13",
- "last": "2026-11-23",
- "days": 93,
- "signals": 2959,
- "counted": 1859,
+ "last": "2026-11-24",
+ "days": 94,
+ "signals": 3002,
+ "counted": 1890,
  "none": {
-  "mean": 19.99,
-  "median": 19,
+  "mean": 20.11,
+  "median": 19.5,
   "min": 5,
   "min_day": "2026-09-07",
   "max": 43,
   "max_day": "2026-11-06"
  },
  "all": {
-  "mean": 31.82
+  "mean": 31.94
  },
  "bt": {
   "eval": {
    "stop": 25,
    "target": 38.25,
-   "won": 1137,
-   "lost": 1819,
+   "won": 1150,
+   "lost": 1849,
    "flat": 3,
-   "rate": 38.46,
+   "rate": 38.35,
    "chance": 39.53
   },
   "funded": {
    "stop": 25,
    "target": 57,
-   "won": 861,
-   "lost": 2089,
+   "won": 873,
+   "lost": 2120,
    "flat": 9,
-   "rate": 29.19,
+   "rate": 29.17,
    "chance": 30.49
   }
  },
@@ -40,19 +40,19 @@
   "eval": {
    "stop": 25,
    "target": 38.25,
-   "won": 1199,
-   "lost": 1754,
+   "won": 1211,
+   "lost": 1785,
    "flat": 6,
-   "rate": 40.6,
+   "rate": 40.42,
    "chance": 39.53
   },
   "funded": {
    "stop": 25,
    "target": 57,
-   "won": 930,
-   "lost": 2018,
+   "won": 939,
+   "lost": 2052,
    "flat": 11,
-   "rate": 31.55,
+   "rate": 31.39,
    "chance": 30.49
   }
  }
