@@ -723,6 +723,12 @@ var TWO_ON = true;
 var FIVE_SIG0 = { v: 1, first: '2026-07-13', last: '2026-11-19', days: 91, signals: 2859, counted: 1783,
   none: { mean: 19.59, median: 19, min: 5, min_day: '2026-09-07', max: 43, max_day: '2026-11-06' }, all: { mean: 31.42 },
   bt: { eval: { stop: 25, target: 38.25, won: 1105, lost: 1751, flat: 3, rate: 38.69, chance: 39.53 }, funded: { stop: 25, target: 57, won: 841, lost: 2009, flat: 9, rate: 29.51, chance: 30.49 } } };
+// THE FADE SYSTEM (the owner, 24 Nov 2026: "update the tab to show the fade system"): the bot started with --fade takes every
+// GO on the OPPOSITE side. With FIVE_FADE on, the plan, its rates and My record's backtest are the opposite side's (the
+// summary's btf, counted by the same script on the same GOs), whenever the summary carries one that adds up; else the
+// signals' own side, as before. The search of 24 Nov 2026 found the opposite side ahead of random directions in every
+// bracket: a candidate, not proof. false = the signals' own side again.
+var FIVE_FADE = true;
 var SIG_URL = 'https://raw.githubusercontent.com/3bdotrades/3bdotrades.github.io/track/signals.json', SIG_KEY = 'funded-slots-roadmap-signals';
 var SIG_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 var SIG = sigOf(FIVE_SIG0);
@@ -753,12 +759,16 @@ function sigOf(o){
       says: 'every G1 and V2 GO from ' + from + ', walked at the bot\'s targets: ' + what + ' (' + x.stop + '-point stop, ' + x.target + '-point target) won ' + x.won.toLocaleString('en-US') + ' and lost ' + x.lost.toLocaleString('en-US') + ' = ' + rate + '%' + (x.flat ? ', ' + x.flat + ' flat left out' : ''),
       chanceSays: what + ' with a ' + x.stop + '-point stop and a ' + x.target + '-point target wins ' + chance + '% of the time' };
   }
-  var e = o.bt && typeof o.bt === 'object' ? side(o.bt.eval, "an eval's trade") : null, w = e ? side(o.bt.funded, 'a funded trade') : null;
+  var e = o.bt && typeof o.bt === 'object' ? side(o.bt.eval, "an eval's trade") : null, w = e ? side(o.bt.funded, 'a funded trade') : null, fade = false;
+  if (FIVE_FADE && o.btf && typeof o.btf === 'object'){
+    var fe = side(o.btf.eval, "an eval's trade on the OPPOSITE side of the signal"), fw = fe ? side(o.btf.funded, 'a funded trade on the OPPOSITE side of the signal') : null;
+    if (fe && fw){ e = fe; w = fw; fade = true; }
+  }
   return { period: period, last: o.last, avg: n.mean, med: n.median, min: n.min, max: n.max,
     minDay: sigDay(n.min_day, true), maxDay: sigDay(n.max_day, true),
     says: 'One trade at a time: of the ' + o.signals.toLocaleString('en-US') + ' G1 and V2 signals from ' + from + ', the ' + o.counted.toLocaleString('en-US') +
       ' that fill 60 seconds or more after the trade before them has ended. All signals: ' + a.mean + ' a day.',
-    bt: e && w ? { period: period, pass: e.rate, win: w.rate, chance: e.chance, fchance: w.chance, says: { pass: e.says, win: w.says }, chanceSays: { pass: e.chanceSays, win: w.chanceSays } } : null };
+    bt: e && w ? { fade: fade, period: period, pass: e.rate, win: w.rate, chance: e.chance, fchance: w.chance, says: { pass: e.says, win: w.says }, chanceSays: { pass: e.chanceSays, win: w.chanceSays } } : null };
 }
 // the four numbers; the fewest and the most say their day on hover
 function sigCells(){
@@ -1696,7 +1706,7 @@ function fiveSystem(){
     rows.push(['Funded ' + k + 'K', b.q + ' NQ, target ' + b.pts.toFixed(2) + ' points (+' + usd0(R.big) + '), stop ' + st.toFixed(2) + ' (−' + usd0(R.stop) + '). Last days ' + sm.q + ' NQ, target ' + sm.pts.toFixed(2) + ' (+' + usd0(R.small) + ')']);
   });
   rows.push(['Payout', 'A new 4% and ' + FIVE_NDAYS + ' profitable days, 14 days apart, ' + FIVE_NPAYS + ' a funded account. Net 50K ' + FIVE_NEW['50'].caps.map(function(c){ return usd0(c * FIVE_CUT); }).join(', ') + '; 25K ' + FIVE_NEW['25'].caps.map(function(c){ return usd0(c * FIVE_CUT); }).join(', ')]);
-  rows.push(['Trading', 'One trade a day an account, one account at a time, on the G1 and V2 signals']);
+  rows.push(['Trading', 'One trade a day an account, one account at a time, on ' + (SIG.bt && SIG.bt.fade ? 'the OPPOSITE side of each G1 and V2 signal (the bot with --fade)' : 'the G1 and V2 signals')]);
   document.getElementById('sys5').innerHTML = rows.map(function(r){ return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
   document.getElementById('sys5-h').hidden = document.getElementById('sys5-w').hidden = false;
 }
@@ -2210,7 +2220,7 @@ function updateFive(){
   // rate to one decimal ("none yet" with no result: never 0%). The counts are on the hover, not on the page (the owner, 20
   // Nov 2026: "don't show 1 of 1 or 3 of 9").
   var rec = fiveRecord(f);
-  document.getElementById('rates-h').textContent = 'My record · backtest ' + SIG.bt.period;
+  document.getElementById('rates-h').textContent = 'My record · backtest ' + (SIG.bt.fade ? 'opposite side · ' : '') + SIG.bt.period;
   fiveSystem();
   [['pass', rec.pass, rec.lost, 'evals passed', 'lost'], ['win', rec.won, rec.flost, 'funded trades won', 'lost']].forEach(function(x){
     var k = x[0], done = x[1] + x[2], m = document.getElementById('f-' + k + '-m'), mc = document.getElementById('f-' + k + '-mc');

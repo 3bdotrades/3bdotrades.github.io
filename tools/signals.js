@@ -45,6 +45,14 @@ function clean(o){
     if (e.won + e.lost + e.flat > o.signals || f.won + f.lost + f.flat > o.signals) return { error: 'the backtest has more trades than signals' };
     out.bt = { eval: e, funded: f };
   }
+  // The same backtest with every GO taken on the OPPOSITE side (the summary's version 3; the owner, 24 Nov 2026: "update the
+  // tab to show the fade system"; the bot's --fade): published as btf under the same checks, left out when it is not there.
+  if (o.backtest_fade !== undefined){
+    const b = o.backtest_fade, e = b && typeof b === 'object' ? side(b.eval) : null, f = b && typeof b === 'object' ? side(b.funded) : null;
+    if (!e || !f) return { error: 'the opposite-side backtest does not add up' };
+    if (e.won + e.lost + e.flat > o.signals || f.won + f.lost + f.flat > o.signals) return { error: 'the opposite-side backtest has more trades than signals' };
+    out.btf = { eval: e, funded: f };
+  }
   return out;
 }
 // one side of the backtest, or null: its counts, and its rate and chance as the summary gives them (two decimals of a percent)
@@ -64,7 +72,7 @@ function pass(dir, file){
   if (c.error) return 'signals: not published: ' + c.error;
   const out = path.join(dir, 'signals.json'), text = JSON.stringify(c, null, 1) + '\n';
   let old = null; try { old = fs.readFileSync(out, 'utf8'); } catch (e) {}
-  const what = c.days + ' days to ' + c.last + ', ' + c.none.mean + ' a day' + (c.bt ? ', backtest ' + c.bt.eval.rate + '% / ' + c.bt.funded.rate + '%' : '');
+  const what = c.days + ' days to ' + c.last + ', ' + c.none.mean + ' a day' + (c.bt ? ', backtest ' + c.bt.eval.rate + '% / ' + c.bt.funded.rate + '%' : '') + (c.btf ? ', opposite side ' + c.btf.eval.rate + '% / ' + c.btf.funded.rate + '%' : '');
   if (old === text) return 'signals: ' + what + ', as kept';
   fs.writeFileSync(out, text);
   return 'signals: ' + what + ', written';
