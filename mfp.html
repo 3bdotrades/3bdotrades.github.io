@@ -208,12 +208,15 @@ var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 6, RUNS = 4000, SAFE = 0
 // one position at a time and a trade is open about 2.6 hours, so a day has room for about 7 trades however many accounts
 // there are. MFP_PACE: the entries of each New York day (Sundays too) in the bot's replay of 13 Jul - 10 Nov 2026 with 20
 // evals (study/mfp_pace.js): 713 entries on 102 days. The week is 6 days here for it.
+// The owner, 25 Nov 2026 ("fix it and make the sl above daily loss limit"): the first live stop filled 4 points worse, lost
+// $158.66 and MFP failed the account. The bot now sizes a trade for a stop 8 points worse (slip: 8: a 5K stop loses $125)
+// and ends an account whose room is under 35% of a full stop (minShare).
 var MFP_PACE = [6,6,8,8,1,6,6,3,1,7,4,9,2,9,9,12,13,13,9,15,13,6,5,6,4,5,6,7,7,8,3,6,6,11,14,5,6,3,1,1,3,1,1,3,2,1,3,5,7,4,8,7,6,11,9,7,6,1,6,4,4,3,12,2,12,13,11,16,9,6,15,8,5,6,7,9,8,4,5,5,6,9,10,17,10,8,6,15,10,4,5,8,5,5,8,7,8,9,13,5,6,14];
 var BUILDS = [
-  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 1, frr: 2, pace: MFP_PACE, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, twin: { go: true, tries: 2, stat: [0.2584, 187.8, 7.3] }, stat: [0.3299, 196, 3.01] },
-  { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 1, frr: 2, pace: MFP_PACE, feeSide: 0.00001, maxLev: 40, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.3299, 392.1, 3.01] },
-  { name: 'Elite 25K · 10% · 5% · 3% · 80%', size: 25000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 186, tries: 1, feeSide: 0.00001, maxLev: 40, minClaim: 250, fundedMax: 4, evalMax: 4, stat: [0.3301, 967, 3.62] },
-  { name: 'Elite 50K · 10% · 5% · 3% · 80%', size: 50000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 371, tries: 1, feeSide: 0.00001, maxLev: 40, minClaim: 500, fundedMax: 2, evalMax: 2, stat: [0.3301, 1934, 3.62] },
+  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 1, frr: 2, pace: MFP_PACE, slip: 8, minShare: 0.35, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, twin: { go: true, tries: 2, stat: [0.2584, 187.8, 7.3] }, stat: [0.315, 183.2, 2.98] },
+  { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 1, frr: 2, pace: MFP_PACE, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.315, 366.3, 2.98] },
+  { name: 'Elite 25K · 10% · 5% · 3% · 80%', size: 25000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 186, tries: 1, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 250, fundedMax: 4, evalMax: 4, stat: [0.3149, 907, 3.66] },
+  { name: 'Elite 50K · 10% · 5% · 3% · 80%', size: 50000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 371, tries: 1, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 500, fundedMax: 2, evalMax: 2, stat: [0.3149, 1815, 3.66] },
   { name: 'Signature 10K · 10% · 6% · 3% · 80%', size: 10000, dd: 0.06, dl: 0.03, tg: [0.10], split: 0.80, price: 65, tries: 1, feeSide: 0.00005, lock: true, minClaim: 600, fundedMax: 10, evalMax: 10, stat: [0.3582, 231.3, 3.85] },
   { name: 'Select 10K · 9% · 3% · 3% · 80%', size: 10000, dd: 0.03, dl: 0.03, tg: [0.09], split: 0.80, price: 30, tries: 1, feeSide: 0.00005, lock: true, minClaim: 900, fundedMax: 10, evalMax: 10, stat: [0.2375, 150.5, 1.91] }
 ];
@@ -245,7 +248,11 @@ function vestSpec(b, stop){
       targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
   }
   if (b.dl) risk = Math.min(risk, b.dl * b.size * (b.dlKeep || 0.97));       // a stop and its fee stay inside the day's loss limit
-  return { d: d, risk: risk, frr: b.frr || FRR, fee: risk / (stop || STOP) * NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, minClaim: b.minClaim || 0, lock: !!b.lock,
+  // a build's slippage allowance: the trade is sized so a stop that fills b.slip points worse still loses no more than that
+  // (the stop itself then loses less: keep of it); an account whose room is under b.minShare of a full stop is done
+  var keep = b.slip ? (stop || STOP) / ((stop || STOP) + b.slip) : 1, minRoom = (b.minShare || 0) * risk;
+  risk *= keep;
+  return { d: d, risk: risk, keep: keep, minRoom: minRoom, frr: b.frr || FRR, fee: risk / (stop || STOP) * NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, minClaim: b.minClaim || 0, lock: !!b.lock,
     targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
 }
 function vestNew(s, funded){ return { stage: funded || !s.targets.length ? -1 : 0, room: s.d, gain: 0, dead: false, wait: false }; }
@@ -273,20 +280,20 @@ function vestStep(a, s, u){
     if (a.room < s.cap * 0.02) a.dead = true;
     return out;
   }
-  var r = Math.min(s.risk, a.room - s.fee);
-  if (!(r > 1e-9)) { a.dead = true; return 0; }
+  var r = Math.min(s.risk, (a.room - s.fee) * (s.keep || 1));
+  if (!(r > 1e-9) || a.room - s.fee < (s.minRoom || 0)) { a.dead = true; return 0; }
   if (a.stage >= 0) {
     var T = s.targets[a.stage], win = T - a.gain + s.fee, p = r / (r + win);
     var d = (u < p ? win : -r) - s.fee;
     a.room += d; a.gain += d;
     if (a.gain >= T - 1e-6) { a.stage = a.stage + 1 < s.targets.length ? a.stage + 1 : -1; a.room = s.d; a.gain = 0; if (a.stage < 0) a.wait = true; }
-    else if (a.room <= s.fee + 1e-9) a.dead = true;
+    else if (a.room <= s.fee + 1e-9 || a.room - s.fee < (s.minRoom || 0)) a.dead = true;
     return 0;
   }
   var F = s.frr || FRR, e = (u < 1 / (1 + F) ? F * r : -r) - s.fee, pay = 0;      // a build's own funded reward:risk, else the page's
   a.room += e; a.gain += e;
   if (a.gain > 1e-6 && a.gain >= s.minClaim - 1e-9) { pay = s.split * a.gain; a.room -= a.gain; a.gain = 0; if (s.lock) a.dead = true; }
-  if (a.room <= s.fee + 1e-9) a.dead = true;
+  if (a.room <= s.fee + 1e-9 || a.room - s.fee < (s.minRoom || 0)) a.dead = true;
   return pay;
 }
 // One account bought, played to its end, n times: how often it passes, what it pays, how many trades it takes.

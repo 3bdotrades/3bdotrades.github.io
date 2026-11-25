@@ -244,7 +244,11 @@ function vestSpec(b, stop){
       targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
   }
   if (b.dl) risk = Math.min(risk, b.dl * b.size * (b.dlKeep || 0.97));       // a stop and its fee stay inside the day's loss limit
-  return { d: d, risk: risk, frr: b.frr || FRR, fee: risk / (stop || STOP) * NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, minClaim: b.minClaim || 0, lock: !!b.lock,
+  // a build's slippage allowance: the trade is sized so a stop that fills b.slip points worse still loses no more than that
+  // (the stop itself then loses less: keep of it); an account whose room is under b.minShare of a full stop is done
+  var keep = b.slip ? (stop || STOP) / ((stop || STOP) + b.slip) : 1, minRoom = (b.minShare || 0) * risk;
+  risk *= keep;
+  return { d: d, risk: risk, keep: keep, minRoom: minRoom, frr: b.frr || FRR, fee: risk / (stop || STOP) * NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, minClaim: b.minClaim || 0, lock: !!b.lock,
     targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
 }
 function vestNew(s, funded){ return { stage: funded || !s.targets.length ? -1 : 0, room: s.d, gain: 0, dead: false, wait: false }; }
@@ -272,20 +276,20 @@ function vestStep(a, s, u){
     if (a.room < s.cap * 0.02) a.dead = true;
     return out;
   }
-  var r = Math.min(s.risk, a.room - s.fee);
-  if (!(r > 1e-9)) { a.dead = true; return 0; }
+  var r = Math.min(s.risk, (a.room - s.fee) * (s.keep || 1));
+  if (!(r > 1e-9) || a.room - s.fee < (s.minRoom || 0)) { a.dead = true; return 0; }
   if (a.stage >= 0) {
     var T = s.targets[a.stage], win = T - a.gain + s.fee, p = r / (r + win);
     var d = (u < p ? win : -r) - s.fee;
     a.room += d; a.gain += d;
     if (a.gain >= T - 1e-6) { a.stage = a.stage + 1 < s.targets.length ? a.stage + 1 : -1; a.room = s.d; a.gain = 0; if (a.stage < 0) a.wait = true; }
-    else if (a.room <= s.fee + 1e-9) a.dead = true;
+    else if (a.room <= s.fee + 1e-9 || a.room - s.fee < (s.minRoom || 0)) a.dead = true;
     return 0;
   }
   var F = s.frr || FRR, e = (u < 1 / (1 + F) ? F * r : -r) - s.fee, pay = 0;      // a build's own funded reward:risk, else the page's
   a.room += e; a.gain += e;
   if (a.gain > 1e-6 && a.gain >= s.minClaim - 1e-9) { pay = s.split * a.gain; a.room -= a.gain; a.gain = 0; if (s.lock) a.dead = true; }
-  if (a.room <= s.fee + 1e-9) a.dead = true;
+  if (a.room <= s.fee + 1e-9 || a.room - s.fee < (s.minRoom || 0)) a.dead = true;
   return pay;
 }
 // One account bought, played to its end, n times: how often it passes, what it pays, how many trades it takes.
