@@ -1604,13 +1604,16 @@ function openKept(o){
   var sum = 0; ks.forEach(function(k){ sum += +d[k]; });
   return Math.round(sum / ks.length);
 }
-// Each firm's share of the evals the fleet keeps open, over the same days (the counter's open.firms). The owner, 25 Nov 2026:
+// Each firm's share of the evals the fleet keeps open (the counter's open.firms). The owner, 25 Nov 2026:
 // "fix the eval firm mix so it buys like the fleet". The plan gave each free seat to the firm furthest from full, which spread
 // the evals over the firms; the fleet does not (17 to 24 Nov: more than half of its open evals at Blue Guardian in both fleets).
+// Over the last MIX_DAYS trading days (the owner, 25 Nov 2026: "use a 5 day window for the mix"): the fleet changes firms faster
+// than the ten days of the seats can follow.
+var MIX_DAYS = 5;
 function openMix(o){
   var d = o && typeof o === 'object' && o.days && typeof o.days === 'object' ? o.days : null, fm = d && o.firms && typeof o.firms === 'object' ? o.firms : null; if (!fm) return null;
   var ks = Object.keys(d).filter(function(k){ if (!/^\d{4}-\d\d-\d\d$/.test(k) || !(num(d[k], -1) >= 0)) return false; var p = k.split('-'), wd = new Date(+p[0], +p[1] - 1, +p[2]).getDay(); return wd > 0 && wd < 6; }).sort();
-  ks = ks.slice(0, -1).slice(-SEAT_DAYS);
+  ks = ks.slice(0, -1).slice(-MIX_DAYS);
   var m = Object.create(null), tot = 0;
   ks.forEach(function(k){ var x = fm[k]; if (!x || typeof x !== 'object') return; Object.keys(x).forEach(function(f){ var n = num(x[f], 0); if (!(n > 0)) return; var key = normFirm(f); m[key] = (m[key] || 0) + n; tot += n; }); });
   if (!(tot > 0)) return null;
