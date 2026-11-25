@@ -212,8 +212,12 @@ function params(r){
 // of the profit: two winning days pass it ($1,508 a day on a $3,000 target). At Tradeify the rule is 40%, so a winning day is
 // just under 40% of the target ($1,198) and it takes three. A losing day costs about a third of the target (stops of $988 to
 // $1,142 on $3,000), half of the drawdown: two losing days in a row end the eval. It has passed once its profit reaches the
-// target. So an eval lasts at least 2 days (Tradeify 3), and longer when losing days come in between.
-var EVAL_WIN = 1508 / 3000, EVAL_WIN_AT = { tradeify: 1198 / 3000 }, EVAL_LOSS = 0.345, EVAL_MAX = 16;
+// target. So an eval that passes takes at least 2 days (Tradeify 3), and longer when losing days come in between.
+// A losing day can also end the eval at once (EVAL_SNAP of them do). The owner, 25 Nov 2026: "fix the eval length too". On
+// the dashboard's builds of 5 to 25 Nov 2026 the 148 evals of G1 and V2 seen from start to end were open 2.53 trading days
+// on average (G1 2.72, V2 2.35) and 62 of the 118 that did not pass had traded on one day only; with two losing days always
+// needed the model's eval lasted 3.2 days and none ended on its first. 0.3 gives 2.57 days at G1's pass rate of that time.
+var EVAL_WIN = 1508 / 3000, EVAL_WIN_AT = { tradeify: 1198 / 3000 }, EVAL_LOSS = 0.345, EVAL_MAX = 16, EVAL_SNAP = 0.3;
 function ownOf(o, k){ return Object.prototype.hasOwnProperty.call(o, k) ? o[k] : undefined; }      // o[k], never something every object has
 function evalWin(firm){ return ownOf(EVAL_WIN_AT, normFirm(firm)) || EVAL_WIN; }
 // Chance: with no edge a trade wins stop / (stop + target) of the time, counted on the price moves themselves (fees change
@@ -236,7 +240,7 @@ function evalRoad(win, p, at, hurt){
     for (k = 0; k < keys.length; k++){
       var s = cur[keys[k]], m = s[2];
       if (s[0] + win >= 1 - 1e-9){ pass[j] += m * p; out[j] += m * p; } else put(nx, s[0] + win, false, m * p);
-      if (s[1]) out[j] += m * q; else put(nx, s[0] - EVAL_LOSS, true, m * q);
+      if (s[1]) out[j] += m * q; else { out[j] += m * q * EVAL_SNAP; put(nx, s[0] - EVAL_LOSS, true, m * q * (1 - EVAL_SNAP)); }
     }
     cur = nx;
   }
