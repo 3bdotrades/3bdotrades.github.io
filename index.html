@@ -882,18 +882,19 @@ var OWNER_SETS = { g1: [
   { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, idle: 1, room: 3992 },
   { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1800, pay2: 900, room: 3989 },
   { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1800, pay2: 900, room: 3895 },
-  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1800, pay2: 900, room: 3895 },
+  { firm: 'FuturesElite', size: '50K', evalPrice: 74.88, activation: 0, pay1: 1800, pay2: 900, room: 3895 },
   { firm: 'Tradeify', size: '25K', evalPrice: 72.38, activation: 0, pay1: 1125, pay2: 562.5, room: 1896 },
   { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 2250, pay2: 1125, room: 4889 }
 ],
-// V2 fleet: G1's prices and payouts, its own rooms; no idle accounts
+// V2 fleet: G1's payouts, its own rooms; no idle accounts. Its prices are what its dashboard's buys show paid from 11 to
+// 24 Nov 2026 (Topstep $102, Lucid $90, Tradeify $110, FuturesElite $74.88: G1 paid that too; Aqua none bought, as G1's)
 v2: [
-  { firm: 'Lucid', size: '50K', evalPrice: 90.3, activation: 0, pay1: 1800, pay2: 900, room: 3895 },
+  { firm: 'Lucid', size: '50K', evalPrice: 90, activation: 0, pay1: 1800, pay2: 900, room: 3895 },
   { firm: 'Lucid', size: '25K', evalPrice: 50.4, activation: 0, pay1: 900, pay2: 450, room: 1993 },
-  { firm: 'Topstep', size: '50K', evalPrice: 85, activation: 0, pay1: 1800, pay2: 900, room: 3992 },
+  { firm: 'Topstep', size: '50K', evalPrice: 102, activation: 0, pay1: 1800, pay2: 900, room: 3992 },
   { firm: 'Aqua', size: '50K', evalPrice: 88.425, activation: 0, pay1: 1800, pay2: 900, room: 3912 },
-  { firm: 'Tradeify', size: '50K', evalPrice: 109.62, activation: 0, pay1: 2250, pay2: 1125, room: 4889 },
-  { firm: 'FuturesElite', size: '50K', evalPrice: 84.56, activation: 0, pay1: 1800, pay2: 900, room: 3895 },
+  { firm: 'Tradeify', size: '50K', evalPrice: 110, activation: 0, pay1: 2250, pay2: 1125, room: 4889 },
+  { firm: 'FuturesElite', size: '50K', evalPrice: 74.88, activation: 0, pay1: 1800, pay2: 900, room: 3895 },
   { firm: 'Blue Guardian', size: '50K', evalPrice: 88.75, activation: 0, pay1: 1800, pay2: 900, room: 3895 }
 ] };
 var OWNER = OWNER_SETS[FLEET.key] || [];
