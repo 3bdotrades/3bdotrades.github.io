@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "ad8e41a9954d23e5f29bd42d1b420062542e1d7d",
- "built": "2026-11-25T09:37:06.000Z",
+ "at": "251df5a6c488f32a6440ef86617b7b95a1f5d10d",
+ "built": "2026-11-25T13:47:01.000Z",
  "day": "Wed 25 Nov",
- "counts": {"pass":[38,142],"win":[16,31],"flip":[49,109],"flip25":[21,42]},
+ "counts": {"pass":[38,143],"win":[16,31],"flip":[49,109],"flip25":[21,42]},
  "flipDone": {"flip":[41,96],"flip25":[19,40]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"6c3e6db0ad49":[0,1],"617bff2a27cb":[0,1],"ae21c82fc81b":[0,-1],"78d958bd1aae":[1,1],"5272e323eeb1":[1,1],"b3bb30ebaeb4":[0,-1],"0818c51c6877":[0,1],"e0028132017c":[0,1],"6d5033218423":[0,-1],"808bd921c1fb":[0,1],"0375f3fcc515":[0,1],"3debf3957a49":[0,1],"78f6aeb38ea0":[0,-1],"b2b210b8e64c":[0,-1],"92815eb89cc4":[0,1]},
@@ -83,7 +83,7 @@
   "d9eec6061f0c": {"p":"e","f":"Blue Guardian","gone":"2026-11-16","z":1,"u":1},
   "e6710585f030": {"p":"e","f":"Blue Guardian","gone":"2026-11-16","z":1,"u":1},
   "262b3468bc0c": {"p":"e","f":"Blue Guardian","gone":"2026-11-18","z":1,"u":1},
-  "dc362976bc63": {"p":"e","f":"Blue Guardian"},
+  "dc362976bc63": {"p":"e","f":"Blue Guardian","gone":"2026-11-25","z":1,"u":1},
   "30406ca976ec": {"p":"e","f":"Blue Guardian","gone":"2026-11-16","z":1,"u":1},
   "b4c7c0b3569c": {"p":"e","f":"Blue Guardian","gone":"2026-11-19","z":1,"u":1},
   "fdc44561a908": {"p":"e","f":"Blue Guardian","gone":"2026-11-18","z":1,"u":1},
@@ -259,6 +259,7 @@
   "2026-11-25 01:57 eval left the dashboard without a pass: blown · Blue Guardian 6da1e6",
   "2026-11-25 02:47 back on the dashboard: its count is taken back · Topstep 1cbdab",
   "2026-11-25 08:47 eval left the dashboard without a pass: blown · Topstep 33dd54",
-  "2026-11-25 09:27 eval passed · Topstep 8295e6"
+  "2026-11-25 09:27 eval passed · Topstep 8295e6",
+  "2026-11-25 13:47 eval left the dashboard without a pass: blown · Blue Guardian dc3629"
  ]
 }
