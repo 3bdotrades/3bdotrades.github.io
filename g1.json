@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "38a1af4e41078fd0da0ad744e952e86822c7e4e8",
- "built": "2026-11-25T02:37:01.000Z",
+ "at": "e39deeff436e003e13b44ada0df9407a00f20cad",
+ "built": "2026-11-25T02:47:01.000Z",
  "day": "Wed 25 Nov",
- "counts": {"pass":[37,141],"win":[16,31],"flip":[43,99],"flip25":[20,41]},
+ "counts": {"pass":[37,140],"win":[16,31],"flip":[43,99],"flip25":[20,41]},
  "flipDone": {"flip":[41,96],"flip25":[19,40]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[18,67],"win":[8,12],"flip":[12,38],"flip25":[13,25]}},
  "today": {"6c3e6db0ad49":[0,1],"617bff2a27cb":[0,1],"ae21c82fc81b":[0,-1],"78d958bd1aae":[1,1]},
@@ -98,7 +98,7 @@
   "33dd545e212c": {"p":"e","f":"Topstep"},
   "2b3bfb71d12e": {"p":"e","f":"Topstep","gone":"2026-11-18","z":1,"u":1},
   "a1067797add3": {"p":"e","f":"Topstep","gone":"2026-11-18","z":1,"u":1},
-  "1cbdabd77517": {"p":"e","f":"Topstep","gone":"2026-11-25","z":1,"u":1},
+  "1cbdabd77517": {"p":"e","f":"Topstep"},
   "1c13b692ea8f": {"p":"e","f":"Blue Guardian","gone":"2026-11-18","z":1,"u":1},
   "6c3e6db0ad49": {"p":"x","f":"FuturesElite"},
   "cf30f33d0eb1": {"p":"e","f":"FuturesElite","gone":"2026-11-18","z":1,"u":1},
@@ -255,6 +255,7 @@
   "2026-11-25 00:37 eval left the dashboard without a pass: blown · Blue Guardian 753326",
   "2026-11-25 01:37 eval passed · Blue Guardian 0f629a",
   "2026-11-25 01:37 eval left the dashboard without a pass: blown · Topstep 1cbdab",
-  "2026-11-25 01:57 eval left the dashboard without a pass: blown · Blue Guardian 6da1e6"
+  "2026-11-25 01:57 eval left the dashboard without a pass: blown · Blue Guardian 6da1e6",
+  "2026-11-25 02:47 back on the dashboard: its count is taken back · Topstep 1cbdab"
  ]
 }
