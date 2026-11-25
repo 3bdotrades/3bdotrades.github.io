@@ -1147,7 +1147,7 @@ function liveRates(){ var c = liveCounts(), o = {}; if (!c) return null; RATE_KE
   // is dropped, with its version
   var fresh = FIVE && !(s.five && s.five.v === FIVE_V);
   if (FIVE) state.five = cleanFive(s.five);
-  else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); state.g1.kc = cashOf(s.g1.kc); }
+  else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); state.g1.kc = cashOf(s.g1.kc); state.g1.ko = num(s.g1.ko, 0) > 0 ? Math.round(s.g1.ko) : 0; }
   // for the edits shared by every browser (see shareEdit): a name for this browser, and the version of this view's part it holds
   state.dev = typeof s.dev === 'string' && /^[a-z0-9]{6,16}$/.test(s.dev) ? s.dev : (Math.random().toString(36) + '00000000').slice(2, 10);
   var held = cleanVersion(s.sh); if (held && !fresh) state.sh = held;
@@ -1565,8 +1565,21 @@ function syncRates(){
       (k === 'pass' ? '. At Tradeify, where an eval needs 3 winning days: ' + three : '');
   });
 }
-// the most evals the fleet keeps trading: the highest number of eval signals it had in a day (from the dashboard)
-function seats(){ var g = state.g1; return g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
+// The most evals the fleet keeps trading. The owner, 25 Nov 2026: "fix the seat rule so the plan buys like the fleet". It is
+// what the fleet itself keeps open: the counter keeps, for each day, the most evals the dashboard showed open at once
+// (open.days of the counts file), and the seats are the average of that over the last SEAT_DAYS trading days before the
+// newest one (still running). Before that it was the highest number of eval signals in a day (the dashboard's "max"), which
+// stood at 17 for V2 while V2 kept up to 27 evals open: replayed from 11 Nov 2026 the plan bought 44 evals in ten trading
+// days and the fleet about 72. That number is still the fallback while the kept one is not read.
+var SEAT_DAYS = 10;
+function openKept(o){
+  var d = o && typeof o === 'object' && o.days && typeof o.days === 'object' ? o.days : null; if (!d) return 0;
+  var ks = Object.keys(d).filter(function(k){ if (!/^\d{4}-\d\d-\d\d$/.test(k) || !(num(d[k], -1) >= 0)) return false; var p = k.split('-'), wd = new Date(+p[0], +p[1] - 1, +p[2]).getDay(); return wd > 0 && wd < 6; }).sort();
+  ks = ks.slice(0, -1).slice(-SEAT_DAYS); if (!ks.length) return 0;
+  var sum = 0; ks.forEach(function(k){ sum += +d[k]; });
+  return Math.round(sum / ks.length);
+}
+function seats(){ var g = state.g1; return g && g.ko > 0 ? g.ko : g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
 // the fleet's firms as a run at these rates takes them; all = with no firm skipped
 function planFirms(rr, all){
   var on = dayOn(), late = on ? lateShare() : 0;
@@ -2360,7 +2373,7 @@ function counted(k){
         var o = m[1] === 'wired' ? came.wired : m[1] === 'pass' ? came.passes : null;
         if (o) o[m[2]] = (o[m[2]] || 0) + 1;
       });
-      return { life: life, came: cameOf(came), cash: cashOf(j.cash), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
+      return { life: life, came: cameOf(came), cash: cashOf(j.cash), open: openKept(j.open), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
     })
     .catch(function(){ return null; });
 }
@@ -2513,7 +2526,7 @@ function applyG1(g){
     return inSet(f);
   });
   // a dashboard without its Lifetime table leaves the last counts read in place
-  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, kc: (state.g1 && state.g1.kc) || null, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
+  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, kc: (state.g1 && state.g1.kc) || null, ko: (state.g1 && state.g1.ko) || 0, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
   save(); syncRates(); update(); drawG1(false);
 }
 var g1El = document.getElementById('g1'), g1Fail = false, keptFail = false, lastSync = 0;
@@ -2524,9 +2537,9 @@ function drawG1(failed){
   if (failed !== undefined) g1Fail = !!failed;
   var g = state.g1, has = g && g.total, L = esc(FLEET.label), s = g1Fail ? (has ? L + ' not readable right now, using the last numbers. ' : L + ' not readable right now: account counts are not filled in. ') : '';
   if (has){
-    var lack = g.sig ? g.sig.max - g.total.evals : 0;
+    var cap = seats(), lack = cap ? cap - g.total.evals : 0;
     s += L + ' ' + esc(g.day || '') + ' ' + esc(g.at || '') + ': ' + g.total.evals + (g.total.evals === 1 ? ' eval' : ' evals') + (g.total.passed ? ' (+' + g.total.passed + ' passed)' : '') + ', ' + g.total.fundeds + ' funded, ' + g.total.flips + ' flipping.';
-    if (g.sig) s += ' Max ' + g.sig.max + ' eval signals a day: ' + (lack > 0 ? 'room for ' + lack + ' more.' : 'no room for more evals.');
+    if (cap) s += (g.ko > 0 ? ' The fleet keeps about ' + cap + ' evals open: ' : ' Max ' + cap + ' eval signals a day: ') + (lack > 0 ? 'room for ' + lack + ' more.' : 'no room for more evals.');
   } else if (!g1Fail) s += 'Reading ' + L + '…';
   if (keptFail) s += liveCounts() ? ' Live rates not readable right now, using the last ones read.' : ' Live rates not readable right now.';
   var un = unreadAt ? Date.parse(unreadAt) : NaN;
@@ -2549,7 +2562,7 @@ function syncG1(){
     if (c){
       if (!state.g1) state.g1 = { life: {}, came: cameOf(null) };
       if (!(g && g.life)) state.g1.life = c.life;
-      state.g1.came = c.came; unreadAt = c.unread; if (c.cash) state.g1.kc = c.cash;
+      state.g1.came = c.came; unreadAt = c.unread; if (c.cash) state.g1.kc = c.cash; if (c.open) state.g1.ko = c.open;
       save(); syncRates(); update();
     } else if (!liveCounts()) update();
     drawG1();

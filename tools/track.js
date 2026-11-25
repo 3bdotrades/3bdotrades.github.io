@@ -36,12 +36,15 @@
 // line (a dated line that turns up later takes its amount back out of it). seen = the dated lines booked, by a hash.
 // The cash is kept only in a file that has it: `node tools/track.js <folder> <clone> --cash` reads every build once and
 // writes it (one time, by hand).
+// open = the most evals the fleet had open at once (rows of the eval table that are not passed and not liquidated), for each
+// New York date of the last KEEP_OPEN_DAYS: days = { date: the highest number a build of that date showed }. The page's plan
+// keeps that many evals trading (its seats). Kept only in a file that has it: `--open` in place of `--cash` writes it once.
 const fs = require('fs'), path = require('path'), crypto = require('crypto'), cp = require('child_process');
 
 const FLEETS = ['g1', 'v2'], KEYS = ['pass', 'win', 'flip', 'flip25'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', times: '×', minus: '-' };
-const OTHERS = ['rm'], FULL_LIST = 7, KEEP_SEEN_DAYS = 120;
+const OTHERS = ['rm'], FULL_LIST = 7, KEEP_SEEN_DAYS = 120, KEEP_OPEN_DAYS = 40;
 const KEEP_GONE_DAYS = 10, LOG_LINES = 400, MARK_LINES = 400, SAVE_EVERY = 200;
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -151,6 +154,12 @@ function cashStep(C, c, day){
   Object.keys(C.seen).forEach(h => { if (dayNo(day) - dayNo(C.seen[h]) > KEEP_SEEN_DAYS) delete C.seen[h]; });
 }
 function cashNew(){ return { open: '', sum: [0, 0], days: {}, rest: {}, seen: {} }; }
+// The evals a build shows open, and one build's number into the kept ones (see the top). O = st.open, day = the build's New York date.
+function openOf(snap){ return snap.eval.filter(r => !r.passed && !r.dead).length; }
+function openStep(O, n, day){
+  if (!(O.days[day] >= n)) O.days[day] = n;
+  const ds = Object.keys(O.days).sort(); ds.slice(0, Math.max(0, ds.length - KEEP_OPEN_DAYS)).forEach(d => { delete O.days[d]; });
+}
 
 // What one build of the dashboard shows for a fleet, or null when its section cannot be trusted:
 // the three tables have to be there with as many rows as the tabs above them say. built: the build's time (its commit's),
@@ -328,7 +337,7 @@ function step(st, snap, meta){
 // one remembered account and one log line per line, so a change shows as a short diff
 function dump(st){
   const rows = Object.keys(st.acc).map(h => '  ' + JSON.stringify(h) + ': ' + JSON.stringify(st.acc[h])).join(',\n');
-  const head = ['v', 'at', 'built', 'unread', 'day', 'counts', 'flipDone', 'base', 'today', 'cash'].filter(k => st[k] !== undefined).map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
+  const head = ['v', 'at', 'built', 'unread', 'day', 'counts', 'flipDone', 'base', 'today', 'cash', 'open'].filter(k => st[k] !== undefined).map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
   const lines = a => a.length ? '\n' + a.map(l => '  ' + JSON.stringify(l)).join(',\n') + '\n ' : '';
   return '{\n' + head + ',\n "marks": [' + lines(st.marks || []) + '],\n "acc": {' + (rows ? '\n' + rows + '\n ' : '') + '},\n "log": [' + lines(st.log) + ']\n}\n';
 }
@@ -346,22 +355,27 @@ function page(dir, sha){ return git(dir, ['show', sha + ':index.html']); }
 function reaches(dir, sha){ try { git(dir, ['merge-base', '--is-ancestor', sha, 'HEAD']); return true; } catch (e){ return false; } }
 
 function main(){
-  const dir = process.argv[2], dash = process.argv[3], refill = process.argv[4] === '--cash';
+  const dir = process.argv[2], dash = process.argv[3], mode = process.argv[4], refill = mode === '--cash' || mode === '--open';
   if (!dir || !dash){ console.error('usage: node tools/track.js <folder> <clone of the dashboard repository>'); process.exit(2); }
   const cache = {}, shown = sha => cache[sha] || (cache[sha] = page(dash, sha));
   if (refill){
     // every build once, oldest first, up to the one each counts file has read: its cash from the start
     const sts = {}, all = builds(dash);
-    FLEETS.forEach(k => { try { const st = JSON.parse(fs.readFileSync(path.join(dir, k + '.json'), 'utf8')); if (st && st.v === 2 && st.at){ st.cash = cashNew(); sts[k] = { st: st, done: false }; } } catch (e) {} });
+    FLEETS.forEach(k => { try { const st = JSON.parse(fs.readFileSync(path.join(dir, k + '.json'), 'utf8')); if (st && st.v === 2 && st.at){ if (mode === '--cash') st.cash = cashNew(); else st.open = { days: {} }; sts[k] = { st: st, done: false }; } } catch (e) {} });
     for (const b of all){
       const live = Object.keys(sts).filter(k => !sts[k].done); if (!live.length) break;
       let html = ''; try { html = page(dash, b.sha); } catch (e) {}
-      live.forEach(k => { const c = html && cashOf(html, k, b.built); if (c) cashStep(sts[k].st.cash, c, nyDate(b.built)); if (b.sha === sts[k].st.at) sts[k].done = true; });
+      live.forEach(k => {
+        if (mode === '--cash'){ const c = html && cashOf(html, k, b.built); if (c) cashStep(sts[k].st.cash, c, nyDate(b.built)); }
+        else { const snap = html && read(html, k, b.built); if (snap) openStep(sts[k].st.open, openOf(snap), nyDate(b.built)); }
+        if (b.sha === sts[k].st.at) sts[k].done = true;
+      });
     }
     Object.keys(sts).forEach(k => {
       const C = sts[k].st.cash;
-      if (!sts[k].done){ console.log(k + ': the history does not reach the build read last: cash not written'); return; }
+      if (!sts[k].done){ console.log(k + ': the history does not reach the build read last: not written'); return; }
       fs.writeFileSync(path.join(dir, k + '.json'), dump(sts[k].st));
+      if (mode === '--open'){ console.log(k + ': open evals ' + JSON.stringify(sts[k].st.open.days)); return; }
       console.log(k + ': cash from ' + C.open + ' | received ' + C.sum[0] + ', spent ' + C.sum[1] + ' | ' + Object.keys(C.days).length + ' days');
     });
     return;
@@ -386,7 +400,7 @@ function main(){
     let unread = 0;
     for (const b of list){
       const snap = read(shown(b.sha), k, b.built);
-      if (snap){ st = step(st, snap, b); delete st.unread; }
+      if (snap){ st = step(st, snap, b); delete st.unread; if (st.open) openStep(st.open, openOf(snap), nyDate(b.built)); }
       else { unread++; if (st && !st.unread) st.unread = b.built; }
       // the cash box is read on its own: a build whose tables cannot be trusted still shows it
       if (st && st.cash){ const c = cashOf(shown(b.sha), k, b.built); if (c) cashStep(st.cash, c, nyDate(b.built)); }
@@ -400,4 +414,4 @@ function main(){
   }
 }
 if (require.main === module) main();
-module.exports = { cashOf: cashOf, cashStep: cashStep, cashNew: cashNew, nyDate: nyDate, read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
+module.exports = { openOf: openOf, openStep: openStep, cashOf: cashOf, cashStep: cashStep, cashNew: cashNew, nyDate: nyDate, read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
