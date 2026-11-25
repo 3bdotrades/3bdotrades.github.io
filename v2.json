@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "8551f9d90295d22b4fb2f7dba8d23dd98b26343f",
- "built": "2026-11-25T14:17:02.000Z",
+ "at": "a1711cc3926eb81c42674a33a99ef2693716626f",
+ "built": "2026-11-25T14:47:01.000Z",
  "day": "Wed 25 Nov",
- "counts": {"pass":[44,191],"win":[13,51],"flip":[93,208],"flip25":[47,76]},
+ "counts": {"pass":[44,192],"win":[13,51],"flip":[93,208],"flip25":[47,76]},
  "flipDone": {"flip":[92,207],"flip25":[47,75]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"6dcd002486dc":[0,1],"939ef825819d":[1,-1]},
@@ -115,7 +115,7 @@
   "88339d141259": {"p":"e","f":"Topstep","gone":"2026-11-25","z":1,"u":1},
   "d5ba1d1ce9b6": {"p":"e","f":"Topstep","gone":"2026-11-25","z":1,"u":1},
   "5b67b6bc5265": {"p":"e","f":"Lucid","gone":"2026-11-25","z":1,"u":1},
-  "5ac0bfc63068": {"p":"e","f":"Lucid"},
+  "5ac0bfc63068": {"p":"e","f":"Lucid","gone":"2026-11-25","z":1,"u":1},
   "0c4c80aff543": {"p":"e","f":"Lucid"},
   "883c1e2410cf": {"p":"e","f":"Lucid"},
   "d9e4679c66c5": {"p":"e","f":"Lucid"},
@@ -226,6 +226,7 @@
   "2026-11-25 08:57 eval left the dashboard without a pass: blown · Blue Guardian 434989",
   "2026-11-25 13:47 eval left the dashboard without a pass: blown · Blue Guardian 36d069",
   "2026-11-25 14:17 eval passed · FuturesElite bba180",
-  "2026-11-25 14:17 eval left the dashboard without a pass: blown · Lucid 5b67b6"
+  "2026-11-25 14:17 eval left the dashboard without a pass: blown · Lucid 5b67b6",
+  "2026-11-25 14:47 eval left the dashboard without a pass: blown · Lucid 5ac0bf"
  ]
 }
