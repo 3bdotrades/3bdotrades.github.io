@@ -391,11 +391,20 @@ function lifeRoad(F){
     if (F.net && k >= 2 && num(net, 0) < NET_MIN - TIE) return short(k, room, 0, NET_MIN - num(net, 0));
     return paid(k, room, 0)[1];
   };
+  // what the payout of cycle k books with that room
+  R.due = function(k, room){ return paid(k, Math.min(room, ROOM_MAX), 0)[0]; };
   // sent back to the funded table with its one trade still to take, or with a trade for what its cycle is short of
   R.again = function(room){ return again(Math.min(room, ROOM_MAX), 0); };
   R.short = function(k, room, aim){ return short(k, Math.min(room, ROOM_MAX), 0, Math.max(TIE, aim)); };
   return R;
 }
+// The trading days between a payout being due and its cash arriving. The owner, 25 Nov 2026: "fix the payouts too so v2 net
+// matches". Lucid and Topstep pay the same or the next day (every payout on the dashboard's builds of 5 to 25 Nov 2026), so
+// nothing waits there. Aqua does not: G1's two were "payout requested" from 16 Nov and counted as received on 24 Nov, and
+// V2's two, requested 17 and 19 Nov, were still not received on 25 Nov ($3,540 the plan had booked on the day). 7 trading
+// days. An account whose payout is requested does not trade until it is paid (their last trades stayed 17 and 19 Nov).
+var PAY_WAIT_AT = { aqua: 6 };
+function payWait(firm){ return ownOf(PAY_WAIT_AT, normFirm(firm)) || 0; }
 // One road per set of flip numbers, kept: the pages' sizes share them from run to run.
 var ROADS = {}, ROADS_N = 0;
 function roadFor(F){
@@ -479,6 +488,7 @@ function simulateGroup(units, r, weeks, days){
   var triesLeft = Math.max(1, P.tries - 1), c1 = fundedToProfit(P.win, triesLeft), M = nDays + H + 2;
   // on: the run starts on the fleet's own trading day, so an account marked done (it has traded today) takes its next trade
   // tomorrow. late0: the share of an eval bought on the first day that starts tomorrow (see planFirms).
+  var wait = payWait(units[0].firm);
   var on = !!units[0].dayOn, late0 = on ? clamp01(num(units[0].lateShare, 0)) : 0;
   function zeros(){ var a = new Array(LD); for (var k = 0; k < LD; k++) a[k] = 0; return a; }
   // n evals of a size trade from day d on, from one point of their road: the days they finish on (outAt) and pass on (passAt).
@@ -491,7 +501,7 @@ function simulateGroup(units, r, weeks, days){
     var w = perWinning(f, r), F = flipOf(f, P), road = roadFor(F);
     var u = { slots: Math.max(0, Math.floor(num(f.slots, 0))), F: F, road: road,
       price: Math.max(0, num(f.evalPrice, 0)), actFee: Math.max(0, num(f.activation, 0)), monthly: Math.max(0, num(f.monthly, 0)), value: w ? w.net : 0, skip: !!f.skip,
-      outAt: zeros(), passAt: zeros(), profitAt: zeros(), failAt: zeros(), came: zeros(), held: [], fc: 0, soon: 0, cashIn: 0,
+      outAt: zeros(), passAt: zeros(), profitAt: zeros(), failAt: zeros(), came: zeros(), payAt: zeros(), held: [], fc: 0, soon: 0, cashIn: 0,
       waitFunded: 0, waitOne: 0, wait: 0, lateFunded: 0, lateOne: 0, latePass: 0, pending: 0, due: 0, trying: 0, days: [] };
     // an account that has just reached profit starts its first cycle with the size's full room
     u.first = road.flip(1, P.D1, F.room, 0); u.fresh = lifeRun(road, u.first, M);
@@ -505,7 +515,8 @@ function simulateGroup(units, r, weeks, days){
   function trading(){ var s = 0; U.forEach(function(u){ s += u.trying + u.fc; }); return s; }
   // n accounts the run starts with in state i of their size's road (-1: done, nothing to follow). late: they have traded
   // today, so their first day from there is tomorrow.
-  function hold(u, i, n, late){ if (i >= 0 && n > 0) u.held.push({ run: lifeRun(u.road, i, M), n: n, off: late ? 1 : 0 }); }
+  // off: the days before its first day from there (a number: an account waiting for its payout does not trade meanwhile)
+  function hold(u, i, n, late){ if (i >= 0 && n > 0) u.held.push({ run: lifeRun(u.road, i, M), n: n, off: typeof late === 'number' ? Math.max(0, late) : late ? 1 : 0 }); }
   // n funded accounts start their tries on day d, one a day, `left` of them each
   function tries(u, d, n, left){
     u.trying += n;
@@ -518,7 +529,7 @@ function simulateGroup(units, r, weeks, days){
   // that many days from now.
   function flipDay(u, d){
     var cash = 0, fc = 0, soon = 0, x = u.fresh, e, n, j;
-    u.held.forEach(function(h){ var k = d + 1 - h.off, a = h.run.alive[k]; cash += h.n * h.run.cash[k]; fc += h.n * a; soon += h.n * (a - h.run.alive[k + H]); });
+    u.held.forEach(function(h){ var k = Math.max(0, d + 1 - h.off), a = h.run.alive[k]; cash += h.n * h.run.cash[k]; fc += h.n * a; soon += h.n * (a - h.run.alive[k + H]); });
     for (e = 0; e < d; e++){ n = u.came[e]; if (n > 0){ j = d - e; cash += n * x.cash[j]; fc += n * x.alive[j]; soon += n * (x.alive[j] - x.alive[j + H]); } }
     u.cashIn = cash; u.fc = fc; u.soon = soon;
   }
@@ -560,6 +571,9 @@ function simulateGroup(units, r, weeks, days){
       if (!(isFinite(room) && room > 0)) room = F.room;
       // With every winning day in, the fleet books that payout the same day, so it is in the cash it has received already:
       // nothing is added here, the account only moves on to what follows that payout.
+      // "payout requested": the payout is not in the cash received yet. It arrives after the firm's wait, and the account
+      // goes on from there (when it was asked for is not known: the whole wait is still ahead).
+      if (x.req){ if (wait < LD) u.payAt[wait] += road.due(k0, room); hold(u, road.paid(k0, room, x.net), 1, wait); return; }
       hold(u, rem > 0 ? road.flip(k0, rem, room, x.net) : road.paid(k0, room, x.net), 1, on && !!x.done);
     });
     if (ip > known.length) hold(u, u.first, ip - known.length);
@@ -637,11 +651,12 @@ function simulateGroup(units, r, weeks, days){
       // an eval bought on the first day: the share of today's eval trades that is behind it already starts tomorrow
       if (u.buy > 0 && d === 0 && late0 > 0){ if (late0 < 1) evals(u, 0, ev.fresh, u.buy * (1 - late0)); evals(u, 1, ev.fresh, u.buy * late0); }
       else if (u.buy > 0) evals(u, d, ev.fresh, u.buy);
+      u.payAt[d + wait] += u.cashIn;                             // a payout's cash arrives `wait` trading days after it is due
       var bought = u.buy + (d === 0 ? u.start0 : 0), evalCost = bought * u.price, actCost = u.act * u.actFee;
       // a monthly fee builds up a day at a time on every account held, trading or waiting
       var feeCost = u.monthly > 0 ? u.monthly * 12 / 260 * (u.trying + u.fc + u.pending + u.wait + u.waitFunded + u.waitOne + u.queue) : 0;
       u.days.push({ d: d, w: Math.floor((P.wd0 + d) / 5), buy: bought, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost,
-                    inn: u.cashIn, winning: u.fc, trying: u.trying, wait: u.wait + u.waitFunded + u.waitOne, occupied: u.trying + u.fc });
+                    inn: u.payAt[d], winning: u.fc, trying: u.trying, wait: u.wait + u.waitFunded + u.waitOne, occupied: u.trying + u.fc });
     });
   }
   function held(){ var s = 0; U.forEach(function(u){ s += u.pending; }); return s; }
@@ -2480,7 +2495,7 @@ function parseG1(html, K){
   // G1 shows "n/4 days" before the first payout and "n/5 days" after one; net = the total of its flips since the last payout
   rows('p-' + K + '-flip').forEach(function(c){
     var m = /(\d+)\s*\/\s*(\d+)\s*days/i.exec(c[3]), room = moneyNum(c[4]), u = unit(c[1], g1Size(c[0], c[3], false));
-    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null, net: moneyNum(c[3]), done: traded(c) });
+    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null, net: moneyNum(c[3]), done: traded(c), req: /payout requested/i.test(c[3]) });
   });
   // eval signals: the "Avg signals" row of the summary table that has an Evals column
   var sig = null;
@@ -2519,7 +2534,7 @@ function applyG1(g){
     if (!f) f = addRow(state.firms, x.firm, x.size + 'K');
     else if (!inSet(f)) f.firm = x.firm;                 // (a row kept with the dashboard's code for a name: its name)
     f.openEvals = x.evals; f.passedNow = x.passed; f.passedDone = x.passedDone; f.fundedNow = x.fundeds; f.inProfitNow = x.flips.length;
-    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net, done: z.done ? 1 : undefined }; });
+    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net, done: z.done ? 1 : undefined, req: z.req ? 1 : undefined }; });
     f.g1Evals = x.evalsAt; f.g1Funded = x.fundedsAt;
     f.g1 = true; seen.push(f);
   });
