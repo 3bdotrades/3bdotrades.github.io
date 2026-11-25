@@ -444,19 +444,22 @@ function lifeRun(R, i, M){
 function groupKey(f){ return String(f.firm !== undefined ? f.firm : (f.name || '')).trim().toLowerCase(); }
 // The firms run the same trading days side by side, because they share the fleet's eval seats: an eval takes one trade a day
 // and the fleet gets only so many eval signals a day, so the evals open across all firms stay within `seats` (no limit when not given).
-// Each free seat goes to the firm furthest from full; at a tie, to the one that pays more. Evals a run starts with (f.start,
+// Each free seat goes to the firm furthest from full; at a tie, to the one that pays more. Where the fleet's own mix is known
+// (fleetMix), a free seat goes first to the firm furthest below its share of the seats. Evals a run starts with (f.start,
 // bought on its first day) take their seats before any new eval is bought. days, when given, ends the run after that many trading days.
 function simulateAll(firms, r, weeks, seats, days){
   var map = Object.create(null), groups = [], per = new Array(firms.length);      // by firm name: holds nothing a name could run into
   firms.forEach(function(f, i){ var k = groupKey(f); if (!(k in map)){ map[k] = groups.length; groups.push([]); } groups[map[k]].push(i); });
   var sims = groups.map(function(idx){ return simulateGroup(idx.map(function(i){ return firms[i]; }), r, weeks, days); });
   var limited = typeof seats === 'number' && isFinite(seats), wants, used;
+  var mix = limited ? fleetMix() : null, share = groups.map(function(idx){ return mix ? num(mix[normFirm(firms[idx[0]].firm !== undefined ? firms[idx[0]].firm : firms[idx[0]].name)], 0) : 0; });
   // the firm that gets the next seat, among those that can use one
-  function next(can){
-    var best = -1, gap = 0;
+  function next(can, lack){
+    var best = -1, gap = 0, short = 0;
     wants.forEach(function(w, i){
       if (!can(i)) return;
       var g = w.need - used[i] * w.pc;
+      if (mix && lack){ var s = share[i] * seats - sims[i].held() - used[i]; if (best < 0 || s > short + 1e-9){ best = i; gap = g; short = s; return; } if (s < short - 1e-9) return; }
       if (best < 0 || g > gap + 1e-9 || (g > gap - 1e-9 && w.value > wants[best].value)){ best = i; gap = g; }
     });
     if (best >= 0) used[best]++;
@@ -470,7 +473,7 @@ function simulateAll(firms, r, weeks, seats, days){
       var held = 0, i; sims.forEach(function(g){ held += g.held(); });
       var left = Math.max(0, Math.floor(seats - held + 1e-9));
       for (; left > 0 && (i = next(function(k){ return sims[k].waiting() >= 1; })) >= 0; left--) sims[i].start(d, 1);
-      for (; left > 0 && (i = next(function(k){ return grant[k] < wants[k].n; })) >= 0; left--) grant[i]++;
+      for (; left > 0 && (i = next(function(k){ return grant[k] < wants[k].n; }, true)) >= 0; left--) grant[i]++;
     }
     sims.forEach(function(g, k){ g.close(d, grant[k]); });
   }
@@ -1169,7 +1172,7 @@ function liveRates(){ var c = liveCounts(), o = {}; if (!c) return null; RATE_KE
   // is dropped, with its version
   var fresh = FIVE && !(s.five && s.five.v === FIVE_V);
   if (FIVE) state.five = cleanFive(s.five);
-  else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); state.g1.kc = cashOf(s.g1.kc); state.g1.ko = num(s.g1.ko, 0) > 0 ? Math.round(s.g1.ko) : 0; }
+  else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); state.g1.kc = cashOf(s.g1.kc); state.g1.ko = num(s.g1.ko, 0) > 0 ? Math.round(s.g1.ko) : 0; state.g1.km = mixOf(s.g1.km); }
   // for the edits shared by every browser (see shareEdit): a name for this browser, and the version of this view's part it holds
   state.dev = typeof s.dev === 'string' && /^[a-z0-9]{6,16}$/.test(s.dev) ? s.dev : (Math.random().toString(36) + '00000000').slice(2, 10);
   var held = cleanVersion(s.sh); if (held && !fresh) state.sh = held;
@@ -1601,6 +1604,21 @@ function openKept(o){
   var sum = 0; ks.forEach(function(k){ sum += +d[k]; });
   return Math.round(sum / ks.length);
 }
+// Each firm's share of the evals the fleet keeps open, over the same days (the counter's open.firms). The owner, 25 Nov 2026:
+// "fix the eval firm mix so it buys like the fleet". The plan gave each free seat to the firm furthest from full, which spread
+// the evals over the firms; the fleet does not (17 to 24 Nov: more than half of its open evals at Blue Guardian in both fleets).
+function openMix(o){
+  var d = o && typeof o === 'object' && o.days && typeof o.days === 'object' ? o.days : null, fm = d && o.firms && typeof o.firms === 'object' ? o.firms : null; if (!fm) return null;
+  var ks = Object.keys(d).filter(function(k){ if (!/^\d{4}-\d\d-\d\d$/.test(k) || !(num(d[k], -1) >= 0)) return false; var p = k.split('-'), wd = new Date(+p[0], +p[1] - 1, +p[2]).getDay(); return wd > 0 && wd < 6; }).sort();
+  ks = ks.slice(0, -1).slice(-SEAT_DAYS);
+  var m = Object.create(null), tot = 0;
+  ks.forEach(function(k){ var x = fm[k]; if (!x || typeof x !== 'object') return; Object.keys(x).forEach(function(f){ var n = num(x[f], 0); if (!(n > 0)) return; var key = normFirm(f); m[key] = (m[key] || 0) + n; tot += n; }); });
+  if (!(tot > 0)) return null;
+  var out = {}; Object.keys(m).forEach(function(f){ out[f] = m[f] / tot; });
+  return out;
+}
+function mixOf(m){ if (!m || typeof m !== 'object') return null; var out = {}, n = 0; Object.keys(m).forEach(function(f){ var v = num(m[f], 0); if (v > 0 && v <= 1){ out[f] = v; n++; } }); return n ? out : null; }
+function fleetMix(){ var g = state.g1; return g && g.ko > 0 && g.km ? g.km : null; }
 function seats(){ var g = state.g1; return g && g.ko > 0 ? g.ko : g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
 // the fleet's firms as a run at these rates takes them; all = with no firm skipped
 function planFirms(rr, all){
@@ -2395,7 +2413,7 @@ function counted(k){
         var o = m[1] === 'wired' ? came.wired : m[1] === 'pass' ? came.passes : null;
         if (o) o[m[2]] = (o[m[2]] || 0) + 1;
       });
-      return { life: life, came: cameOf(came), cash: cashOf(j.cash), open: openKept(j.open), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
+      return { life: life, came: cameOf(came), cash: cashOf(j.cash), open: openKept(j.open), mix: openMix(j.open), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
     })
     .catch(function(){ return null; });
 }
@@ -2556,7 +2574,7 @@ function applyG1(g){
     return inSet(f);
   });
   // a dashboard without its Lifetime table leaves the last counts read in place
-  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, kc: (state.g1 && state.g1.kc) || null, ko: (state.g1 && state.g1.ko) || 0, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
+  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, kc: (state.g1 && state.g1.kc) || null, ko: (state.g1 && state.g1.ko) || 0, km: (state.g1 && state.g1.km) || null, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
   save(); syncRates(); update(); drawG1(false);
 }
 var g1El = document.getElementById('g1'), g1Fail = false, keptFail = false, lastSync = 0;
@@ -2592,7 +2610,7 @@ function syncG1(){
     if (c){
       if (!state.g1) state.g1 = { life: {}, came: cameOf(null) };
       if (!(g && g.life)) state.g1.life = c.life;
-      state.g1.came = c.came; unreadAt = c.unread; if (c.cash) state.g1.kc = c.cash; if (c.open) state.g1.ko = c.open;
+      state.g1.came = c.came; unreadAt = c.unread; if (c.cash) state.g1.kc = c.cash; if (c.open){ state.g1.ko = c.open; state.g1.km = c.mix || null; }
       save(); syncRates(); update();
     } else if (!liveCounts()) update();
     drawG1();

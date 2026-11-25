@@ -38,7 +38,8 @@
 // writes it (one time, by hand).
 // open = the most evals the fleet had open at once (rows of the eval table that are not passed and not liquidated), for each
 // New York date of the last KEEP_OPEN_DAYS: days = { date: the highest number a build of that date showed }. The page's plan
-// keeps that many evals trading (its seats). Kept only in a file that has it: `--open` in place of `--cash` writes it once.
+// keeps that many evals trading (its seats). firms = { date: { firm as the dashboard names it: its open evals } } on the build
+// that showed that day's highest number: the page's plan shares its seats among the firms the way the fleet does. Kept only in a file that has it: `--open` in place of `--cash` writes it once.
 const fs = require('fs'), path = require('path'), crypto = require('crypto'), cp = require('child_process');
 
 const FLEETS = ['g1', 'v2'], KEYS = ['pass', 'win', 'flip', 'flip25'];
@@ -156,9 +157,12 @@ function cashStep(C, c, day){
 function cashNew(){ return { open: '', sum: [0, 0], days: {}, rest: {}, seen: {} }; }
 // The evals a build shows open, and one build's number into the kept ones (see the top). O = st.open, day = the build's New York date.
 function openOf(snap){ return snap.eval.filter(r => !r.passed && !r.dead).length; }
-function openStep(O, n, day){
-  if (!(O.days[day] >= n)) O.days[day] = n;
-  const ds = Object.keys(O.days).sort(); ds.slice(0, Math.max(0, ds.length - KEEP_OPEN_DAYS)).forEach(d => { delete O.days[d]; });
+function firmsOf(snap){ const m = {}; snap.eval.forEach(r => { if (r.passed || r.dead) return; const f = String(r.firm || '').trim().toLowerCase(); m[f] = (m[f] || 0) + 1; }); return m; }
+function openStep(O, n, day, firms){
+  const up = !(O.days[day] >= n);
+  if (up) O.days[day] = n;
+  if (firms && (up || (O.days[day] === n && !(O.firms && O.firms[day])))){ if (!O.firms) O.firms = {}; O.firms[day] = firms; }
+  const ds = Object.keys(O.days).sort(); ds.slice(0, Math.max(0, ds.length - KEEP_OPEN_DAYS)).forEach(d => { delete O.days[d]; if (O.firms) delete O.firms[d]; });
 }
 
 // What one build of the dashboard shows for a fleet, or null when its section cannot be trusted:
@@ -367,7 +371,7 @@ function main(){
       let html = ''; try { html = page(dash, b.sha); } catch (e) {}
       live.forEach(k => {
         if (mode === '--cash'){ const c = html && cashOf(html, k, b.built); if (c) cashStep(sts[k].st.cash, c, nyDate(b.built)); }
-        else { const snap = html && read(html, k, b.built); if (snap) openStep(sts[k].st.open, openOf(snap), nyDate(b.built)); }
+        else { const snap = html && read(html, k, b.built); if (snap) openStep(sts[k].st.open, openOf(snap), nyDate(b.built), firmsOf(snap)); }
         if (b.sha === sts[k].st.at) sts[k].done = true;
       });
     }
@@ -400,7 +404,7 @@ function main(){
     let unread = 0;
     for (const b of list){
       const snap = read(shown(b.sha), k, b.built);
-      if (snap){ st = step(st, snap, b); delete st.unread; if (st.open) openStep(st.open, openOf(snap), nyDate(b.built)); }
+      if (snap){ st = step(st, snap, b); delete st.unread; if (st.open) openStep(st.open, openOf(snap), nyDate(b.built), firmsOf(snap)); }
       else { unread++; if (st && !st.unread) st.unread = b.built; }
       // the cash box is read on its own: a build whose tables cannot be trusted still shows it
       if (st && st.cash){ const c = cashOf(shown(b.sha), k, b.built); if (c) cashStep(st.cash, c, nyDate(b.built)); }
@@ -414,4 +418,4 @@ function main(){
   }
 }
 if (require.main === module) main();
-module.exports = { openOf: openOf, openStep: openStep, cashOf: cashOf, cashStep: cashStep, cashNew: cashNew, nyDate: nyDate, read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
+module.exports = { firmsOf: firmsOf, openOf: openOf, openStep: openStep, cashOf: cashOf, cashStep: cashStep, cashNew: cashNew, nyDate: nyDate, read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
