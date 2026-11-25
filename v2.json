@@ -1,9 +1,9 @@
 {
  "v": 2,
- "at": "79cbbf4ec86e745aa42b260b13ce965651099f4e",
- "built": "2026-11-25T01:07:01.000Z",
+ "at": "cad416c73fa42fcc116b2cb08494f53e554b800b",
+ "built": "2026-11-25T02:27:09.000Z",
  "day": "Wed 25 Nov",
- "counts": {"pass":[43,184],"win":[13,49],"flip":[93,208],"flip25":[47,76]},
+ "counts": {"pass":[43,184],"win":[13,50],"flip":[93,208],"flip25":[47,76]},
  "flipDone": {"flip":[92,207],"flip25":[47,75]},
  "base": {"built":"2026-11-10T19:47:00.000Z","counts":{"pass":[31,112],"win":[11,33],"flip":[60,138],"flip25":[40,65]}},
  "today": {"6dcd002486dc":[0,1],"939ef825819d":[1,-1]},
@@ -66,7 +66,7 @@
   "98657380366e": {"p":"e","f":"Topstep","gone":"2026-11-20","z":1,"u":1},
   "f5aa17116e20": {"p":"e","f":"Lucid","gone":"2026-11-17","z":1,"u":1},
   "59f6979d26b4": {"p":"e","f":"Lucid","gone":"2026-11-18","z":1,"u":1},
-  "24e8137ce13e": {"p":"f","f":"FuturesElite"},
+  "24e8137ce13e": {"p":"f","f":"FuturesElite","z":1},
   "c07f7db1f408": {"p":"e","f":"FuturesElite"},
   "918770959796": {"p":"e","f":"FuturesElite","gone":"2026-11-18","z":1,"u":1},
   "8e2031792e63": {"p":"e","f":"FuturesElite","gone":"2026-11-18","z":1,"u":1},
@@ -216,6 +216,7 @@
   "2026-11-24 08:17 eval left the dashboard without a pass: blown · Blue Guardian 7002fb",
   "2026-11-24 08:57 funded account lost · FuturesElite 8f3930",
   "2026-11-24 14:47 funded account won · Blue Guardian 98cc19",
-  "2026-11-25 01:07 eval left the dashboard without a pass: blown · Topstep 88339d"
+  "2026-11-25 01:07 eval left the dashboard without a pass: blown · Topstep 88339d",
+  "2026-11-25 02:27 funded account lost · FuturesElite 24e813"
  ]
 }
