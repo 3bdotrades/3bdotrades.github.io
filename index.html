@@ -952,8 +952,12 @@ var FIVE_SIZES = [{ k: '50', size: '50K', list: 97, credit: 10, price: 69.6, pay
 // day's end). A funded account: big days of 40% of the payout target until the rest fits the small days owed; a losing day
 // stops just inside the5ers' daily pause (stop) and the account goes on. A trade wins as often as its sizes say (what it
 // risks over risk plus gain, after FIVE_COST a contract of commission and slip), times the backtest's share of chance.
-var FIVE_NEW = { '50': { start: 50000, goal: 3000, pgoal: 2000, small: 160, big: 800, stop: 1240, nmax: 4, caps: [1250, 1500, 1500, 1750, 1750] },
+var FIVE_NEW = { '50': { start: 50000, goal: 3000, pgoal: 2000, small: 160, big: 800, stop: 1245, nmax: 4, caps: [1250, 1500, 1500, 1750, 1750] },
                  '25': { start: 25000, goal: 1500, pgoal: 1000, small: 110, big: 400, stop: 595, nmax: 2, caps: [750, 875, 1000, 1000, 1000] } };
+// The size of a day's trade (the owner, 25 Nov 2026, "build it": half the contracts at double the points, the same money a
+// day at half the commission and slip): enough NQ for the target to lie within 60 points, $1,200 a contract (30 points,
+// $600, until then; the 50K funded stop was $1,240 on 2 NQ and is $1,245 on 1 NQ, both just inside the daily pause).
+var FIVE_PTS_USD = 1200;
 var FIVE_CUT = 0.8 * 0.965, FIVE_NDAYS = 5, FIVE_NPAYS = 5, FIVE_COST = 10, FIVE_NRUNS = 2000;
 var FIVE_MAX = 5, FIVE_WAIT = 14, FIVE_PAYS = 3;
 // The backtest, the plan's rates and chance (the owner, 20 Nov 2026: "My record show my real record and under it the rate of
@@ -1720,9 +1724,9 @@ function fiveZeros(n){ var a = new Array(n); for (var k = 0; k < n; k++) a[k] = 
 // ---- the new program's accounts (FIVE_NEW) ----
 // The System box (the owner, 23 Nov 2026: "apply the best system to 5ers and update the github and lets use it"): the day
 // plan the bot trades (tools/ba_days.py of the bot), in six lines, every number worked from FIVE_NEW: a day's contracts are
-// enough for its target to lie within 30 points, a target is the day's money plus the $5 a contract of commission, up to
+// enough for its target to lie within 60 points (FIVE_PTS_USD), a target is the day's money plus the $5 a contract of commission, up to
 // the tick; the funded stop is R.stop with commission in. One line per size and stage, the payouts, the order of trading.
-function fiveSysTrade(G, nmax){ var q = Math.max(1, Math.min(nmax, Math.ceil(G / 600))); return { q: q, pts: Math.ceil((G + 5 * q) / (20 * q) / 0.25) * 0.25 }; }
+function fiveSysTrade(G, nmax){ var q = Math.max(1, Math.min(nmax, Math.ceil(G / FIVE_PTS_USD))); return { q: q, pts: Math.ceil((G + 5 * q) / (20 * q) / 0.25) * 0.25 }; }
 function fiveSystem(){
   var rows = [], usd0 = function(n){ return '$' + Math.round(n).toLocaleString('en-US'); };
   ['50', '25'].forEach(function(k){
@@ -1775,7 +1779,7 @@ function fiveChain(s, d, z, H, T, rnd, kap, keep, put){
     }
     L = s.usd - (s.peak - 0.04 * (R.start + s.peak)); dead = true;
     if (s.k === 'F' && L > R.stop){ L = R.stop; dead = false; }
-    n = Math.max(1, Math.min(R.nmax, Math.ceil(G / 600))); c = FIVE_COST * n;
+    n = Math.max(1, Math.min(R.nmax, Math.ceil(G / FIVE_PTS_USD))); c = FIVE_COST * n;
     p = L > c ? (s.k === 'F' ? kap.f : kap.e) * (L - c) / ((L - c) + (G + c)) : 0;
     if (rnd() < p){
       s.usd += G; s.cum += G; s.days++; if (G > s.best) s.best = G; if (s.usd > s.peak) s.peak = s.usd;
