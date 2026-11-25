@@ -56,6 +56,9 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 .legend{display:inline-flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .legend i.line{width:14px;height:2px;border-radius:1px;vertical-align:3px}
+.legend i.dash{height:0;background:none;border-top:2px dashed var(--net)}
+.tabs.sub{margin-top:-8px}
+.tabs.sub .tab{padding:6px 14px;font-size:14px}
 .chartcard{padding:12px 12px 6px}
 .chartbox svg{display:block;width:100%;height:auto;overflow:visible}
 .chartbox{position:relative;touch-action:pan-y}
@@ -65,7 +68,7 @@ tr.pick td:first-child{color:var(--accent);font-weight:600}
 .tip .r span:first-child{color:var(--mute)}
 .tip i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
 .chartbox text{font-size:11.5px;fill:var(--mute);font-variant-numeric:tabular-nums}
-/* the two firms side by side, each this page for one firm in a frame of its own */
+/* two profiles side by side, each this page for one profile in a frame of its own */
 main.wide{max-width:1560px}
 .profiles{margin-top:22px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
 .profiles iframe{display:block;width:100%;height:1500px;border:0;background:var(--bg);color-scheme:dark}
@@ -96,6 +99,15 @@ html.embed,.embed body{overflow:hidden}
 <main>
   <h1 class="sr">Funded Slots Roadmap: My Funded Perpetuals</h1>
   <nav class="tabs" aria-label="Fleet"><a class="tab" href="./?fleet=g1">G1</a><a class="tab" href="./?fleet=v2">V2 fleet</a><a class="tab" href="./?fleet=5ers">5ers</a><a class="tab" href="mfp.html" aria-current="page">Perps</a><a class="tab" href="cfd.html">CFD</a></nav>
+  <nav class="tabs sub" id="views" aria-label="View" hidden></nav>
+  <div class="profiles" id="two" hidden><iframe id="pf1" title="Profile 1"></iframe><iframe id="pf2" title="Profile 2"></iframe></div>
+  <div id="best-box" hidden>
+  <h2 id="best-h"></h2>
+  <div class="wrap"><table>
+    <thead><tr><th>Program</th><th>Price</th><th>Eval pass</th><th>Funded pays</th><th>Per eval bought</th><th>Per $1 paid</th></tr></thead>
+    <tbody id="best"></tbody>
+  </table></div>
+  </div>
   <div id="one">
 
   <div class="top">
@@ -161,7 +173,7 @@ html.embed,.embed body{overflow:hidden}
   </table></div>
   </div>
 
-  <h2><span>Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span></span></h2>
+  <h2><span>Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span><span id="lg-alt" hidden><i class="line dash"></i><span id="lg-alt-t"></span></span></span></h2>
   <div class="wrap chartcard"><div class="chartbox" id="chart" role="img" aria-label="Weekly claims in, evals out and the running total"></div></div>
   </div>
 </main>
@@ -200,6 +212,12 @@ var HOME = '';                              // the Perps tab is the MFP page alo
 var LEAN = true;                            // only what the 5ers tab has (the owner: "like 5ers using this system only"): no trade table,
                                             // no comparison, no other programs, 10 seats at the pick's price
 var PAIRS = false;                          // the plan trades in hedge pairs (false: one account at a time)
+var TWO = true;                             // two profiles side by side, each this page for one profile (?p=1, ?p=2) in a frame
+var LIFT = { eval: 1.0055, funded: 1.0244, name: 'Our signals\' backtest', says: 'The same plan with every trade at our G1 / V2 signals\' backtest win rates instead of a coin: 20.04% on the eval trade (a coin 19.93%) and 34.15% on the funded trade (33.33%), 7,860 signals, 6 Oct 2025 – 10 Nov 2026. Not a proven edge' };
+var LIFT_ = null;                            // { eval, funded, name, says }: a second, dashed running total: the same plan with a
+                                            // trade's chance times these (a build's lift: [eval, funded])
+var BEST = { title: 'Best perps programs · one trade to the target, coin flip, fees in · prices of 23 Nov 2026', rows: [["Hypernova Low 200K 80% (closed beta)", 1950, 0.3725, 9409.8, 0], ["Hypernova Low 50K 80% (closed beta)", 500, 0.3725, 2352.4, 0], ["Hypernova Low 100K 80% (closed beta)", 1000, 0.3725, 4704.9, 0], ["MFP Elite 10K 3% DLL 80%", 71, 0.3256, 381.4, 0], ["MFP Elite 5K 3% DLL 80%", 36, 0.3256, 190.7, 1], ["Hypernova Medium 50K 80% (closed beta)", 675, 0.4116, 2785.2, 0], ["Hypernova Medium 100K 80% (closed beta)", 1350, 0.4116, 5570.3, 0], ["Hypernova Medium 200K 80% (closed beta)", 2700, 0.4116, 11140.7, 0], ["Hypernova Low 200K 90% (closed beta)", 2340, 0.3725, 10586.0, 0], ["Hypernova Low 50K 90% (closed beta)", 600, 0.3725, 2646.5, 0], ["Hypernova Low 100K 90% (closed beta)", 1200, 0.3725, 5293.0, 0], ["MFP Elite 50K 3% DLL 80%", 371, 0.3255, 1846, 0], ["MFP Elite 25K 3% DLL 80%", 186, 0.3255, 923, 0], ["MFP Elite 10K 3% DLL 90% (est.)", 85, 0.3264, 417.8, 0], ["Hypernova Low 10K 80% (closed beta)", 110, 0.3725, 470.5, 0]] };
+var BEST_ = null;                            // { title, rows }: the page's second view, the best programs (?view=best)
 var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 6, RUNS = 4000, SAFE = 0.99, SEED = 20261123;
 // The owner, 24 Nov 2026, on study/mfp_flip.js ("1:2 or 1:3 idk u choose"): the 5K's funded trade risks its stop for three
 // times it (frr: 3): the same EV on fees, about a third more net a month than JJ's 1:1, for about $570 more cash. Then, the same
@@ -252,7 +270,7 @@ function vestSpec(b, stop){
   // (the stop itself then loses less: keep of it); an account whose room is under b.minShare of a full stop is done
   var keep = b.slip ? (stop || STOP) / ((stop || STOP) + b.slip) : 1, minRoom = (b.minShare || 0) * risk;
   risk *= keep;
-  return { d: d, risk: risk, keep: keep, minRoom: minRoom, frr: b.frr || FRR, fee: risk / (stop || STOP) * NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, minClaim: b.minClaim || 0, lock: !!b.lock,
+  return { d: d, risk: risk, keep: keep, minRoom: minRoom, lift: b.lift || null, frr: b.frr || FRR, fee: risk / (stop || STOP) * NQ_PX * (b.feeSide === undefined ? FEE_SIDE : b.feeSide) * 2, minClaim: b.minClaim || 0, lock: !!b.lock,
     targets: b.tg.map(function(t){ return t * b.size; }), split: b.split, price: b.price };
 }
 function vestNew(s, funded){ return { stage: funded || !s.targets.length ? -1 : 0, room: s.d, gain: 0, dead: false, wait: false }; }
@@ -286,14 +304,14 @@ function vestStep(a, s, u){
   if (s.keep && s.keep < 1 && a.room - s.fee - r < s.minRoom) r = Math.min(s.risk / s.keep, a.room - s.fee);
   if (!(r > 1e-9) || a.room - s.fee < (s.minRoom || 0)) { a.dead = true; return 0; }
   if (a.stage >= 0) {
-    var T = s.targets[a.stage], win = T - a.gain + s.fee, p = r / (r + win);
+    var T = s.targets[a.stage], win = T - a.gain + s.fee, p = r / (r + win) * (s.lift ? s.lift[0] : 1);
     var d = (u < p ? win : -r) - s.fee;
     a.room += d; a.gain += d;
     if (a.gain >= T - 1e-6) { a.stage = a.stage + 1 < s.targets.length ? a.stage + 1 : -1; a.room = s.d; a.gain = 0; if (a.stage < 0) a.wait = true; }
     else if (a.room <= s.fee + 1e-9 || a.room - s.fee < (s.minRoom || 0)) a.dead = true;
     return 0;
   }
-  var F = s.frr || FRR, e = (u < 1 / (1 + F) ? F * r : -r) - s.fee, pay = 0;      // a build's own funded reward:risk, else the page's
+  var F = s.frr || FRR, e = (u < (s.lift ? s.lift[1] : 1) / (1 + F) ? F * r : -r) - s.fee, pay = 0;      // a build's own funded reward:risk, else the page's
   a.room += e; a.gain += e;
   if (a.gain > 1e-6 && a.gain >= s.minClaim - 1e-9) { pay = s.split * a.gain; a.room -= a.gain; a.gain = 0; if (s.lock) a.dead = true; }
   if (a.room <= s.fee + 1e-9 || a.room - s.fee < (s.minRoom || 0)) a.dead = true;
@@ -432,12 +450,16 @@ function vestClean(o){
 }
 // ---------- VEST ENGINE END ----------
 BUILDS[0].next = BUILDS[1];
-if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestFeed: vestFeed, FEED_URL: FEED_URL, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestFeed: vestFeed, FEED_URL: FEED_URL, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, TWO: TWO, LIFT: LIFT, BEST: BEST, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'mfp', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
 if (typeof document !== 'undefined') (function(){
   'use strict';
   if (HOME) { location.replace(HOME); return; }
   function tell(){}
+  var QS = (window.location && window.location.search) || '', PAGE = ((window.location && window.location.pathname) || '').split('/').pop() || '';
+  var PROFILE = TWO ? +((/[?&]p=([12])(&|$)/.exec(QS) || [])[1] || 0) : 0, VIEW = !!BEST && /[?&]view=best(&|$)/.test(QS);
+  var FRAMED = PROFILE > 0 && window.parent !== window;
   var STORE = 'funded-slots-roadmap-mfp-mix', state;
+  if (PROFILE === 2) STORE += '-p2';             // Profile 2 is typed on the page and kept apart; Profile 1 is the page as it was
   try { state = vestClean(JSON.parse(localStorage.getItem(STORE) || 'null')); } catch (e) { state = vestClean(null); }
   function $(id){ return document.getElementById(id); }
   function money(v){ var s = Math.round(Math.abs(v)).toLocaleString('en-US'); return (v < -0.5 ? '−$' : '$') + s; }
@@ -448,6 +470,34 @@ if (typeof document !== 'undefined') (function(){
   BUILDS[0].next = BUILDS[1];
   var PICK = BUILDS[0], stats = BUILDS.map(vestStat);
 
+  // the page's views (BEST: Plan / Best programs) and, with TWO, its two profiles side by side
+  if (BEST) {
+    $('views').hidden = false;
+    $('views').innerHTML = '<a class="tab" href="' + PAGE + '"' + (VIEW ? '' : ' aria-current="page"') + '>Plan</a><a class="tab" href="' + PAGE + '?view=best"' + (VIEW ? ' aria-current="page"' : '') + '>Best programs</a>';
+  }
+  if (VIEW) {
+    $('one').hidden = true; $('best-box').hidden = false; $('best-h').textContent = BEST.title;
+    $('best').innerHTML = BEST.rows.map(function(r){
+      var ev = r[3] * r[2] - r[1], roi = r[3] * r[2] / r[1];
+      return '<tr' + (r[4] ? ' class="pick"' : '') + '><td>' + r[0] + '</td><td>' + money(r[1]) + '</td><td>' + (r[2] * 100).toFixed(1) + '%</td><td>' + money(r[3]) + '</td><td class="' + (ev > 0 ? 'pos' : 'neg') + '">' + signed(ev) + '</td><td>$' + roi.toFixed(2) + '</td></tr>';
+    }).join('');
+    return;
+  }
+  if (TWO && !PROFILE) {
+    $('one').hidden = true; $('two').hidden = false; document.querySelector('main').classList.add('wide');
+    [1, 2].forEach(function(n){ $('pf' + n).src = PAGE + '?p=' + n; });
+    window.addEventListener('message', function(e){      // each frame says how tall it is
+      var d = e.data;
+      if (e.origin !== window.location.origin || !d || (d.perps !== 1 && d.perps !== 2) || !(d.h > 0)) return;
+      $('pf' + d.perps).style.height = (Math.ceil(d.h) + 4) + 'px';
+    });
+    return;
+  }
+  if (FRAMED) document.documentElement.classList.add('embed');
+  if (PROFILE) { var h0 = document.querySelector('#one h2'); h0.textContent = 'Profile ' + PROFILE + ' · ' + h0.textContent; }
+  function sayHeight(){ if (FRAMED) window.parent.postMessage({ perps: PROFILE, h: document.querySelector('main').offsetHeight }, window.location.origin); }
+  if (FRAMED) window.addEventListener('resize', sayHeight);
+  if (LIFT) { $('lg-alt').hidden = false; $('lg-alt-t').textContent = LIFT.name; $('lg-alt').title = LIFT.says; }
   function drawStatic(){
     var st = stats[0], s = st.spec, rs = PICK.next ? vestStat(PICK.next) : st;      // the rates of the eval bought from now on
     $('r-pass').textContent = (rs.pass * 100).toFixed(1);
@@ -531,7 +581,7 @@ if (typeof document !== 'undefined') (function(){
   function drawChart(rows){
     var show = PICK.weeks ? rows : rows.slice(0, 24), W = 1120, Hh = 300, L = 62, R = 84, T = 12, B = 26, n = show.length;
     var hi = 0, lo = 0;
-    show.forEach(function(r){ hi = Math.max(hi, r.inn, r.total); lo = Math.min(lo, -r.out, r.total); });
+    show.forEach(function(r){ hi = Math.max(hi, r.inn, r.total); lo = Math.min(lo, -r.out, r.total); if (r.alt !== undefined){ hi = Math.max(hi, r.alt); lo = Math.min(lo, r.alt); } });
     if (hi - lo < 1) hi = lo + 1;
     var y = function(v){ return T + (hi - v) / (hi - lo) * (Hh - T - B); }, bw = (W - L - R) / n, svg = [];
     var step = Math.pow(10, Math.floor(Math.log10((hi - lo) / 4))), m = (hi - lo) / 4 / step; step *= m >= 5 ? 5 : m >= 2 ? 2 : 1;
@@ -546,6 +596,7 @@ if (typeof document !== 'undefined') (function(){
       svg.push('<circle cx="' + c + '" cy="' + y(r.total) + '" r="3" fill="var(--net)"/>');
       if (i % (n > 48 ? 8 : 4) === 0) svg.push('<text x="' + c + '" y="' + (Hh - 8) + '" text-anchor="middle">W' + r.week + '</text>');
     });
+    if (show[0].alt !== undefined) svg.push('<path d="' + show.map(function(r, i){ return (i ? 'L' : 'M') + (L + (i + 0.5) * bw) + ' ' + y(r.alt); }).join('') + '" fill="none" stroke="var(--net)" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.75"/>');
     svg.push('<path d="' + path + '" fill="none" stroke="var(--net)" stroke-width="2"/>');
     // the running total at the line's end, and a hair line for the week under the pointer
     var last = show[n - 1];
@@ -563,7 +614,8 @@ if (typeof document !== 'undefined') (function(){
     tipEl.innerHTML = '<div class="h">W' + r.week + '</div>' +
       '<div class="r"><span><i style="background:var(--in)"></i>' + (CLAIM === 'Request' ? 'Payouts' : 'Claims') + ' in</span><span>' + money(r.inn) + '</span></div>' +
       '<div class="r"><span><i style="background:var(--out)"></i>Evals out</span><span>' + money(r.out) + '</span></div>' +
-      '<div class="r"><span><i style="background:var(--net)"></i>Running total</span><span>' + signed(r.total) + '</span></div>';
+      '<div class="r"><span><i style="background:var(--net)"></i>Running total</span><span>' + signed(r.total) + '</span></div>' +
+      (r.alt !== undefined ? '<div class="r"><span><i style="background:none;border-top:2px dashed var(--net);height:0"></i>' + LIFT.name + '</span><span>' + signed(r.alt) + '</span></div>' : '');
     tipEl.hidden = false;
     var tw = tipEl.offsetWidth, left = cx * k + 14;
     if (left + tw > box.clientWidth) left = cx * k - tw - 14;
@@ -602,6 +654,11 @@ if (typeof document !== 'undefined') (function(){
     $('money').innerHTML = 'Paid <b>' + cents(state.paid) + '</b> · Received <b>' + cents(state.recv) + '</b> · So far <b class="' + (so > 0 ? 'pos' : so < 0 ? 'neg' : '') + '">' + (so < 0 ? '−' : so > 0 ? '+' : '') + cents(Math.abs(so)) + '</b>';
     $('pairs').hidden = !PAIRS;
     $('pairs').innerHTML = 'Wallet 99% in pairs <b>' + money(res.wallet) + '</b> · the same accounts traded one by one <b>' + money(single.wallet) + '</b>';
+    if (LIFT) {                                  // the same plan, the same draws, a trade's chance lifted: the dashed line
+      var lf = [LIFT.eval, LIFT.funded], lb = Object.assign({}, PICK, { lift: lf, next: PICK.next ? Object.assign({}, PICK.next, { lift: lf }) : null });
+      var lr = vestPlan(lb, state, PAIRS ? PAIR_OPP : 0, Math.min(RUNS, 1000), PICK.weeks || WEEKS).rows;      // 1,000 plays: a line, not a tile
+      res.rows.forEach(function(r, i){ r.alt = lr[i].total; });
+    }
     drawChart(res.rows);
     var alt = LEAN ? null : vestTwin(PICK);
     $('cmp-box').hidden = !alt;
@@ -613,6 +670,7 @@ if (typeof document !== 'undefined') (function(){
       $('cmp').innerHTML = line(PICK, ms, res) + line(alt, as, ap);
     }
     tell(res);
+    sayHeight();
   }
   var timer = 0;
   $('c-pays').hidden = !PICK.payCap;
@@ -643,7 +701,7 @@ if (typeof document !== 'undefined') (function(){
     if (moved) { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} drawStatic(); update(); }
   }
   function loadFeed(){
-    if (!FEED_URL || typeof fetch !== 'function') return;
+    if (!FEED_URL || PROFILE === 2 || typeof fetch !== 'function') return;      // Profile 2 is typed
     try { fetch(FEED_URL + '?t=' + Date.now(), { cache: 'no-store' }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(takeFeed).catch(function(){}); } catch (e) {}
   }
   drawStatic(); update();

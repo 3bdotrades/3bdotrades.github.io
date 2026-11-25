@@ -46,10 +46,15 @@ function clean(answer){
   const rows = answer && Array.isArray(answer.data) ? answer.data : null;
   if (!rows) throw new Error('no data list');
   const out = [];
+  const elite = function(a){ return /elite/i.test(String(a.name || '') + ' ' + String(a.display_name || '')); };
+  // MFP names the funded account of a passed Elite eval only "Funded 5K" (seen 25 Nov 2026): it is the plan's when an
+  // Elite eval of its size has passed (the bot's own rule, mfp_bot.is_elite)
+  const passed = {};
+  rows.slice(0, 2000).forEach(function(a){ if (a && a.stage === 'evaluation' && a.status === 'passed' && elite(a)) passed[Math.round(Number(a.starting_balance))] = true; });
   rows.slice(0, 2000).forEach(function(a){
     if (!a || typeof a.id !== 'string' || !/^[\w.:|-]{1,80}$/.test(a.id)) return;
     if (a.stage !== 'evaluation' && a.stage !== 'funded') return;
-    if (!/elite/i.test(String(a.name || '') + ' ' + String(a.display_name || ''))) return;      // another program: not the plan's
+    if (!elite(a) && !(a.stage === 'funded' && passed[Math.round(Number(a.starting_balance))])) return;      // another program: not the plan's
     if (['active', 'passed', 'failed', 'closed'].indexOf(a.status) < 0) return;
     const size = Math.round(Number(a.starting_balance));
     if (SIZES.indexOf(size) < 0) return;                       // a sandbox or prize account of another size is not part of the plan
