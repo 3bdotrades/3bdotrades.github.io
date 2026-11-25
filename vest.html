@@ -276,7 +276,10 @@ function vestStep(a, s, u){
     if (a.room < s.cap * 0.02) a.dead = true;
     return out;
   }
+  // the allowance on every trade but the account's last: when the room left after a slipped stop would not fund another
+  // real trade, this one takes the whole room (the bot's rule since 25 Nov 2026)
   var r = Math.min(s.risk, (a.room - s.fee) * (s.keep || 1));
+  if (s.keep && s.keep < 1 && a.room - s.fee - r < s.minRoom) r = Math.min(s.risk / s.keep, a.room - s.fee);
   if (!(r > 1e-9) || a.room - s.fee < (s.minRoom || 0)) { a.dead = true; return 0; }
   if (a.stage >= 0) {
     var T = s.targets[a.stage], win = T - a.gain + s.fee, p = r / (r + win);

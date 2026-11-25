@@ -213,10 +213,10 @@ var FUNDED_MAX = 10, EVAL_MAX = 100, WEEKS = 48, DAYS = 6, RUNS = 4000, SAFE = 0
 // and ends an account whose room is under 35% of a full stop (minShare).
 var MFP_PACE = [6,6,8,8,1,6,6,3,1,7,4,9,2,9,9,12,13,13,9,15,13,6,5,6,4,5,6,7,7,8,3,6,6,11,14,5,6,3,1,1,3,1,1,3,2,1,3,5,7,4,8,7,6,11,9,7,6,1,6,4,4,3,12,2,12,13,11,16,9,6,15,8,5,6,7,9,8,4,5,5,6,9,10,17,10,8,6,15,10,4,5,8,5,5,8,7,8,9,13,5,6,14];
 var BUILDS = [
-  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 1, frr: 2, pace: MFP_PACE, slip: 8, minShare: 0.35, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, twin: { go: true, tries: 2, stat: [0.2584, 187.8, 7.3] }, stat: [0.315, 183.2, 2.98] },
-  { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 1, frr: 2, pace: MFP_PACE, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.315, 366.3, 2.98] },
-  { name: 'Elite 25K · 10% · 5% · 3% · 80%', size: 25000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 186, tries: 1, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 250, fundedMax: 4, evalMax: 4, stat: [0.3149, 907, 3.66] },
-  { name: 'Elite 50K · 10% · 5% · 3% · 80%', size: 50000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 371, tries: 1, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 500, fundedMax: 2, evalMax: 2, stat: [0.3149, 1815, 3.66] },
+  { name: 'Elite 5K · 10% · 5% · 3% · 80%', size: 5000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 36, tries: 1, frr: 2, pace: MFP_PACE, slip: 8, minShare: 0.35, pick: true, feeSide: 0.00001, maxLev: 40, minClaim: 50, fundedMax: 20, evalMax: 20, twin: { go: true, tries: 2, stat: [0.2584, 187.8, 7.3] }, stat: [0.3303, 196.6, 3.04] },
+  { name: 'Elite 10K · 10% · 5% · 3% · 80%', size: 10000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 71, tries: 1, frr: 2, pace: MFP_PACE, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 100, fundedMax: 10, evalMax: 10, stat: [0.3303, 393.2, 3.04] },
+  { name: 'Elite 25K · 10% · 5% · 3% · 80%', size: 25000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 186, tries: 1, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 250, fundedMax: 4, evalMax: 4, stat: [0.3301, 970, 3.77] },
+  { name: 'Elite 50K · 10% · 5% · 3% · 80%', size: 50000, dd: 0.05, dl: 0.03, tg: [0.10], split: 0.80, price: 371, tries: 1, slip: 8, minShare: 0.35, feeSide: 0.00001, maxLev: 40, minClaim: 500, fundedMax: 2, evalMax: 2, stat: [0.3301, 1939, 3.77] },
   { name: 'Signature 10K · 10% · 6% · 3% · 80%', size: 10000, dd: 0.06, dl: 0.03, tg: [0.10], split: 0.80, price: 65, tries: 1, feeSide: 0.00005, lock: true, minClaim: 600, fundedMax: 10, evalMax: 10, stat: [0.3582, 231.3, 3.85] },
   { name: 'Select 10K · 9% · 3% · 3% · 80%', size: 10000, dd: 0.03, dl: 0.03, tg: [0.09], split: 0.80, price: 30, tries: 1, feeSide: 0.00005, lock: true, minClaim: 900, fundedMax: 10, evalMax: 10, stat: [0.2375, 150.5, 1.91] }
 ];
@@ -280,7 +280,10 @@ function vestStep(a, s, u){
     if (a.room < s.cap * 0.02) a.dead = true;
     return out;
   }
+  // the allowance on every trade but the account's last: when the room left after a slipped stop would not fund another
+  // real trade, this one takes the whole room (the bot's rule since 25 Nov 2026)
   var r = Math.min(s.risk, (a.room - s.fee) * (s.keep || 1));
+  if (s.keep && s.keep < 1 && a.room - s.fee - r < s.minRoom) r = Math.min(s.risk / s.keep, a.room - s.fee);
   if (!(r > 1e-9) || a.room - s.fee < (s.minRoom || 0)) { a.dead = true; return 0; }
   if (a.stage >= 0) {
     var T = s.targets[a.stage], win = T - a.gain + s.fee, p = r / (r + win);
