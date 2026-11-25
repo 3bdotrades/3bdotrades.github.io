@@ -406,7 +406,9 @@ function lifeRoad(F){
 // The wait runs from the day the payout was asked for, which is the row's last trade (the owner, 25 Nov 2026: "fix g1 too so
 // its net matches"): G1's three Aqua rows last traded 12, 13 and 16 Nov and were paid 24 Nov. Counting the whole wait again
 // from each day's build left that $5,310 out of the replay of 18 Nov. Past its wait, a payout is expected the next day.
-var PAY_WAIT_AT = { aqua: 6 };
+// 26 Nov 2026: 7, not 6. G1's three took 8, 7 and 6 trading days; V2's request of 17 Nov was still unpaid at the close of
+// 25 Nov, its sixth day.
+var PAY_WAIT_AT = { aqua: 7 };
 function payWait(firm){ return ownOf(PAY_WAIT_AT, normFirm(firm)) || 0; }
 // One road per set of flip numbers, kept: the pages' sizes share them from run to run.
 var ROADS = {}, ROADS_N = 0;
@@ -579,7 +581,9 @@ function simulateGroup(units, r, weeks, days){
       // nothing is added here, the account only moves on to what follows that payout.
       // "payout requested": the payout is not in the cash received yet. It arrives after the firm's wait, counted from the
       // row's last trade (ago: the trading days since; not read, the whole wait is still ahead), and the account goes on from there.
-      if (x.req){ var left = wait > 0 ? Math.max(1, wait - Math.max(0, Math.round(num(x.ago, 0)))) : 0; if (left < LD) u.payAt[left] += road.due(k0, room); hold(u, road.paid(k0, room, x.net), 1, left); return; }
+      // back: its last trade lost, so it has traded since it asked (a request follows a winning day): the firm has let it trade
+      // again, the payout is out. G1's three Aqua rows showed this on the morning of 24 Nov and were paid that day.
+      if (x.req){ var left = wait > 0 ? (x.back ? 1 : Math.max(1, wait - Math.max(0, Math.round(num(x.ago, 0))))) : 0; if (left < LD) u.payAt[left] += road.due(k0, room); hold(u, road.paid(k0, room, x.net), 1, left); return; }
       hold(u, rem > 0 ? road.flip(k0, rem, room, x.net) : road.paid(k0, room, x.net), 1, on && !!x.done);
     });
     if (ip > known.length) hold(u, u.first, ip - known.length);
@@ -2527,7 +2531,7 @@ function parseG1(html, K){
   // G1 shows "n/4 days" before the first payout and "n/5 days" after one; net = the total of its flips since the last payout
   rows('p-' + K + '-flip').forEach(function(c){
     var m = /(\d+)\s*\/\s*(\d+)\s*days/i.exec(c[3]), room = moneyNum(c[4]), u = unit(c[1], g1Size(c[0], c[3], false));
-    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null, net: moneyNum(c[3]), done: traded(c), req: /payout requested/i.test(c[3]), ago: ago(c) });
+    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null, net: moneyNum(c[3]), done: traded(c), req: /payout requested/i.test(c[3]), ago: ago(c), lost: (moneyNum(c[5]) || 0) < 0 });
   });
   // eval signals: the "Avg signals" row of the summary table that has an Evals column
   var sig = null;
@@ -2566,7 +2570,7 @@ function applyG1(g){
     if (!f) f = addRow(state.firms, x.firm, x.size + 'K');
     else if (!inSet(f)) f.firm = x.firm;                 // (a row kept with the dashboard's code for a name: its name)
     f.openEvals = x.evals; f.passedNow = x.passed; f.passedDone = x.passedDone; f.fundedNow = x.fundeds; f.inProfitNow = x.flips.length;
-    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net, done: z.done ? 1 : undefined, req: z.req ? 1 : undefined, ago: z.req && z.ago !== null ? z.ago : undefined }; });
+    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net, done: z.done ? 1 : undefined, req: z.req ? 1 : undefined, ago: z.req && z.ago !== null ? z.ago : undefined, back: z.req && z.lost ? 1 : undefined }; });
     f.g1Evals = x.evalsAt; f.g1Funded = x.fundedsAt;
     f.g1 = true; seen.push(f);
   });
