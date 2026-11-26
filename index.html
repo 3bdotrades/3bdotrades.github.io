@@ -1600,12 +1600,16 @@ function syncRates(){
 // newest one (still running). Before that it was the highest number of eval signals in a day (the dashboard's "max"), which
 // stood at 17 for V2 while V2 kept up to 27 evals open: replayed from 11 Nov 2026 the plan bought 44 evals in ten trading
 // days and the fleet about 72. That number is still the fallback while the kept one is not read.
+// The owner, 26 Nov 2026: "fix the spend so it matches the fleet". A day's highest number is more than the fleet holds through
+// the day (a lost eval is not replaced at once), so the plan spent about $450 too much in every replay of 11 to 25 Nov.
+// The seats are now the average of each day's AVERAGE (open.avg: every build of the day), the high only where that is missing.
 var SEAT_DAYS = 10;
 function openKept(o){
   var d = o && typeof o === 'object' && o.days && typeof o.days === 'object' ? o.days : null; if (!d) return 0;
   var ks = Object.keys(d).filter(function(k){ if (!/^\d{4}-\d\d-\d\d$/.test(k) || !(num(d[k], -1) >= 0)) return false; var p = k.split('-'), wd = new Date(+p[0], +p[1] - 1, +p[2]).getDay(); return wd > 0 && wd < 6; }).sort();
   ks = ks.slice(0, -1).slice(-SEAT_DAYS); if (!ks.length) return 0;
-  var sum = 0; ks.forEach(function(k){ sum += +d[k]; });
+  var av = o.avg && typeof o.avg === 'object' ? o.avg : {}, sum = 0;
+  ks.forEach(function(k){ var a = av[k]; sum += Array.isArray(a) && num(a[1], 0) > 0 && num(a[0], -1) >= 0 ? a[0] / a[1] : +d[k]; });
   return Math.round(sum / ks.length);
 }
 // Each firm's share of the evals the fleet keeps open (the counter's open.firms). The owner, 25 Nov 2026:
@@ -1618,8 +1622,11 @@ function openMix(o){
   var d = o && typeof o === 'object' && o.days && typeof o.days === 'object' ? o.days : null, fm = d && o.firms && typeof o.firms === 'object' ? o.firms : null; if (!fm) return null;
   var ks = Object.keys(d).filter(function(k){ if (!/^\d{4}-\d\d-\d\d$/.test(k) || !(num(d[k], -1) >= 0)) return false; var p = k.split('-'), wd = new Date(+p[0], +p[1] - 1, +p[2]).getDay(); return wd > 0 && wd < 6; }).sort();
   ks = ks.slice(0, -1).slice(-MIX_DAYS);
-  var m = Object.create(null), tot = 0;
-  ks.forEach(function(k){ var x = fm[k]; if (!x || typeof x !== 'object') return; Object.keys(x).forEach(function(f){ var n = num(x[f], 0); if (!(n > 0)) return; var key = normFirm(f); m[key] = (m[key] || 0) + n; tot += n; }); });
+  var m = Object.create(null), tot = 0, by = o.buys && typeof o.buys === 'object' ? o.buys : null;
+  // what the fleet BOUGHT over those days and since (open.buys), where the counter keeps it: the evals it holds open say where
+  // evals linger, not where it buys (13 to 25 Nov 2026: a fifth of the plan's evals went to Aqua, where the fleet bought none)
+  if (by && ks.length) Object.keys(by).forEach(function(k){ var x = by[k]; if (!/^\d{4}-\d\d-\d\d$/.test(k) || k < ks[0] || !x || typeof x !== 'object') return; Object.keys(x).forEach(function(f){ var n = num(x[f], 0); if (!(n > 0)) return; var key = normFirm(f); m[key] = (m[key] || 0) + n; tot += n; }); });
+  if (!(tot > 0)) ks.forEach(function(k){ var x = fm[k]; if (!x || typeof x !== 'object') return; Object.keys(x).forEach(function(f){ var n = num(x[f], 0); if (!(n > 0)) return; var key = normFirm(f); m[key] = (m[key] || 0) + n; tot += n; }); });
   if (!(tot > 0)) return null;
   var out = {}; Object.keys(m).forEach(function(f){ out[f] = m[f] / tot; });
   return out;
