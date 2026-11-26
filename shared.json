@@ -1,8 +1,8 @@
 {
  "v": 1,
  "g1": {
-  "n": 116,
-  "t": "2026-11-25T23:53:24.794Z",
+  "n": 119,
+  "t": "2026-11-26T09:38:47.869Z",
   "by": "jbtyloyt",
   "slotsV": 2,
   "skip": [],
@@ -11,7 +11,7 @@
    "tradeify|25": 1,
    "blueguardian|50": 2,
    "lucid|25": 1,
-   "futureselite|50": 4,
+   "futureselite|50": 3,
    "tradeify|50": 0,
    "lucid|50": 3
   }
