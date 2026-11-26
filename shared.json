@@ -1,15 +1,15 @@
 {
  "v": 1,
  "g1": {
-  "n": 119,
-  "t": "2026-11-26T09:38:47.869Z",
+  "n": 122,
+  "t": "2026-11-26T10:56:47.321Z",
   "by": "jbtyloyt",
   "slotsV": 2,
   "skip": [],
   "slots": {
    "aqua": 3,
    "tradeify|25": 1,
-   "blueguardian|50": 2,
+   "blueguardian|50": 1,
    "lucid|25": 1,
    "futureselite|50": 3,
    "tradeify|50": 0,
