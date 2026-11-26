@@ -192,7 +192,7 @@ span.pick{cursor:default}
   <h2 id="jour-h" hidden>Journal</h2>
   <div class="wrap" id="jour" hidden></div>
 
-  <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span><span id="lg-coin" title="The same plan from today with every trade at chance (what the fleet's trade sizes give with no edge) instead of its live rates" hidden><i class="line dash"></i>Coin flip</span></span><label class="fresh" id="fresh-box" title="A start from nothing on 21 Sep 2026 at Lucid, FuturesElite, Topstep and Blue Guardian, this many evals kept open, every trade at chance" hidden><i></i>Fresh start, coin flip: evals <input id="fresh-n" type="number" min="1" max="200" step="1" inputmode="numeric"></label></h2>
+  <h2><span id="chart-h">Cash by week</span><span class="legend" aria-hidden="true"><span><i style="background:var(--in)"></i>Payouts in</span><span><i style="background:var(--out)"></i>Evals out</span><span><i class="line" style="background:var(--net)"></i>Running total</span><span id="lg-coin" title="The same plan from today with every trade at chance (what the fleet's trade sizes give with no edge) instead of its live rates" hidden><i class="line dash"></i>Coin flip</span></span><label class="fresh" id="fresh-box" title="A start from nothing (G1: 21 Sep 2026, V2: 2 Nov 2026) at Lucid, FuturesElite, Topstep and Blue Guardian, this many evals kept open, every trade at chance" hidden><i></i>Fresh start, coin flip: evals <input id="fresh-n" type="number" min="1" max="200" step="1" inputmode="numeric"></label></h2>
   <div class="wrap chartcard"><div class="chartbox" id="chart" tabindex="0" role="img" aria-label="Weekly cash in and out with the running total and, for the weeks ahead, the same plan at coin-flip rates. Use the left and right arrow keys to read each week."></div></div>
   </div>
 </main>
@@ -1689,7 +1689,8 @@ function coinFlip(){ var cr = chanceRates(FLEET.key); return runAll(planFirms(cr
 // (shared evenly, not by the fleet's mix), every trade at chance (chanceRates, as the dashed line), today's prices and rules
 // all the way. No slots: with the page's 5 accounts in profit a firm the curve stopped growing above about 20 evals, and the
 // owner chose "No slots limit" (26 Nov 2026). The number is kept in this browser only.
-var FRESH_FROM = '2026-09-21', FRESH_FIRMS = ['lucid', 'futureselite', 'topstep', 'blueguardian'], FRESH_DEF = 20, FRESH_MAX = 200, FRESH_KEY = 'roadmap-fresh-evals', FRESH_SLOTS = 1e4;
+// V2's starts on 2 Nov, the week its own line begins (the owner, 26 Nov 2026: "make v2 yellow line start from 2 nov like the blue").
+var FRESH_FROM = FLEET.key === 'v2' ? '2026-11-02' : '2026-09-21', FRESH_FIRMS = ['lucid', 'futureselite', 'topstep', 'blueguardian'], FRESH_DEF = 20, FRESH_MAX = 200, FRESH_KEY = 'roadmap-fresh-evals', FRESH_SLOTS = 1e4;
 function freshWeeks(){ var p = FRESH_FROM.split('-'); return Math.max(0, Math.round((START - mondayOf(new Date(+p[0], +p[1] - 1, +p[2]))) / 6048e5)); }
 function freshEvals(){ var v = NaN; try { v = +localStorage.getItem(FRESH_KEY); } catch (e) {} return v >= 1 && v <= FRESH_MAX ? Math.round(v) : FRESH_DEF; }
 function freshStart(){
