@@ -1,17 +1,18 @@
 {
  "v": 1,
  "g1": {
-  "n": 137,
-  "t": "2026-11-28T12:39:23.861Z",
+  "n": 146,
+  "t": "2026-11-28T13:27:59.394Z",
   "by": "jbtyloyt",
   "slotsV": 2,
   "skip": [],
   "slots": {
    "tradeify|25": 0,
-   "lucid|25": 0,
+   "lucid|25": 1,
    "tradeify|50": 0,
-   "aqua|50": 0,
-   "futureselite|50": 0
+   "aqua|50": 3,
+   "futureselite|50": 3,
+   "lucid|50": 3
   }
  },
  "v2": {
