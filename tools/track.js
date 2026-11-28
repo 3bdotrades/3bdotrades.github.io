@@ -491,6 +491,8 @@ function main(){
     if (out !== old && (changed || list.length >= SAVE_EVERY)) fs.writeFileSync(file, out);
     console.log(k + ': ' + list.length + ' builds read' + (unread ? ' (' + unread + ' not readable)' : '') + ' | ' + KEYS.map(x => x + ' ' + st.counts[x][0] + '/' + st.counts[x][1]).join(', ') + ' | ' + st.day + (st.unread ? ' | not readable since ' + st.unread : '') + (changed ? ' | saved' : ''));
   }
+  // both fleets' first payouts into each file (only where they changed)
+  payPool(dir);
 }
 if (require.main === module) main();
 module.exports = { tagOf: tagOf, payStep: payStep, payNew: payNew, buyStep: buyStep, firmsOf: firmsOf, openOf: openOf, openStep: openStep, cashOf: cashOf, cashStep: cashStep, cashNew: cashNew, nyDate: nyDate, read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
