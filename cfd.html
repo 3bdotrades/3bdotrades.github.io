@@ -38,6 +38,7 @@ h2{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;align-
 .cell{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:10px 12px;min-width:0}
 .cell+.cell{border-left:1px solid var(--line)}
 .cell .k,.cell label{font-size:12px;font-weight:600;color:var(--mute)}
+.cell .kd{font-size:12px;font-weight:600;color:var(--ink)}
 .cell .v{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;font-size:20px;font-weight:600;line-height:1.3;font-variant-numeric:tabular-nums}
 .cell .v small{font-size:13px;font-weight:400;color:var(--mute)}
 .box{width:100%;max-width:6.8em;font:600 20px/1.3 system-ui,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:0 6px;text-align:right;-moz-appearance:textfield;appearance:textfield}
@@ -117,7 +118,7 @@ html.embed,.embed body{overflow:hidden}
         <div class="cell"><span class="k">Buy now</span><span class="v" id="t-buy">–</span></div>
         <div class="cell"><span class="k" title="The deepest your own cash goes before claims cover it: in 99 of 100 plays of the plan, and on the average path">Cash needed</span><span class="v" id="t-need">–</span><span class="v" id="t-need2"></span></div>
         <div class="cell"><span class="k" id="k-net">Net after 48 weeks</span><span class="v" id="t-net">–</span></div>
-        <div class="cell"><span class="k" id="k-run">Once running</span><span class="v" id="t-run">–</span></div>
+        <div class="cell"><span class="kd" id="t-run-d" title="The first week the plan nets its Once running month as a week, and keeps it up" hidden></span><span class="k" id="k-run">Once running</span><span class="v" id="t-run">–</span></div>
       </div>
     </div>
     <div>
@@ -230,6 +231,38 @@ var BUILDS = [
     brNote: 'Every trade a coin flip at fair odds for its stop and target, less a point of cost. Our G1 / V2 signals win like a coin at these brackets (12 Jul – 10 Nov 2026: 25.0% of 791 at 50 / 150, 9.3% of 376 at 50 / 500)',
     weeks: 96, frr: 10, payCap: 5, payWait: 10, feeSide: 0.5 / 26000, maxLev: 30, minClaim: 100, fundedMax: 6, evalMax: 6, twin: { go: false, tries: 1, stat: [0.3235, 3890, 7.33] }, stat: [0.2562, 3871, 47.89] }
 ];
+// The days the market is shut all day (the owner, 28 Nov 2026: "do all edits we did", the G1 and V2 tabs' holidays): CME's index
+// futures, which our signals and NAS100 follow, close on Christmas, New Year and Good Friday. No trade, eval or payout day falls on
+// one; a shortened session (Thanksgiving, the eves) is a trading day. The plan's weeks are calendar weeks from the one its first
+// trading day is in: Sunday to Saturday where the week has 6 days (the bot trades from Sunday evening's open), else Monday to Sunday.
+var CLOSED = { '2026-12-25': 1, '2027-01-01': 1, '2027-03-26': 1, '2027-12-24': 1, '2028-04-14': 1, '2028-12-25': 1 };
+function vKey(d){ return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function vOpen(d){ var w = d.getDay(); return (DAYS === 6 ? w !== 6 : w > 0 && w < 6) && !CLOSED[vKey(d)]; }
+// the plan's trading days from today (or the next one): wk = each one's week, open = each week's trading days, start = week 0's
+// first day
+function vCal(weeks, from){
+  var t = from || new Date(), d = new Date(t.getFullYear(), t.getMonth(), t.getDate()), wk = [], open = [], k;
+  for (k = 0; k < 14 && !vOpen(d); k++) d.setDate(d.getDate() + 1);
+  var start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() - (DAYS === 6 ? 0 : 1) + 7) % 7));
+  for (k = 0; k < weeks; k++) open.push(0);
+  for (; ; d.setDate(d.getDate() + 1)){ var w = Math.floor(Math.round((d - start) / 864e5) / 7); if (w >= weeks) break; if (vOpen(d)){ wk.push(w); open[w]++; } }
+  return { wk: wk, open: open, start: start };
+}
+// The week the plan is running from (the owner, 28 Nov 2026, of the G1 and V2 tabs: "i need above once running to put a date to
+// tell me in this day u net = that"): the first full week that nets the Once running month as a week (12/52 of it), with no four
+// weeks from then on under 90% of that on average, a week taken a trading day at a time (a week with a holiday has a day less).
+// -1: none, or nothing to reach.
+var RUN_HOLD = 0.9, RUN_SPAN = 4;
+function vRunFrom(rows, monthly, open){
+  var pace = monthly * 12 / 52, ok = -1, n = rows.length; if (!(pace > 0) || n < RUN_SPAN) return -1;
+  var x = rows.map(function(r, t){ var o = open && open[t] > 0 ? open[t] : DAYS; return (r.inn - r.out) * DAYS / o; });
+  for (var t = n - RUN_SPAN; t >= (open && open[0] < DAYS ? 1 : 0); t--){
+    var sm = 0; for (var u = t; u < t + RUN_SPAN; u++) sm += x[u];
+    if (sm / RUN_SPAN < RUN_HOLD * pace) break;
+    if (x[t] >= pace) ok = t;
+  }
+  return ok;
+}
 function vestRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 // stat: one account bought and played to its end, 4,000,000 times by vestBuild (how often it passes, what a funded one pays
 // before it is lost, trades taken); kept as numbers so every visit shows the same figures. The kit re-plays them (t50_vest.js).
@@ -333,7 +366,7 @@ function vestBuild(b, n, stop){
 // day has room for one of those counts, drawn evenly, and the accounts take turns, funded ones first, then whoever
 // waited longest (the bot's own order); the rest wait for another day.
 function vestPlan(b, st, opp, runs, weeks){
-  var s = vestSpec(b), rnd = vestRng(SEED), H = weeks * DAYS, price = st.price;
+  var cal = vCal(weeks), s = vestSpec(b), rnd = vestRng(SEED), H = cal.wk.length, price = st.price;
   var FMAX = b.fundedMax || FUNDED_MAX, EMAX = b.evalMax || EVAL_MAX;      // how many funded accounts and evals the firm lets this build hold at once
   var seats = Math.max(1, Math.min(EMAX + FMAX, Math.round(st.seats)));
   var f0 = Math.max(0, Math.min(FMAX, Math.round(st.funded))), e0 = Math.max(0, Math.min(EMAX, Math.round(st.evals)));
@@ -358,7 +391,7 @@ function vestPlan(b, st, opp, runs, weeks){
       a.gain = 0; a.wait = false; a.hold = 0; a.last = -1; a.dead = i >= f0 + e0 + f2 + e2;
     }
     for (var day = 0; day < H; day++) {
-      var w = (day / DAYS) | 0;
+      var w = cal.wk[day];
       for (q = pend.length - 1; q >= 0; q--) if (pend[q][0] <= day) { due += pend[q][1]; pend.splice(q, 1); }
       cash += due; inW[w] += due; due = 0;
       if (over) { cumD[day] += cash; continue; }           // the last payout is taken: nothing is bought or traded any more
@@ -401,8 +434,8 @@ function vestPlan(b, st, opp, runs, weeks){
   var late = 0, from = Math.floor(weeks / 2);
   for (wk = from; wk < weeks; wk++) late += rows[wk].inn - rows[wk].out;
   return { buy: buy0, cost: buy0 * cost1, buySize: NX ? NX.size : b.size, wallet: holes[Math.min(runs - 1, Math.ceil(SAFE * runs) - 1)], need: -lowMean,
-    net: nets / runs, monthly: late / (weeks - from) * 52 / 12, rows: rows,
-    cap: CAP, left: CAP - had, paid: paidT / runs, fees: feeT / runs, evals: evalT / runs, runWeeks: endT / runs / DAYS, hit: hit / runs };
+    net: nets / runs, monthly: late / (weeks - from) * 52 / 12, rows: rows, open: cal.open, start: cal.start,
+    cap: CAP, left: CAP - had, paid: paidT / runs, fees: feeT / runs, evals: evalT / runs, runWeeks: endT / runs / (H / weeks), hit: hit / runs };
 }
 // The feed (the owner: "make it update automatically like 5ers"): tools/mfp.js on his PC counts his MFP accounts through
 // MFP's API every 10 minutes and publishes the counts as mfp.json beside the live counts. vestFeed reads one such file for
@@ -441,7 +474,7 @@ function vestClean(o){
   return p;
 }
 // ---------- VEST ENGINE END ----------
-if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestFeed: vestFeed, FEED_URL: FEED_URL, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, TWO: TWO, LIFT: LIFT, BEST: BEST, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'cfd', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED };
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestFeed: vestFeed, FEED_URL: FEED_URL, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, TWO: TWO, LIFT: LIFT, BEST: BEST, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'cfd', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED, CLOSED: CLOSED, vCal: vCal, vRunFrom: vRunFrom, DAYS: DAYS };
 if (typeof document !== 'undefined') (function(){
   'use strict';
   if (HOME) { location.replace(HOME); return; }
@@ -627,6 +660,8 @@ if (typeof document !== 'undefined') (function(){
     $('t-need2').innerHTML = '<small>' + money(res.need) + ' expected</small>';
     $('t-net').textContent = signed(res.net); tone($('t-net'), res.net);
     $('t-run').innerHTML = signed(res.monthly) + '<small>/mo</small>'; tone($('t-run'), res.monthly);
+    var rf = res.cap ? -1 : vRunFrom(res.rows, res.monthly, res.open), rd = rf >= 0 ? new Date(res.start.getFullYear(), res.start.getMonth(), res.start.getDate() + 7 * rf) : null;
+    $('t-run-d').hidden = !rd; $('t-run-d').textContent = rd ? 'From ' + ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][rd.getDay()] + ' ' + rd.getDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][rd.getMonth()] : '';
     if (res.cap) {
       // a firm that ends the plan at a number of payouts: the run to the last of them, not a rate that goes on
       var lw = res.left > 0, per = res.evals ? res.paid / res.evals - state.price : 0;

@@ -1573,7 +1573,7 @@ function showTip(i){
   tipEl.style.top = '6px';
 }
 (function(){ var fi = document.getElementById('fresh-n'); if (!fi) return;
-  fi.addEventListener('input', function(){ var v = Math.round(+fi.value); if (!(v >= 1 && v <= FRESH_MAX)) return; try { localStorage.setItem(FRESH_KEY, String(v)); } catch (e) {} update(); });
+  fi.addEventListener('input', function(){ var v = Math.round(+fi.value); if (!(v >= 1 && v <= FRESH_MAX)) return; try { localStorage.setItem(freshKey(), String(v)); } catch (e) {} update(); });
   fi.addEventListener('change', function(){ fi.value = freshEvals(); }); })();
 function hideTip(){ tipEl.hidden = true; var xh = chartEl.querySelector('#xhair'); if (xh) xh.setAttribute('visibility', 'hidden'); }
 chartEl.addEventListener('pointermove', function(e){
@@ -1792,7 +1792,9 @@ function coinFlip(){ var cr = chanceRates(FLEET.key); return runAll(planFirms(cr
 // V2's starts on 2 Nov, the week its own line begins (the owner, 26 Nov 2026: "make v2 yellow line start from 2 nov like the blue").
 var FRESH_FROM = FLEET.key === 'v2' ? '2026-11-02' : '2026-09-21', FRESH_FIRMS = ['lucid', 'futureselite', 'topstep', 'blueguardian'], FRESH_DEF = 20, FRESH_MAX = 200, FRESH_KEY = 'roadmap-fresh-evals', FRESH_SLOTS = 1e4;
 function freshWeeks(){ var p = FRESH_FROM.split('-'); return Math.max(0, Math.round((START - mondayOf(new Date(+p[0], +p[1] - 1, +p[2]))) / 6048e5)); }
-function freshEvals(){ var v = NaN; try { v = +localStorage.getItem(FRESH_KEY); } catch (e) {} return v >= 1 && v <= FRESH_MAX ? Math.round(v) : FRESH_DEF; }
+function freshKey(){ return FIVE ? FRESH_KEY + '-5ers-' + (PROFILE || 1) : FRESH_KEY; }
+function freshDef(){ var c = FIVE && state.five && state.five.cap; return c ? Math.max(1, c[0] + c[1]) : FRESH_DEF; }
+function freshEvals(){ var v = NaN; try { v = +localStorage.getItem(freshKey()); } catch (e) {} return v >= 1 && v <= FRESH_MAX ? Math.round(v) : freshDef(); }
 function freshStart(){
   if (FIVE || (FLEET.key !== 'g1' && FLEET.key !== 'v2')) return null;
   var cr = chanceRates(FLEET.key), firms = [], fp = FRESH_FROM.split('-'), f0 = mondayOf(new Date(+fp[0], +fp[1] - 1, +fp[2])); cr.wd0 = 0; cr.cal = calendar(f0, f0);
@@ -2046,14 +2048,14 @@ var FIVE_LATE = (function(){
 // Each account is followed as shares: E[c] evals whose trade is on day c, F[c] accounts funded on day c with their first
 // trade that day, G[c] funded accounts whose last payout was on day c (their next trade is on the trading day after it).
 function fiveFlow(seats, p, q, z, H, dow0, late){
-  var out = fiveZeros(H + 1), inn = fiveZeros(H + 1), buy = fiveZeros(H + 1);
+  var out = fiveZeros(H + 1), inn = fiveZeros(H + 1), buy = fiveZeros(H + 1), fix = fiveZeros(H + 1);
   function T(c){ var w = (dow0 + c) % 7; return w < 5 ? c : c + 7 - w; }      // the first trading day from day c on
   var b0 = T(0), t0 = late ? T(b0 + 1) : b0, kap = fiveKap(p, q);
   // m places of the new program from day `from` on (K: their expected cash from the same weekday of the first week)
   function addNew(K, from, m){ for (var c = 0; c + from <= H; c++){ out[c + from] += m * K.out[c]; inn[c + from] += m * K.inn[c]; buy[c + from] += m * K.buy[c]; } }
   seats.forEach(function(a){
     var E = fiveZeros(H + 1), F = fiveZeros(H + 1), G = fiveZeros(H + 1), c, k;
-    function pay(c, m, amt){ if (c <= H) inn[c] += m * (amt > 0 ? amt : z.pay); }
+    function pay(c, m, amt, typed){ if (c <= H) (typed ? fix : inn)[c] += m * (amt > 0 ? amt : z.pay); }
     // an account of before that ends: a new eval of the new program takes its place on the next trading day
     function end(c, m){ var n = T(c + 1); if (!a.keep || n > H || !(m > 0)) return; addNew(fiveNewFlow({ k: 'N', b: n % 7, d: n % 7 }, z, H, dow0, kap, true), n - n % 7, m); }
     if (a.s === 'n'){ if (b0 <= H) addNew(fiveNewFlow({ k: 'N', b: b0, d: t0 }, z, H, dow0, kap, true), 0, 1); return; }
@@ -2064,7 +2066,7 @@ function fiveFlow(seats, p, q, z, H, dow0, late){
     else if (a.s === 'f'){ if (t0 <= H) F[t0] += 1; }
     else if (a.s === 'p'){
       var c1 = Math.max(0, Math.round(num(a.c, 0))), left = Math.min(FIVE_PAYS, Math.max(1, Math.round(num(a.left, 1)))), last = c1 + (left - 1) * FIVE_WAIT;
-      for (k = 0; k < left; k++) pay(c1 + k * FIVE_WAIT, 1, a.amt);
+      for (k = 0; k < left; k++) pay(c1 + k * FIVE_WAIT, 1, a.amt, true);
       if (last <= H) G[last] += 1;
     }
     for (c = 0; c <= H; c++){
@@ -2073,7 +2075,7 @@ function fiveFlow(seats, p, q, z, H, dow0, late){
       if (G[c] > 0){ var t = T(c + 1); if (t <= H){ won(c, G[c] * q); end(t, G[c] * (1 - q)); } }
     }
   });
-  return { out: out, inn: inn, buy: buy };
+  return { out: out, inn: inn, buy: buy, fix: fix };
 }
 // What one place makes a trading day in the long run at these rates: what a new eval is expected to be paid less its price,
 // over the trading days until the place needs its next eval (1 for the eval; then with p a funded trade, 1 when it loses,
@@ -2116,12 +2118,29 @@ function fiveSeats(z, i){
 // `weeks` weeks from this week's Monday at rates rr, as runAll gives a fleet's: a row a week, and each size's own. A size
 // takes its evals at fivePrice for the pass rate of the run (z: the size as the run takes it). The hub credits held go into
 // the evals bought today, the 50K first: they cost 0.8 x the credits less, as far as their cost goes.
-function fivePlan(rr, weeks){
-  var dow0 = (TODAY.getDay() + 6) % 7, H = 7 * weeks - dow0 - 1, rows = [], per = [], t, crLeft = Math.max(0, num(state.five.cr, 0)), b0 = dow0 < 5 ? 0 : 7 - dow0;
+// The market holidays (CLOSED; the owner, 28 Nov 2026: "do all edits we did" on the 5ers tab too). A place's path is worked out on
+// weekdays (fiveNewFlow keeps one per weekday and moves it by whole weeks), so its days are then taken in order: the k-th weekday
+// from day 0 is the k-th trading day, everything after a holiday a trading day later. A payout typed with its day stays on it.
+// from: the date of day 0.
+function fiveShut(f, from, H){
+  var open = [], wk = [], to = {}, c, d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  for (c = 0; c <= H + 40; c++, d.setDate(d.getDate() + 1)){ var w = d.getDay(); if (isOpen(d)) open.push(c); if (c <= H && w > 0 && w < 6) wk.push(c); }
+  wk.forEach(function(x, k){ to[x] = open[k] === undefined ? H + 1 : open[k]; });
+  var out = fiveZeros(H + 1), inn = fiveZeros(H + 1), buy = fiveZeros(H + 1);
+  for (c = 0; c <= H; c++){ var m = to[c] !== undefined ? to[c] : c; if (m > H) continue; out[m] += f.out[c]; inn[m] += f.inn[c]; buy[m] += f.buy[c]; }
+  if (f.fix) for (c = 0; c <= H; c++) inn[c] += f.fix[c];
+  return { out: out, inn: inn, buy: buy };
+}
+// opt (the yellow line, fiveFreshRun): { from: a Monday, places: [50K, 25K] }, every place a new eval bought on its first
+// trading day, no hub credits, no late start
+function fivePlan(rr, weeks, opt){
+  var day0 = opt ? opt.from : new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()), dow0 = (day0.getDay() + 6) % 7, H = 7 * weeks - dow0 - 1, rows = [], per = [], t, crLeft = opt ? 0 : Math.max(0, num(state.five.cr, 0)), b0 = 0;
+  // the first trading day from day 0: the hub credits go into its evals
+  for (var bd = new Date(day0.getFullYear(), day0.getMonth(), day0.getDate()); !isOpen(bd) && b0 < 14; bd.setDate(bd.getDate() + 1)) b0++;
   for (t = 0; t < weeks; t++) rows.push({ t: t, out: 0, inn: 0 });
   FIVE_SIZES.forEach(function(z0, i){
     var z = { k: z0.k, size: z0.size, price: fivePrice(z0, z0.pass5), pay: z0.pay };
-    var seats = fiveSeats(z0, i), f = fiveFlow(seats, rr.pass, rr.win, z, H, dow0, FIVE_LATE), pr = [], n = 0;
+    var seats = opt ? fiveNewPlaces(opt.places[i]) : fiveSeats(z0, i), f = fiveShut(fiveFlow(seats, rr.pass, rr.win, z, H, dow0, opt ? false : FIVE_LATE), day0, H), pr = [], n = 0;
     seats.forEach(function(a){ if (a.s === 'n') n++; });
     var save = b0 <= H ? Math.min(FIVE_DISC * crLeft, n * z.price) : 0;
     if (save > 0){ f.out[b0] -= save; crLeft -= save / FIVE_DISC; }
@@ -2129,10 +2148,14 @@ function fivePlan(rr, weeks){
     for (var c = 0; c <= H; c++){ var w = Math.floor((dow0 + c) / 7); pr[w].out += f.out[c]; pr[w].inn += f.inn[c]; rows[w].out += f.out[c]; rows[w].inn += f.inn[c]; }
     per.push({ rows: pr, buy: n, cost: n * z.price - save, seats: seats, z: z });
   });
+  // each week's trading days (from day 0: the first week may be part of one)
+  var open = []; for (t = 0; t < weeks; t++) open.push(0);
+  for (var c2 = 0, dd = new Date(day0.getFullYear(), day0.getMonth(), day0.getDate()); c2 <= H; c2++, dd.setDate(dd.getDate() + 1)) if (isOpen(dd)) open[Math.floor((dow0 + c2) / 7)]++;
   var cum = 0, low = 0, totOut = 0, totIn = 0;
   rows.forEach(function(r){ cum += r.inn - r.out; r.cum = cum; if (cum < low) low = cum; totOut += r.out; totIn += r.inn; });
-  return { rows: rows, per: per, totOut: totOut, totIn: totIn, net: totIn - totOut, need: -low };
+  return { rows: rows, per: per, totOut: totOut, totIn: totIn, net: totIn - totOut, need: -low, open: open };
 }
+function fiveNewPlaces(n){ var a = []; for (var i = 0; i < n; i++) a.push({ s: 'n', keep: true }); return a; }
 // The wallet to keep ready (the owner, 20 Nov 2026: "i need something i use to keep my wallet ready for non risk of ruin"):
 // the plan played FIVE_RUNS times with every trade won or lost at random at its rates, from this profile as it is (its
 // accounts, payouts due, slots, prices and hub credits, as fiveFlow and fivePlan take them), each run's deepest cash hole
@@ -2144,8 +2167,10 @@ function fiveRng(seed){ var a = seed >>> 0; return function(){ a = (a + 0x6D2B79
 // and sum (an array) gets each day's cash added up over the runs (for a check against the plan's own expected days)
 function fiveWallet(rr, weeks, runs, safe, sum){
   runs = runs || FIVE_RUNS; safe = safe || FIVE_SAFE;
-  var dow0 = (TODAY.getDay() + 6) % 7, H = 7 * weeks - 1, rnd = fiveRng(20261120), holes = [], kap = fiveKap(rr.pass, rr.win);
-  function T(c){ var w = (dow0 + c) % 7; return w < 5 ? c : c + 7 - w; }      // the first trading day from day c on
+  var dow0 = (TODAY.getDay() + 6) % 7, H = 7 * weeks - 1, rnd = fiveRng(20261120), holes = [], kap = fiveKap(rr.pass, rr.win), nx = [];
+  // the first trading day from day c on (market holidays left out)
+  for (var c9 = H + 40, d9 = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + H + 40), n9 = H + 41; c9 >= 0; c9--, d9.setDate(d9.getDate() - 1)){ if (isOpen(d9)) n9 = c9; nx[c9] = n9; }
+  function T(c){ return c < nx.length ? nx[c] : c; }
   var b0 = T(0), t0 = FIVE_LATE ? T(b0 + 1) : b0, crLeft = Math.max(0, num(state.five.cr, 0));
   var sizes = FIVE_SIZES.map(function(z0, i){
     var z = { k: z0.k, price: fivePrice(z0, z0.pass5), pay: z0.pay }, seats = fiveSeats(z0, i), n = 0;
@@ -2196,8 +2221,36 @@ function fiveWalletAt(rr){
 }
 // the average month once the first wave is through, per size (weeks 24-63 of a long run, as monthlyUnits)
 function fiveMonthly(rr){
-  var W = 64, from = 24;
-  return fivePlan(rr, W).per.map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
+  var W = 64, from = 24, P = fivePlan(rr, W), out = P.per.map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
+  out.weeks = P.rows.map(function(r){ return r.inn - r.out; }); out.open = P.open;
+  return out;
+}
+// The 5ers tab's real weeks (the owner, 28 Nov 2026: "do all edits we did", Cash by week included): the journal's dated lines,
+// a week at a time from the Monday of this week (t < 0: weeks before it, the rows' own; w0: this week's so far, on the plan's
+// first week). Lines with no day are before all of them.
+function fiveHistory(f){
+  var weeks = {}, w0 = { inn: 0, out: 0 }, base = 0, tMin = 0;
+  f.j.forEach(function(x){
+    var l = jLine(x); if (!l || !(l.paid || l.inn)) return;
+    var amt = l.paid ? -l.a : l.a, d = l.d === '-' ? null : dateOf(l.d);
+    if (!d){ base += amt; return; }
+    var t = Math.floor(Math.round((d - START) / 864e5) / 7); if (t > 0) return;
+    if (t === 0){ if (amt > 0) w0.inn += amt; else w0.out -= amt; return; }
+    var r = weeks[t] || (weeks[t] = { inn: 0, out: 0 }); if (amt > 0) r.inn += amt; else r.out -= amt; if (t < tMin) tMin = t;
+  });
+  var rows = [], cum = base;
+  for (var t = tMin; t < 0; t++){ var r = weeks[t] || { inn: 0, out: 0 }; cum += r.inn - r.out; rows.push({ t: t, actual: true, inn: r.inn, out: r.out, cum: cum, items: [] }); }
+  return { rows: rows, w0: w0 };
+}
+// The yellow line on the 5ers tab: a start from nothing on the Monday of the journal's first dated day, every place a new eval at
+// chance, the typed number of places shared between the sizes as this profile's slots are (the 50K the odd one).
+function fiveFreshFrom(f){ var d0 = null; f.j.forEach(function(x){ var l = jLine(x); if (l && l.d !== '-'){ var d = dateOf(l.d); if (d && (!d0 || d < d0)) d0 = d; } }); return d0 ? mondayOf(d0) : null; }
+function fiveFreshRun(f, weeks){
+  var from = fiveFreshFrom(f); if (!from || from >= START) return null;
+  var back = Math.round((START - from) / 6048e5), n = freshEvals(), c = f.cap, n50 = c[0] + c[1] > 0 ? Math.round(n * c[0] / (c[0] + c[1]) + 0.01) : Math.ceil(n / 2);
+  var P = fivePlan({ pass: FIVE_CHANCE, win: FIVE_FCHANCE }, back + weeks, { from: from, places: [n50, n - n50] }), out = {};
+  P.rows.forEach(function(r, w){ out[w - back] = r.cum; });
+  return out;
 }
 // How many of the plan's weeks Cash by week shows (the owner, 20 Nov 2026: "Cash by week edit it to be not that too long just
 // untill curve be consitent"): FIVE_PAST weeks past the first week from which the average weekly net (payouts in less evals
@@ -2455,6 +2508,8 @@ function updateFive(){
   tn2.title = "The plan's own running total (payouts in less evals bought) at its lowest";
   var tn = document.getElementById('t-net'); tn.textContent = signed(res.net); tn.className = 'v ' + (res.net >= 0 ? 'pos' : 'neg');
   var tr = document.getElementById('t-run'); tr.innerHTML = signed(run) + '<small>/mo</small>'; tr.className = 'v ' + (run >= 0 ? 'pos' : 'neg');
+  var rf5 = runningFrom(runs.weeks, run, WD0, runs.open), trd5 = document.getElementById('t-run-d'), rd5 = rf5 >= 0 ? weekStart(rf5) : null;
+  trd5.hidden = !rd5; trd5.textContent = rd5 ? 'From ' + WEEKDAY[rd5.getDay()] + ' ' + dShort(rd5) : '';
   // the money so far: counted from the journal, not typed
   var m = fiveMoney(f), base = Math.round((m.out - m.paid) * 100) / 100;
   document.getElementById('f-paid').textContent = cents(m.paid);
@@ -2496,7 +2551,11 @@ function updateFive(){
   var coin = rr.pass !== FIVE_CHANCE || rr.win !== FIVE_FCHANCE ? fivePlan({ pass: FIVE_CHANCE, win: FIVE_FCHANCE }, FIVE_WEEKS) : null;
   // the chart ends a little after its running total turns into a steady line (fiveShow); Net and the per-size column keep
   // their FIVE_WEEKS
-  drawChart(res.rows.slice(0, fiveShow(res.rows, run * 12 / 52)).map(function(r, i){ var o = { t: r.t, inn: r.inn, out: r.out, cum: r.cum + base }; if (coin) o.coin = coin.rows[i].cum + base; return o; }));
+  // with the real weeks before it (fiveHistory: this week's real cash in its bars) and the yellow line (fiveFreshRun)
+  var shown = fiveShow(res.rows, run * 12 / 52), hist = fiveHistory(f), fr = fiveFreshRun(f, shown);
+  var rows5 = hist.rows.concat(res.rows.slice(0, shown).map(function(r, i){ var o = { t: r.t, inn: r.inn + (i === 0 ? hist.w0.inn : 0), out: r.out + (i === 0 ? hist.w0.out : 0), cum: r.cum + base }; if (coin) o.coin = coin.rows[i].cum + base; return o; }));
+  if (fr) rows5.forEach(function(r){ if (fr[r.t] !== undefined) r.fresh = fr[r.t]; });
+  drawChart(rows5);
   tellParent();
 }
 // a number or a date typed on the 5ers tab (a box emptied to type a new one: nothing yet)
