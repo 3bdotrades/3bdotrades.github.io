@@ -195,17 +195,41 @@ function tagOf(id){
   return ('0000000' + h.toString(16)).slice(-8);
 }
 function payNew(){ return { d1: 4, d: 5, s: 0, a: {} }; }
+// How long a payout takes (the owner, 28 Nov 2026: "Yes, fix them", of the page's fixed 7 trading days for Aqua): each account
+// also keeps a[8] = the day its payout came due (the last trade of the cycle's last winning day: when its count is full, or when
+// it shows "payout requested" first) and a[9] = a payout seen ([due, paid, 1 once "payout requested" followed it]) until it is
+// settled. Paid = the day the dashboard started its new count; where "payout requested" came after that (G1's Aqua, 15 to 24 Nov
+// 2026), the day that ended. pk.w = { firm|size: [due, paid] of the last PAY_KEEP payouts }, pk.wpool = both fleets' together.
+function lastTradeOn(r, day){
+  const m = /^(\d\d)-(\d\d)$/.exec(r.day || ''); if (!m) return '';
+  // (the dashboard's trading day rolls at 18:00 ET, so in the evening it is a day or three ahead of New York's date)
+  const y = Number(day.slice(0, 4)); let d = y + '-' + m[1] + '-' + m[2]; if (dayNo(d) - dayNo(day) > 7) d = (y - 1) + d.slice(4);
+  return d;
+}
+function waitPush(P, u, due, paid){ const w = P.w[u] || (P.w[u] = []); w.push([due, paid]); if (w.length > PAY_KEEP) w.shift(); }
 function payStep(P, snap, day, cash){
   const seed = !P.s;
   if (!P.f) P.f = {};
   if (!P.seen) P.seen = {};
+  if (!P.w) P.w = {};
+  // paid on the dashboard's trading day of the build (the last trades are in trading days too)
+  const tday = lastTradeOn({ day: snap.date }, day) || day;
   snap.flip.forEach(r => {
-    const t = tagOf(r.id), n = r.days ? r.days[0] : null, m = r.days ? r.days[1] : null, a = P.a[t];
-    if (!a){ const k0 = seed && m !== null && m > 4 ? 1 : 0; P.a[t] = [n, m, r.req ? 1 : 0, k0, day, k0, unit(r, false), 0]; return; }
+    const t = tagOf(r.id), n = r.days ? r.days[0] : null, m = r.days ? r.days[1] : null, a = P.a[t], lt = lastTradeOn(r, day);
+    if (!a){ const k0 = seed && m !== null && m > 4 ? 1 : 0; P.a[t] = [n, m, r.req ? 1 : 0, k0, day, k0, unit(r, false), 0, r.req || (n !== null && n >= m) ? lt || day : '', 0]; return; }
     a[4] = day;
-    if (r.req){ a[2] = 1; return; }
+    if (r.req){ if (a[9]) a[9][2] = 1; else if (!a[8]) a[8] = lt || day; a[2] = 1; return; }
     if (n === null) return;
-    if (a[0] !== null && n < a[0]) a[3]++;
+    if (a[0] !== null && n < a[0]){
+      a[3]++;
+      const due = a[8] || lt || day;
+      if (a[2] === 1) waitPush(P, a[6], due, tday); else a[9] = [due, tday, 0];
+      a[8] = '';
+    } else {
+      if (a[9] && a[2] === 1 && a[9][2]){ waitPush(P, a[6], a[9][0], tday); a[9] = 0; }
+      else if (a[9] && a[0] !== null && n > a[0]){ waitPush(P, a[6], a[9][0], a[9][1]); a[9] = 0; }
+      if (!a[8] && !a[9] && m !== null && n >= m) a[8] = lt || day;
+    }
     a[0] = n; a[1] = m; a[2] = 0;
   });
   P.s = 1;
@@ -226,8 +250,10 @@ function payStep(P, snap, day, cash){
 }
 function payPool(dir){
   const files = FLEETS.map(k => path.join(dir, k + '.json')), sts = files.map(f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e){ return null; } }), pool = {};
+  const wpool = {};
   sts.forEach(st => { if (st && st.pk && st.pk.f) Object.keys(st.pk.f).forEach(u => { pool[u] = (pool[u] || []).concat(st.pk.f[u]); }); });
-  sts.forEach((st, i) => { if (!st || !st.pk) return; if (JSON.stringify(st.pk.pool || {}) === JSON.stringify(pool)) return; st.pk.pool = pool; fs.writeFileSync(files[i], dump(st)); });
+  sts.forEach(st => { if (st && st.pk && st.pk.w) Object.keys(st.pk.w).forEach(u => { wpool[u] = (wpool[u] || []).concat(st.pk.w[u]); }); });
+  sts.forEach((st, i) => { if (!st || !st.pk) return; if (JSON.stringify(st.pk.pool || {}) === JSON.stringify(pool) && JSON.stringify(st.pk.wpool || {}) === JSON.stringify(wpool)) return; st.pk.pool = pool; st.pk.wpool = wpool; fs.writeFileSync(files[i], dump(st)); });
 }
 function openStep(O, n, day, firms){
   const up = !(O.days[day] >= n);
@@ -453,7 +479,7 @@ function main(){
       if (!sts[k].done){ console.log(k + ': the history does not reach the build read last: not written'); return; }
       fs.writeFileSync(path.join(dir, k + '.json'), dump(sts[k].st));
       if (mode === '--open'){ console.log(k + ': open evals ' + JSON.stringify(sts[k].st.open.days)); return; }
-      if (mode === '--pays'){ const P = sts[k].st.pk; console.log(k + ': payout days ' + P.d1 + ' then ' + P.d + ' | ' + Object.keys(P.a).length + ' accounts | first payouts ' + JSON.stringify(P.f)); return; }
+      if (mode === '--pays'){ const P = sts[k].st.pk; console.log(k + ': payout days ' + P.d1 + ' then ' + P.d + ' | ' + Object.keys(P.a).length + ' accounts | first payouts ' + JSON.stringify(P.f) + ' | waits ' + JSON.stringify(P.w)); return; }
       console.log(k + ': cash from ' + C.open + ' | received ' + C.sum[0] + ', spent ' + C.sum[1] + ' | ' + Object.keys(C.days).length + ' days');
     });
     if (mode === '--pays') payPool(dir);

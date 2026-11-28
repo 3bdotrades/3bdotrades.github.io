@@ -209,7 +209,7 @@ function params(r){
   var D = Math.min(30, Math.max(1, Math.round(num(r.payDays, 5))));
   return { pass: clamp01(r.pass), win: clamp01(r.win), tries: Math.min(10, Math.max(1, Math.round(num(r.tries, 2)))), q: clamp01(r.flip),
     D: D, D1: Math.min(30, Math.max(1, Math.round(num(r.payDays1, D)))), L: Math.min(60, Math.max(1, Math.round(num(r.lossDays, 20)))),
-    wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), chance: !!r.chance, odds: r.odds > 0 && r.odds < 1 ? Number(r.odds) : FUNDED_ODDS };
+    wd0: Math.max(0, Math.min(5, Math.round(num(r.wd0, 0)))), cal: Array.isArray(r.cal) && r.cal.length ? r.cal : null, chance: !!r.chance, odds: r.odds > 0 && r.odds < 1 ? Number(r.odds) : FUNDED_ODDS };
 }
 // ----- the eval stage -----
 // An eval trades one day at a time. A winning day is worth just over half of its target, because no day may be more than 50%
@@ -413,7 +413,16 @@ function lifeRoad(F){
 // 26 Nov 2026: 7, not 6. G1's three took 8, 7 and 6 trading days; V2's request of 17 Nov was still unpaid at the close of
 // 25 Nov, its sixth day.
 var PAY_WAIT_AT = { aqua: 7 };
-function payWait(firm){ return ownOf(PAY_WAIT_AT, normFirm(firm)) || 0; }
+// Since 28 Nov 2026 (the owner: "Yes, fix them", of the 7 here while V2's last two Aqua payouts took 8 and 9): a firm's wait is
+// the middle one of its real waits where the counter has PAY_MIN of them (pk.wpool: [due, paid] per payout, both fleets: due =
+// the last trade of the payout's last winning day, paid = the day the dashboard started its new count), in trading days.
+// PAY_WAIT_AT is what a firm with fewer takes.
+function payWait(firm){
+  var p = state.g1 && state.g1.kp, k = normFirm(firm), w = [];
+  if (p && p.wait) Object.keys(p.wait).forEach(function(u){ if (u.split('|')[0] === k) w = w.concat(p.wait[u]); });
+  if (w.length >= PAY_MIN){ w.sort(function(a, b){ return a - b; }); return w[Math.floor(w.length / 2)]; }
+  return ownOf(PAY_WAIT_AT, k) || 0;
+}
 // One road per set of flip numbers, kept: the pages' sizes share them from run to run.
 var ROADS = {}, ROADS_N = 0;
 function roadFor(F){
@@ -495,7 +504,9 @@ function simulateAll(firms, r, weeks, seats, days, plain){
 function simulateGroup(units, r, weeks, days){
   // the firm's evals: its pass rate (lower where three winning days are needed) and how long an eval lasts on average
   var P = params(r), c = fundedToProfit(P.win, P.tries), ev = evalOf(units[0], P), pc = ev.fresh.rate * c, H = Math.max(1, Math.round(ev.fresh.days));
-  var nDays = Math.max(1, days > 0 ? Math.min(Math.round(days), weeks * 5 - P.wd0) : weeks * 5 - P.wd0), LD = nDays + EVAL_MAX + P.tries + 8, capSum = 0;
+  // the run's trading days: from its calendar (P.cal: the week of each, market holidays left out), else 5 a week from P.wd0
+  var all = P.cal ? P.cal.filter(function(w){ return w < weeks; }).length : weeks * 5 - P.wd0;
+  var nDays = Math.max(1, days > 0 ? Math.min(Math.round(days), all) : all), LD = nDays + EVAL_MAX + P.tries + 8, capSum = 0;
   // a funded account that has lost a try already has one fewer left
   var triesLeft = Math.max(1, P.tries - 1), c1 = fundedToProfit(P.win, triesLeft), M = nDays + H + 2;
   // on: the run starts on the fleet's own trading day, so an account marked done (it has traded today) takes its next trade
@@ -672,7 +683,7 @@ function simulateGroup(units, r, weeks, days){
       var bought = u.buy + (d === 0 ? u.start0 : 0), evalCost = bought * u.price, actCost = u.act * u.actFee;
       // a monthly fee builds up a day at a time on every account held, trading or waiting
       var feeCost = u.monthly > 0 ? u.monthly * 12 / 260 * (u.trying + u.fc + u.pending + u.wait + u.waitFunded + u.waitOne + u.queue) : 0;
-      u.days.push({ d: d, w: Math.floor((P.wd0 + d) / 5), buy: bought, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost,
+      u.days.push({ d: d, w: P.cal ? P.cal[d] : Math.floor((P.wd0 + d) / 5), buy: bought, act: u.act, evalCost: evalCost, actCost: actCost, feeCost: feeCost, out: evalCost + actCost + feeCost,
                     inn: u.payAt[d], winning: u.fc, trying: u.trying, wait: u.wait + u.waitFunded + u.waitOne, occupied: u.trying + u.fc });
     });
   }
@@ -718,15 +729,20 @@ function monthlyUnits(firms, r, seats){
   var out = per.map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
   // and every week's net of the whole run, for the week it is running from (runningFrom)
   out.weeks = []; for (t = 0; t < W; t++){ var s = 0; per.forEach(function(p){ s += p.rows[t].inn - p.rows[t].out; }); out.weeks.push(s); }
+  // and each week's trading days (a week with a market holiday has four)
+  var P = params(r); out.open = []; for (t = 0; t < W; t++) out.open.push(P.cal ? P.cal.filter(function(w){ return w === t; }).length : t === 0 ? 5 - P.wd0 : 5);
   return out;
 }
 // The week the plan is running from. The owner, 28 Nov 2026: "i need above once running to put a date to tell me in this day u
 // net = that". The first full week whose net reaches the Once running month as a week (12/52 of it), with no RUN_SPAN weeks
 // from then on under RUN_HOLD of that on average. (Single weeks of the long run wander about 10% either side of it, so a rule
-// on single weeks put the date anywhere from December to next September with the same plan.) -1: none, or nothing to reach.
+// on single weeks put the date anywhere from December to next September with the same plan.) Weeks are taken a trading day at
+// a time (open: a week's trading days): a week with a market holiday nets a fifth less without being any less running.
+// -1: none, or nothing to reach.
 var RUN_HOLD = 0.9, RUN_SPAN = 4;
-function runningFrom(weeks, run, wd0){
+function runningFrom(weeks, run, wd0, open){
   var pace = run * 12 / 52, ok = -1, n = weeks ? weeks.length : 0; if (!(pace > 0) || n < RUN_SPAN) return -1;
+  weeks = weeks.map(function(v, t){ var o = open && open[t] > 0 ? open[t] : 5; return v * 5 / o; });
   for (var t = n - RUN_SPAN; t >= (wd0 > 0 ? 1 : 0); t--){
     var s = 0; for (var u = t; u < t + RUN_SPAN; u++) s += weeks[u];
     if (s / RUN_SPAN < RUN_HOLD * pace) break;
@@ -1363,7 +1379,7 @@ function shareEdit(){
 function chanceRates(fleet){
   var odds = fundedOdds(fleet);
   return { pass: evalRoad(EVAL_WIN, evalOdds(''), 0, false).rate, win: odds, odds: odds, flip: flipOdds('', '50K'), flip25: flipOdds('', '25K'), chance: true,
-    tries: FIXED.tries, payDays1: payRule().d1, payDays: payRule().d, lossDays: FIXED.lossDays, wd0: WD0 };
+    tries: FIXED.tries, payDays1: payRule().d1, payDays: payRule().d, lossDays: FIXED.lossDays, wd0: WD0, cal: planCal() };
 }
 // The rates a run takes: the live ones, as the page shows them. Funded win becomes the chance per trade p:
 // an account with FIXED.tries trades at it reaches profit with 1 - (1 - p)^tries. odds = the odds of the funded trade that
@@ -1373,7 +1389,7 @@ function fracRates(){
   if (!r) return null;
   RATE_KEYS.forEach(function(k){ f[k] = r[k] / 100; });
   return { pass: f.pass, win: 1 - Math.pow(1 - clamp01(f.win), 1 / FIXED.tries), odds: fundedOdds(FLEET.key), flip: f.flip, flip25: f.flip25,
-    tries: FIXED.tries, payDays1: payRule().d1, payDays: payRule().d, lossDays: FIXED.lossDays, wd0: WD0 };
+    tries: FIXED.tries, payDays1: payRule().d1, payDays: payRule().d, lossDays: FIXED.lossDays, wd0: WD0, cal: planCal() };
 }
 // a 25K account flips the 25K box: its row takes that rate. On chance alone every row has the odds of its own flip day.
 function boxed(f, rr){
@@ -1386,7 +1402,32 @@ function boxed(f, rr){
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function mondayOf(d){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
 var START = mondayOf(new Date());
-var WD0 = (function(d){ return d === 0 || d === 6 ? 5 : d - 1; })(new Date().getDay());
+// The days the futures markets are shut all day (CME's index futures, which the fleets trade). The owner, 28 Nov 2026: "Yes, fix
+// them" (the plan counted Christmas and New Year as trading days). A shortened session (Thanksgiving, the eves) is a trading day:
+// the fleets traded on Thanksgiving, 26 Nov 2026. A weekday here is not a trading day: no eval, flip or payout day falls on it.
+var CLOSED = { '2026-12-25': 1, '2027-01-01': 1, '2027-03-26': 1, '2027-12-24': 1, '2028-04-14': 1, '2028-12-25': 1 };
+function dayKeyOf(d){ return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function isOpen(d){ var w = d.getDay(); return w > 0 && w < 6 && !CLOSED[dayKeyOf(d)]; }
+// the trading days after date a, up to and with date b ('YYYY-MM-DD')
+function openBetween(a, b){
+  var p = String(a).split('-'), q = String(b).split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]), e = new Date(+q[0], +q[1] - 1, +q[2]), n = 0;
+  if (!(d.getTime() > 0) || !(e.getTime() > 0)) return null;
+  for (d.setDate(d.getDate() + 1); d <= e && n < 400; d.setDate(d.getDate() + 1)) if (isOpen(d)) n++;
+  return n;
+}
+// A run's trading days from its first one (first: a date), with the week of each, counted from the Monday from: the plan's week
+// t is the t-th week after the Monday of this week. Kept per start.
+var CALS = {}, CAL_WEEKS = 80;
+function calendar(from, first){
+  var key = dayKeyOf(from) + '|' + dayKeyOf(first); if (CALS[key]) return CALS[key];
+  var out = [], d = new Date(first.getFullYear(), first.getMonth(), first.getDate()), end = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 7 * CAL_WEEKS);
+  for (; d < end; d.setDate(d.getDate() + 1)) if (isOpen(d)) out.push(Math.floor(Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - from) / 864e5) / 7));
+  return (CALS[key] = out);
+}
+// at a weekend or on a day the market is shut the plan starts on the next trading day (WD0 = 5: as at a weekend)
+var WD0 = (function(t){ var d = t.getDay(); return d === 0 || d === 6 || !isOpen(t) ? 5 : d - 1; })(new Date());
+// the plan's own trading days: from today, or from the next trading day
+function planCal(){ var t = new Date(), d = new Date(t.getFullYear(), t.getMonth(), t.getDate()); while (!isOpen(d)) d.setDate(d.getDate() + 1); return calendar(START, d); }
 // The plan starts on this browser's today. When the dashboard's trading day is that same day, an account that has already
 // traded today takes its next trade tomorrow (see planFirms and simulateGroup). On any other day every account trades on the
 // plan's first day: in the hour after midnight here the fleet's day has not rolled yet (18:00 ET), at a weekend the plan
@@ -1409,11 +1450,12 @@ function lateShare(){
 function weekStart(t){ var d = new Date(START.getTime()); d.setDate(d.getDate() + 7 * t); return d; }
 function dShort(d){ return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
 // at a weekend the first day of the plan is Monday
-var BUY_K = WD0 === 5 ? 'Buy Monday ' + dShort(weekStart(1)) : 'Buy today', BUY_DAY = WD0 === 5 ? 'Monday' : 'today';
+var BUY_FIRST = (function(){ var t = new Date(), d = new Date(t.getFullYear(), t.getMonth(), t.getDate()); while (!isOpen(d)) d.setDate(d.getDate() + 1); return d; })();
+var BUY_K = WD0 === 5 ? 'Buy ' + WEEKDAY[BUY_FIRST.getDay()] + ' ' + dShort(BUY_FIRST) : 'Buy today', BUY_DAY = WD0 === 5 ? WEEKDAY[BUY_FIRST.getDay()] : 'today';
 // the 5 trading days "Next week" adds up on G1 and V2 (NEXT_WEEK), from the plan's first day: "Mon 23 – Fri 27 Nov"
 var WEEK_SAID = (function(){
   var d = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()), a = [];
-  while (a.length < 5){ if (d.getDay() > 0 && d.getDay() < 6) a.push(new Date(d.getTime())); d.setDate(d.getDate() + 1); }
+  while (a.length < 5){ if (isOpen(d)) a.push(new Date(d.getTime())); d.setDate(d.getDate() + 1); }
   return WEEKDAY[a[0].getDay()] + ' ' + a[0].getDate() + (a[0].getMonth() === a[4].getMonth() ? '' : ' ' + MONTHS[a[0].getMonth()]) + ' – ' + WEEKDAY[a[4].getDay()] + ' ' + dShort(a[4]);
 })();
 var WEEK_K = 'Buy next week';
@@ -1692,7 +1734,10 @@ function payKept(p){
   Object.keys(ps).forEach(function(u){ var v = ps[u], a = Array.isArray(v) ? v.filter(function(x){ return num(x, 0) > 0; }) : null;
     if (a && a.length) pay[u] = { mean: a.reduce(function(x, y){ return x + num(y, 0); }, 0) / a.length, n: a.length };
     else if (v && num(v.mean, 0) > 0 && num(v.n, 0) > 0) pay[u] = { mean: num(v.mean, 0), n: Math.round(num(v.n, 0)) }; });
-  return { d1: payDaysOk(p.d1), d: payDaysOk(p.d), k: k, pay: pay };
+  // what each payout waited, in trading days (from the counter's [due, paid] dates; as kept here: wait)
+  var wait = {}, ws = p.wait && typeof p.wait === 'object' ? p.wait : p.wpool && typeof p.wpool === 'object' ? p.wpool : p.w && typeof p.w === 'object' ? p.w : {};
+  Object.keys(ws).forEach(function(u){ var a = (Array.isArray(ws[u]) ? ws[u] : []).map(function(x){ return Array.isArray(x) ? openBetween(x[0], x[1]) : num(x, -1); }).filter(function(n){ return n !== null && n >= 0 && n <= 30; }); if (a.length) wait[u] = a; });
+  return { d1: payDaysOk(p.d1), d: payDaysOk(p.d), k: k, pay: pay, wait: wait };
 }
 // A size's first payout: what its firm's first payouts really brought, where there are PAY_MIN of them and they are more than
 // PAY_BAND off the owner's (the owner, 28 Nov 2026: "Use real averages", Lucid then $1,537 and Topstep $1,463 against $1,782 and
@@ -1726,7 +1771,7 @@ function planFirms(rr, all){
 // 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
 function outcome(rr, all){
   var firms = planFirms(rr, all), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
-  res.runs = monthlyUnits(firms, rr, cap); res.run = res.runs.reduce(function(a, b){ return a + b; }, 0); res.runFrom = runningFrom(res.runs.weeks, res.run, rr.wd0);
+  res.runs = monthlyUnits(firms, rr, cap); res.run = res.runs.reduce(function(a, b){ return a + b; }, 0); res.runFrom = runningFrom(res.runs.weeks, res.run, rr.wd0, res.runs.open);
   // the evals to buy: on the plan's first day, or with NEXT_WEEK on its first 5 trading days added up
   var span = NEXT_WEEK ? 5 : 1;
   res.buy = 0; res.cost = 0; res.per.forEach(function(p){ for (var d = 0; d < span; d++) if (p.days[d]){ res.buy += p.days[d].buy; res.cost += p.days[d].evalCost; } });
@@ -1750,7 +1795,7 @@ function freshWeeks(){ var p = FRESH_FROM.split('-'); return Math.max(0, Math.ro
 function freshEvals(){ var v = NaN; try { v = +localStorage.getItem(FRESH_KEY); } catch (e) {} return v >= 1 && v <= FRESH_MAX ? Math.round(v) : FRESH_DEF; }
 function freshStart(){
   if (FIVE || (FLEET.key !== 'g1' && FLEET.key !== 'v2')) return null;
-  var cr = chanceRates(FLEET.key), firms = []; cr.wd0 = 0;
+  var cr = chanceRates(FLEET.key), firms = [], fp = FRESH_FROM.split('-'), f0 = mondayOf(new Date(+fp[0], +fp[1] - 1, +fp[2])); cr.wd0 = 0; cr.cal = calendar(f0, f0);
   FRESH_FIRMS.forEach(function(k){
     var f = state.firms.filter(function(x){ return normFirm(x.firm) === k && sizeNum(x.size) === 50; })[0]; if (!f) return;
     var x = clone(f); Object.keys(x).forEach(function(q){ if (q.slice(0, 2) === 'g1') delete x[q]; });
@@ -2598,7 +2643,7 @@ function parseG1(html, K){
     var m = /^(\d\d)-(\d\d)/.exec(String(c[5] || '')); if (!m || !td) return null;
     var y = new Date().getFullYear(), b = Date.UTC(y, td.m - 1, td.d), a = Date.UTC(y, +m[1] - 1, +m[2]), n = 0;
     if (a > b) a = Date.UTC(y - 1, +m[1] - 1, +m[2]);
-    for (var t = a + 864e5; t <= b && n < 60; t += 864e5){ var wd = new Date(t).getUTCDay(); if (wd !== 0 && wd !== 6) n++; }
+    for (var t = a + 864e5; t <= b && n < 60; t += 864e5){ var x = new Date(t), wd = x.getUTCDay(), k = x.getUTCFullYear() + '-' + ('0' + (x.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + x.getUTCDate()).slice(-2); if (wd !== 0 && wd !== 6 && !CLOSED[k]) n++; }
     return n;
   }
   function unit(firmText, size){
