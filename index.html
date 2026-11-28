@@ -721,12 +721,17 @@ function monthlyUnits(firms, r, seats){
   return out;
 }
 // The week the plan is running from. The owner, 28 Nov 2026: "i need above once running to put a date to tell me in this day u
-// net = that". The first full week whose net reaches the Once running month as a week (12/52 of it), with no later week of the
-// long run under RUN_HOLD of that. -1: none, or nothing to reach.
-var RUN_HOLD = 0.9;
+// net = that". The first full week whose net reaches the Once running month as a week (12/52 of it), with no RUN_SPAN weeks
+// from then on under RUN_HOLD of that on average. (Single weeks of the long run wander about 10% either side of it, so a rule
+// on single weeks put the date anywhere from December to next September with the same plan.) -1: none, or nothing to reach.
+var RUN_HOLD = 0.9, RUN_SPAN = 4;
 function runningFrom(weeks, run, wd0){
-  var pace = run * 12 / 52, ok = -1; if (!(pace > 0) || !weeks || !weeks.length) return -1;
-  for (var t = weeks.length - 1; t >= (wd0 > 0 ? 1 : 0); t--){ if (weeks[t] < RUN_HOLD * pace) break; if (weeks[t] >= pace) ok = t; }
+  var pace = run * 12 / 52, ok = -1, n = weeks ? weeks.length : 0; if (!(pace > 0) || n < RUN_SPAN) return -1;
+  for (var t = n - RUN_SPAN; t >= (wd0 > 0 ? 1 : 0); t--){
+    var s = 0; for (var u = t; u < t + RUN_SPAN; u++) s += weeks[u];
+    if (s / RUN_SPAN < RUN_HOLD * pace) break;
+    if (weeks[t] >= pace) ok = t;
+  }
   return ok;
 }
 
