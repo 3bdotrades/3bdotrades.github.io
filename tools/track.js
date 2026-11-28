@@ -48,7 +48,7 @@ const fs = require('fs'), path = require('path'), crypto = require('crypto'), cp
 const FLEETS = ['g1', 'v2'], KEYS = ['pass', 'win', 'flip', 'flip25'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', times: '×', minus: '-' };
-const OTHERS = ['rm'], FULL_LIST = 7, KEEP_SEEN_DAYS = 120, KEEP_OPEN_DAYS = 40, KEEP_BOUGHT_DAYS = 14, KEEP_PAY_DAYS = 30;
+const OTHERS = ['rm'], FULL_LIST = 7, KEEP_SEEN_DAYS = 120, KEEP_OPEN_DAYS = 40, KEEP_BOUGHT_DAYS = 14, KEEP_PAY_DAYS = 30, PAY_KEEP = 12;
 const KEEP_GONE_DAYS = 10, LOG_LINES = 400, MARK_LINES = 400, SAVE_EVERY = 200;
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -116,7 +116,7 @@ function cashOf(html, k, built){
       let y = Number(day.slice(0, 4)), date = y + '-' + ('0' + (mon + 1)).slice(-2) + '-' + ('0' + dm[1]).slice(-2);
       if (date > day) date = (y - 1) + date.slice(4);
       const id = x[1] + '|' + date + '|' + text(tx) + '|' + amt.toFixed(2); n[id] = (n[id] || 0) + 1;
-      o[x[2]].push({ d: date, h: key(id + '|' + n[id]), amt: amt });
+      o[x[2]].push({ d: date, h: key(id + '|' + n[id]), amt: amt, tx: text(tx) });
       return '';
     });
   });
@@ -184,17 +184,24 @@ function buyStep(O, snap, day){
 // An account new in the flips has had none (it has just won its funded trade); only on the first build read (pk.s = 0) are
 // they older accounts, told by the count of then (4 before the first payout, 5 after). pk.d1, pk.d = the count most accounts
 // show before their first payout and after one, as the rows show them now.
+// What a payout brought (the owner, 28 Nov 2026, of the plan's $1,782 for a first payout where Lucid paid $1,537 and Topstep $1,463
+// on average: "Use real averages"): a line of the Cash box's Received list that names an account in the flips is that account's
+// payout. Each account also keeps the payouts it was seen with first (k0) and its firm and size, and how many Received lines
+// have named it; the first line of one seen from before its first payout is its first payout. pk.f = { firm|size: what the
+// last PAY_KEEP first payouts brought }, pk.seen = the lines read. pk.pool = both fleets' pk.f together (a firm pays alike).
 function tagOf(id){
   const s = String(id || '').trim().replace(/\s+/g, ' '); let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return ('0000000' + h.toString(16)).slice(-8);
 }
 function payNew(){ return { d1: 4, d: 5, s: 0, a: {} }; }
-function payStep(P, snap, day){
+function payStep(P, snap, day, cash){
   const seed = !P.s;
+  if (!P.f) P.f = {};
+  if (!P.seen) P.seen = {};
   snap.flip.forEach(r => {
     const t = tagOf(r.id), n = r.days ? r.days[0] : null, m = r.days ? r.days[1] : null, a = P.a[t];
-    if (!a){ P.a[t] = [n, m, r.req ? 1 : 0, seed && m !== null && m > 4 ? 1 : 0, day]; return; }
+    if (!a){ const k0 = seed && m !== null && m > 4 ? 1 : 0; P.a[t] = [n, m, r.req ? 1 : 0, k0, day, k0, unit(r, false), 0]; return; }
     a[4] = day;
     if (r.req){ a[2] = 1; return; }
     if (n === null) return;
@@ -202,11 +209,25 @@ function payStep(P, snap, day){
     a[0] = n; a[1] = m; a[2] = 0;
   });
   P.s = 1;
+  // the Received lines not read yet: the account it names (its number, or the end of it), among the accounts listed now
+  if (cash) cash.pays.forEach(it => {
+    if (P.seen[it.h]) return; P.seen[it.h] = day;
+    const last = String(it.tx || '').trim().split(' ').pop(); if (last.length < 5) return;
+    const r = snap.flip.find(x => x.id === last || x.id.indexOf(last) >= 0 || last.indexOf(x.id) >= 0), a = r && P.a[tagOf(r.id)]; if (!a || a.length < 8) return;
+    a[7]++;
+    if (a[5] === 0 && a[7] === 1){ const f = P.f[a[6]] || (P.f[a[6]] = []); f.push(Math.round(it.amt * 100) / 100); if (f.length > PAY_KEEP) f.shift(); }
+  });
+  Object.keys(P.seen).forEach(h => { if (dayNo(day) - dayNo(P.seen[h]) > KEEP_SEEN_DAYS) delete P.seen[h]; });
   // the counts the rows show now: the one most of them show, before a first payout and after one
   const most = (x) => { let b = null, bn = 0; Object.keys(x).forEach(m => { if (x[m] > bn){ b = +m; bn = x[m]; } }); return b; }, c0 = {}, c1 = {};
   snap.flip.forEach(r => { if (!r.days) return; const a = P.a[tagOf(r.id)], c = a[3] ? c1 : c0; c[r.days[1]] = (c[r.days[1]] || 0) + 1; });
   if (most(c0)) P.d1 = most(c0); if (most(c1)) P.d = most(c1);
   Object.keys(P.a).forEach(t => { if (dayNo(day) - dayNo(P.a[t][4]) > KEEP_PAY_DAYS) delete P.a[t]; });
+}
+function payPool(dir){
+  const files = FLEETS.map(k => path.join(dir, k + '.json')), sts = files.map(f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e){ return null; } }), pool = {};
+  sts.forEach(st => { if (st && st.pk && st.pk.f) Object.keys(st.pk.f).forEach(u => { pool[u] = (pool[u] || []).concat(st.pk.f[u]); }); });
+  sts.forEach((st, i) => { if (!st || !st.pk) return; if (JSON.stringify(st.pk.pool || {}) === JSON.stringify(pool)) return; st.pk.pool = pool; fs.writeFileSync(files[i], dump(st)); });
 }
 function openStep(O, n, day, firms){
   const up = !(O.days[day] >= n);
@@ -422,7 +443,7 @@ function main(){
       let html = ''; try { html = page(dash, b.sha); } catch (e) {}
       live.forEach(k => {
         if (mode === '--cash'){ const c = html && cashOf(html, k, b.built); if (c) cashStep(sts[k].st.cash, c, nyDate(b.built)); }
-        else if (mode === '--pays'){ const snap = html && read(html, k, b.built); if (snap) payStep(sts[k].st.pk, snap, nyDate(b.built)); }
+        else if (mode === '--pays'){ const snap = html && read(html, k, b.built); if (snap) payStep(sts[k].st.pk, snap, nyDate(b.built), cashOf(html, k, b.built)); }
         else { const snap = html && read(html, k, b.built); if (snap){ openStep(sts[k].st.open, openOf(snap), nyDate(b.built), firmsOf(snap)); buyStep(sts[k].st.open, snap, nyDate(b.built)); } }
         if (b.sha === sts[k].st.at) sts[k].done = true;
       });
@@ -432,9 +453,10 @@ function main(){
       if (!sts[k].done){ console.log(k + ': the history does not reach the build read last: not written'); return; }
       fs.writeFileSync(path.join(dir, k + '.json'), dump(sts[k].st));
       if (mode === '--open'){ console.log(k + ': open evals ' + JSON.stringify(sts[k].st.open.days)); return; }
-      if (mode === '--pays'){ const P = sts[k].st.pk; console.log(k + ': payout days ' + P.d1 + ' then ' + P.d + ' | ' + Object.keys(P.a).length + ' accounts | ' + JSON.stringify(P.a)); return; }
+      if (mode === '--pays'){ const P = sts[k].st.pk; console.log(k + ': payout days ' + P.d1 + ' then ' + P.d + ' | ' + Object.keys(P.a).length + ' accounts | first payouts ' + JSON.stringify(P.f)); return; }
       console.log(k + ': cash from ' + C.open + ' | received ' + C.sum[0] + ', spent ' + C.sum[1] + ' | ' + Object.keys(C.days).length + ' days');
     });
+    if (mode === '--pays') payPool(dir);
     return;
   }
   for (const k of FLEETS){
@@ -457,7 +479,7 @@ function main(){
     let unread = 0;
     for (const b of list){
       const snap = read(shown(b.sha), k, b.built);
-      if (snap){ st = step(st, snap, b); delete st.unread; if (st.open){ openStep(st.open, openOf(snap), nyDate(b.built), firmsOf(snap)); buyStep(st.open, snap, nyDate(b.built)); } if (st.pk) payStep(st.pk, snap, nyDate(b.built)); }
+      if (snap){ st = step(st, snap, b); delete st.unread; if (st.open){ openStep(st.open, openOf(snap), nyDate(b.built), firmsOf(snap)); buyStep(st.open, snap, nyDate(b.built)); } if (st.pk) payStep(st.pk, snap, nyDate(b.built), cashOf(shown(b.sha), k, b.built)); }
       else { unread++; if (st && !st.unread) st.unread = b.built; }
       // the cash box is read on its own: a build whose tables cannot be trusted still shows it
       if (st && st.cash){ const c = cashOf(shown(b.sha), k, b.built); if (c) cashStep(st.cash, c, nyDate(b.built)); }

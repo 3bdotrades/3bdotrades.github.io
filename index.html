@@ -1687,7 +1687,22 @@ function payKept(p){
   if (!p || typeof p !== 'object') return null;
   var src = p.a && typeof p.a === 'object' ? p.a : p.k && typeof p.k === 'object' ? p.k : null; if (!src) return null;
   var k = {}; Object.keys(src).forEach(function(t){ var v = Array.isArray(src[t]) ? src[t][3] : src[t]; if (/^[0-9a-f]{8}$/.test(t) && num(v, -1) >= 0) k[t] = Math.round(num(v, 0)); });
-  return { d1: payDaysOk(p.d1), d: payDaysOk(p.d), k: k };
+  // what first payouts brought, by firm and size (both fleets: pool, else this fleet's f; as kept here: pay)
+  var pay = {}, ps = p.pay && typeof p.pay === 'object' ? p.pay : p.pool && typeof p.pool === 'object' ? p.pool : p.f && typeof p.f === 'object' ? p.f : {};
+  Object.keys(ps).forEach(function(u){ var v = ps[u], a = Array.isArray(v) ? v.filter(function(x){ return num(x, 0) > 0; }) : null;
+    if (a && a.length) pay[u] = { mean: a.reduce(function(x, y){ return x + num(y, 0); }, 0) / a.length, n: a.length };
+    else if (v && num(v.mean, 0) > 0 && num(v.n, 0) > 0) pay[u] = { mean: num(v.mean, 0), n: Math.round(num(v.n, 0)) }; });
+  return { d1: payDaysOk(p.d1), d: payDaysOk(p.d), k: k, pay: pay };
+}
+// A size's first payout: what its firm's first payouts really brought, where there are PAY_MIN of them and they are more than
+// PAY_BAND off the owner's (the owner, 28 Nov 2026: "Use real averages", Lucid then $1,537 and Topstep $1,463 against $1,782 and
+// $1,770; Aqua's $1,770 is the owner's within a dollar a payout, so it keeps his). As pay1 the plan takes it as a payout with room.
+var PAY_MIN = 3, PAY_BAND = 0.05;
+function payFirst(f){
+  var own = Math.max(0, num(f.pay1, 0)), p = state.g1 && state.g1.kp, m = p && p.pay ? p.pay[normFirm(f.firm) + '|' + sizeNum(f.size)] : null;
+  if (!m || m.n < PAY_MIN || !(own > 0)) return own;
+  var fee = Math.max(0, num(PAY_FIXED[normFirm(f.firm)], 0)), cut = fee > 0 ? 0 : PAY_FEE, plan = (1 - cut) * own - fee;
+  return Math.abs(m.mean - plan) <= PAY_BAND * plan ? own : Math.max(0, (m.mean + fee) / (1 - cut));
 }
 function payRule(){ var p = state.g1 && state.g1.kp; return { d1: p && p.d1 ? p.d1 : FIXED.payDays1, d: p && p.d ? p.d : FIXED.payDays }; }
 // (an account the counter has not listed yet came into the flips since its last read: it has just won its funded trade)
@@ -1700,6 +1715,7 @@ function planFirms(rr, all){
   var on = dayOn(), late = on ? lateShare() : 0;
   return state.firms.map(function(f){
     var x = boxed(clone(f), rr);
+    x.pay1 = payFirst(f);
     if (Array.isArray(x.g1Flips)) x.g1Flips.forEach(function(z){ if (z){ var p = paidOf(z.tag); if (p !== undefined) z.paid = p; } });
     x.firmCap = slotsAt(normFirm(f.firm)); x.slots = slotsAt(unitKey(f));
     x.idle = idleOf(f); x.dayOn = on; x.lateShare = late;
@@ -1738,7 +1754,7 @@ function freshStart(){
   FRESH_FIRMS.forEach(function(k){
     var f = state.firms.filter(function(x){ return normFirm(x.firm) === k && sizeNum(x.size) === 50; })[0]; if (!f) return;
     var x = clone(f); Object.keys(x).forEach(function(q){ if (q.slice(0, 2) === 'g1') delete x[q]; });
-    x.openEvals = 0; x.passedNow = 0; x.fundedNow = 0; x.inProfitNow = 0; x.idle = 0; x = boxed(x, cr);
+    x.openEvals = 0; x.passedNow = 0; x.fundedNow = 0; x.inProfitNow = 0; x.idle = 0; x.pay1 = payFirst(f); x = boxed(x, cr);
     x.firmCap = FRESH_SLOTS; x.slots = FRESH_SLOTS; x.dayOn = false; x.lateShare = 0; delete x.skip;
     firms.push(x);
   });
