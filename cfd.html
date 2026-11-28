@@ -454,6 +454,12 @@ function vestFeed(o, size, price, next){
   var rc = o.counts.received, rv = rc && typeof rc === 'object' ? rc[size] : undefined;      // Received: only a feed that reads payouts has it
   if (rv !== undefined && (typeof rv !== 'number' || !isFinite(rv) || rv < 0 || rv > 1e8)) return null;
   var res = { evals: out.evals, funded: out.funded, paid: Math.round(out.bought * price * 100) / 100, recv: rv === undefined ? null : Math.round(rv * 100) / 100, at: o.at };
+  // the evals the bot has finished, every size of the firm (the blend: vestBlend); none where the feed does not count them
+  var pz = o.counts.passed, fz = o.counts.failed, pn = 0, fn = 0;
+  if (pz && fz && typeof pz === 'object' && typeof fz === 'object'){
+    Object.keys(pz).forEach(function(k){ var a = pz[k], c = fz[k]; if (typeof a === 'number' && typeof c === 'number' && a >= 0 && c >= 0 && a === Math.floor(a) && c === Math.floor(c) && a + c <= 5000){ pn += a; fn += c; } });
+    res.real = { passed: pn, done: pn + fn };
+  }
   if (next) {                                 // the bigger build's accounts beside them: their counts, their fees in Paid, their payouts in Received
     var two = vestFeed(o, next.size, next.price);
     if (!two) return null;
@@ -473,8 +479,27 @@ function vestClean(o){
   });
   return p;
 }
+// The bot's own evals (the owner, 28 Nov 2026, "Blend, then real", when the bot had passed 4 of 19 against the plan's 32.0%): the
+// plan's eval pass rate is the build's kept one (stat) counted as PASS_PRIOR evals beside the real ones the feed has finished
+// (passed and failed, every size of the firm), so it moves to the real rate as they come in. Its trades keep their odds; an eval
+// trade takes a factor (a lift) found so that the build passes at that rate. Funded accounts keep their kept figures.
+var PASS_PRIOR = 20, liftMemo = {};
+function vestBlend(b, real){ return real && real.done > 0 ? (b.stat[0] * PASS_PRIOR + real.passed) / (PASS_PRIOR + real.done) : b.stat[0]; }
+function vestLiftFor(b, rate){
+  var key = b.name + '|' + rate.toFixed(5); if (liftMemo[key]) return liftMemo[key];
+  var lo = 0.2, hi = 1.5;
+  for (var i = 0; i < 16; i++){ var m = (lo + hi) / 2, r = vestBuild(Object.assign({}, b, { lift: [m, 1], next: null }), 60000).pass; if (r > rate) hi = m; else lo = m; }
+  return (liftMemo[key] = (lo + hi) / 2);
+}
+// the build as the plan takes it: with its blended rate (and its bigger build's) where the bot has finished evals
+function vestReal(b, real){
+  if (!real || !(real.done > 0) || b.go) return b;
+  var out = Object.assign({}, b, { lift: [vestLiftFor(b, vestBlend(b, real)), 1] });
+  if (b.next) out.next = Object.assign({}, b.next, { lift: [vestLiftFor(b.next, vestBlend(b.next, real)), 1] });
+  return out;
+}
 // ---------- VEST ENGINE END ----------
-if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestFeed: vestFeed, FEED_URL: FEED_URL, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, TWO: TWO, LIFT: LIFT, BEST: BEST, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'cfd', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED, CLOSED: CLOSED, vCal: vCal, vRunFrom: vRunFrom, DAYS: DAYS };
+if (typeof module !== 'undefined') module.exports = { BUILDS: BUILDS, vestFeed: vestFeed, FEED_URL: FEED_URL, vestTwin: vestTwin, JJ_GO: JJ_GO, GO: GO, FRR: FRR, STOP: STOP, vestSpec: vestSpec, vestBuild: vestBuild, vestStat: vestStat, vestPlan: vestPlan, vestClean: vestClean, vestStep: vestStep, vestNew: vestNew, PAIR_OPP: PAIR_OPP, PAIRS: PAIRS, LEAN: LEAN, HOME: HOME, TWO: TWO, LIFT: LIFT, BEST: BEST, SHOW_PROGS: SHOW_PROGS, MARKET: MARKET, FIRM: 'cfd', WEEKS: WEEKS, RUNS: RUNS, VEST_SEED: VEST_SEED, vestBlend: vestBlend, vestLiftFor: vestLiftFor, vestReal: vestReal, PASS_PRIOR: PASS_PRIOR, CLOSED: CLOSED, vCal: vCal, vRunFrom: vRunFrom, DAYS: DAYS };
 if (typeof document !== 'undefined') (function(){
   'use strict';
   if (HOME) { location.replace(HOME); return; }
@@ -491,7 +516,7 @@ if (typeof document !== 'undefined') (function(){
   function cents(v){ return '$' + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function evPct(roi){ var v = Math.round((roi - 1) * 100); return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + '%'; }
   function tone(el, v){ el.className = 'v ' + (v > 0.5 ? 'pos' : v < -0.5 ? 'neg' : ''); }
-  var PICK = BUILDS[0], stats = BUILDS.map(vestStat);
+  var PICK = BUILDS[0], stats = BUILDS.map(vestStat), REAL = null, realStat = null;
 
   // the page's views (BEST: Plan / Best programs) and, with TWO, its two profiles side by side
   if (BEST) {
@@ -522,8 +547,9 @@ if (typeof document !== 'undefined') (function(){
   if (FRAMED) window.addEventListener('resize', sayHeight);
   if (LIFT) { $('lg-alt').hidden = false; $('lg-alt-t').textContent = LIFT.name; $('lg-alt').title = LIFT.says; }
   function drawStatic(){
-    var st = stats[0], s = st.spec, rs = PICK.next ? vestStat(PICK.next) : st;      // the rates of the eval bought from now on
+    var st = stats[0], s = st.spec, rs = realStat || (PICK.next ? vestStat(PICK.next) : st);      // the rates of the eval bought from now on (with the bot's own evals: realStat)
     $('r-pass').textContent = (rs.pass * 100).toFixed(1);
+    var kb = PICK.next || PICK; $('r-pass').parentNode.title = REAL && REAL.done > 0 ? 'The kept ' + (kb.stat[0] * 100).toFixed(1) + '% counted as ' + PASS_PRIOR + ' evals beside the bot\'s own: ' + REAL.passed + ' passed of ' + REAL.done + ' finished. It moves to the bot\'s own rate as more finish.' : '';
     $('r-fund').textContent = money(rs.funded);
     $('r-ev').textContent = signed(rs.ev); tone($('r-ev'), rs.ev);
     $('r-roi').innerHTML = evPct(rs.roi) + ' <small>$' + rs.roi.toFixed(2) + ' per $1</small>'; tone($('r-roi'), (rs.roi - 1) * 100);
@@ -654,7 +680,7 @@ if (typeof document !== 'undefined') (function(){
   $('chart').addEventListener('pointerdown', onPoint);
   $('chart').addEventListener('pointerleave', hideTip);
   function update(){
-    var res = vestPlan(PICK, state, PAIRS ? PAIR_OPP : 0, RUNS, PICK.weeks || WEEKS), single = PAIRS ? vestPlan(PICK, state, 0, RUNS, WEEKS) : res;
+    var PL = vestReal(PICK, REAL), res = vestPlan(PL, state, PAIRS ? PAIR_OPP : 0, RUNS, PICK.weeks || WEEKS), single = PAIRS ? vestPlan(PL, state, 0, RUNS, WEEKS) : res;
     $('t-buy').innerHTML = res.buy ? res.buy + (PICK.next ? ' × ' + (res.buySize / 1000) + 'K' : '') + ' evals <small>' + money(res.cost) + '</small>' : '0 evals';
     $('t-need').innerHTML = money(res.wallet) + ' <small>wallet 99%</small>';
     $('t-need2').innerHTML = '<small>' + money(res.need) + ' expected</small>';
@@ -721,6 +747,7 @@ if (typeof document !== 'undefined') (function(){
     if (!f) return;
     var n = vestClean({ seats: state.seats, evals: f.evals, funded: f.funded, evals2: two ? f.evals2 : state.evals2, funded2: two ? f.funded2 : state.funded2, price: state.price, paid: f.paid, recv: f.recv === null ? state.recv : f.recv, pays: state.pays });
     var moved = n.evals2 !== state.evals2 || n.funded2 !== state.funded2 || n.evals !== state.evals || n.funded !== state.funded || n.paid !== state.paid || n.recv !== state.recv;
+    if (f.real && (!REAL || f.real.passed !== REAL.passed || f.real.done !== REAL.done)){ REAL = f.real.done > 0 ? f.real : null; var pb = vestReal(PICK, REAL); realStat = REAL ? vestBuild(pb.next || pb, 100000) : null; moved = true; }
     state = n;
     ['evals', 'funded', 'paid'].concat(two ? ['evals2', 'funded2'] : []).concat(f.recv === null ? [] : ['recv']).forEach(function(k){ var el = $('i-' + k); el.value = state[k]; el.disabled = true; el.title = 'From your MFP accounts, read ' + f.at.slice(11, 16) + ' UTC'; });
     if (moved) { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} drawStatic(); update(); }
