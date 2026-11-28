@@ -44,6 +44,7 @@ h2{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;align-
 .cell+.cell{border-left:1px solid var(--line)}
 .cell .k,.cell label{font-size:12px;font-weight:600;color:var(--mute)}
 .cell .v{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;font-size:20px;font-weight:600;line-height:1.3;font-variant-numeric:tabular-nums}
+.cell .kd{font-size:12px;font-weight:600;color:var(--ink)}
 .cell .v small{font-size:13px;font-weight:400;color:var(--mute)}
 .rates .v{column-gap:3px}
 .box{width:3.6em;font:600 20px/1.3 system-ui,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:0 6px;text-align:right;-moz-appearance:textfield;appearance:textfield}
@@ -164,7 +165,7 @@ span.pick{cursor:default}
         <div class="cell"><span class="k" id="t-buy-k">Buy today</span><span class="v" id="t-buy">–</span></div>
         <div class="cell"><span class="k" title="The most cash you are out before payouts cover it">Cash needed</span><span class="v" id="t-need">–</span><span class="v" id="t-need2" hidden></span></div>
         <div class="cell"><span class="k" id="t-net-k">Net after 12 weeks</span><span class="v" id="t-net">–</span></div>
-        <div class="cell"><span class="k">Once running</span><span class="v" id="t-run">–</span></div>
+        <div class="cell"><span class="kd" id="t-run-d" title="The first week the plan nets its Once running month as a week, and keeps it up" hidden></span><span class="k">Once running</span><span class="v" id="t-run">–</span></div>
       </div>
     </div>
     <div>
@@ -574,7 +575,10 @@ function simulateGroup(units, r, weeks, days){
     var known = Array.isArray(f.g1Flips) && ip > 0 ? f.g1Flips.slice(0, Math.floor(ip)) : [];
     known.forEach(function(x){
       x = x || {};
-      var k0 = F.req2 > 0 && num(x.cycle, 1) >= 2 ? 2 : 1, top = k0 === 1 ? P.D1 : P.D;
+      // which payout it is on: one more than the payouts the counter has seen it make (paid), else as its count of days says
+      // (4 before the first payout, 5 after: the dashboards until 26 Nov 2026)
+      var pd = x.paid !== undefined ? Math.max(0, Math.round(num(x.paid, 0))) : -1;
+      var k0 = !(F.req2 > 0) ? 1 : pd >= 0 ? Math.min(3, pd + 1) : num(x.cycle, 1) >= 2 ? 2 : 1, top = k0 === 1 ? P.D1 : P.D;
       var rem = Math.min(top, Math.round(num(x.rem, top)));
       // its room as the dashboard shows it, this cycle's winning days included. (A count kept by an older page has losing days
       // left instead of the room.) With no room read, the size's room at the start.
@@ -710,8 +714,20 @@ function runAll(firms, r, weeks, seats, days, plain){
 
 // Average month once the first wave is through (weeks 24-63 of a long run), per account size.
 function monthlyUnits(firms, r, seats){
-  var W = 64, from = 24;
-  return simulateAll(firms, r, W, seats).map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
+  var W = 64, from = 24, per = simulateAll(firms, r, W, seats), t;
+  var out = per.map(function(p){ var s = 0; for (var t = from; t < W; t++) s += p.rows[t].inn - p.rows[t].out; return s / (W - from) * 52 / 12; });
+  // and every week's net of the whole run, for the week it is running from (runningFrom)
+  out.weeks = []; for (t = 0; t < W; t++){ var s = 0; per.forEach(function(p){ s += p.rows[t].inn - p.rows[t].out; }); out.weeks.push(s); }
+  return out;
+}
+// The week the plan is running from. The owner, 28 Nov 2026: "i need above once running to put a date to tell me in this day u
+// net = that". The first full week whose net reaches the Once running month as a week (12/52 of it), with no later week of the
+// long run under RUN_HOLD of that. -1: none, or nothing to reach.
+var RUN_HOLD = 0.9;
+function runningFrom(weeks, run, wd0){
+  var pace = run * 12 / 52, ok = -1; if (!(pace > 0) || !weeks || !weeks.length) return -1;
+  for (var t = weeks.length - 1; t >= (wd0 > 0 ? 1 : 0); t--){ if (weeks[t] < RUN_HOLD * pace) break; if (weeks[t] >= pace) ok = t; }
+  return ok;
 }
 
 // What one account that reaches profit is expected to book over its flips, and what it costs in evals to get one.
@@ -1179,7 +1195,7 @@ function liveRates(){ var c = liveCounts(), o = {}; if (!c) return null; RATE_KE
   // is dropped, with its version
   var fresh = FIVE && !(s.five && s.five.v === FIVE_V);
   if (FIVE) state.five = cleanFive(s.five);
-  else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); state.g1.kc = cashOf(s.g1.kc); state.g1.ko = num(s.g1.ko, 0) > 0 ? Math.round(s.g1.ko) : 0; state.g1.km = mixOf(s.g1.km); }
+  else if (s.g1 && s.g1.total && typeof s.g1.total === 'object'){ state.g1 = s.g1; state.g1.life = lifeOf(s.g1.life); state.g1.came = cameOf(s.g1.came); state.g1.kc = cashOf(s.g1.kc); state.g1.ko = num(s.g1.ko, 0) > 0 ? Math.round(s.g1.ko) : 0; state.g1.km = mixOf(s.g1.km); state.g1.kp = payKept(s.g1.kp); }
   // for the edits shared by every browser (see shareEdit): a name for this browser, and the version of this view's part it holds
   state.dev = typeof s.dev === 'string' && /^[a-z0-9]{6,16}$/.test(s.dev) ? s.dev : (Math.random().toString(36) + '00000000').slice(2, 10);
   var held = cleanVersion(s.sh); if (held && !fresh) state.sh = held;
@@ -1342,7 +1358,7 @@ function shareEdit(){
 function chanceRates(fleet){
   var odds = fundedOdds(fleet);
   return { pass: evalRoad(EVAL_WIN, evalOdds(''), 0, false).rate, win: odds, odds: odds, flip: flipOdds('', '50K'), flip25: flipOdds('', '25K'), chance: true,
-    tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
+    tries: FIXED.tries, payDays1: payRule().d1, payDays: payRule().d, lossDays: FIXED.lossDays, wd0: WD0 };
 }
 // The rates a run takes: the live ones, as the page shows them. Funded win becomes the chance per trade p:
 // an account with FIXED.tries trades at it reaches profit with 1 - (1 - p)^tries. odds = the odds of the funded trade that
@@ -1352,7 +1368,7 @@ function fracRates(){
   if (!r) return null;
   RATE_KEYS.forEach(function(k){ f[k] = r[k] / 100; });
   return { pass: f.pass, win: 1 - Math.pow(1 - clamp01(f.win), 1 / FIXED.tries), odds: fundedOdds(FLEET.key), flip: f.flip, flip25: f.flip25,
-    tries: FIXED.tries, payDays1: FIXED.payDays1, payDays: FIXED.payDays, lossDays: FIXED.lossDays, wd0: WD0 };
+    tries: FIXED.tries, payDays1: payRule().d1, payDays: payRule().d, lossDays: FIXED.lossDays, wd0: WD0 };
 }
 // a 25K account flips the 25K box: its row takes that rate. On chance alone every row has the odds of its own flip day.
 function boxed(f, rr){
@@ -1654,6 +1670,23 @@ function openMix(o){
   var out = {}; Object.keys(m).forEach(function(f){ out[f] = m[f] / tot; });
   return out;
 }
+// The counter's payouts, account by account (pk of the counts file, see tools/track.js): how many payouts each account in the
+// flips has had, and the winning days a payout needs (d1 before the first, d after). The owner, 28 Nov 2026: "if we keep buying
+// and math get bad or good it updates automatically". Until 26 Nov 2026 the row's count said it ("n/4 days" before the first
+// payout, "n/5 days" after one); since then the dashboards show "n/5 days" before every payout, and the plan took the eight G1
+// accounts still before their first payout for accounts after it (half the payout). The counter has seen each count start over.
+function tagOf(id){ var s = String(id || '').trim().replace(/\s+/g, ' '), h = 0x811c9dc5; for (var i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return ('0000000' + h.toString(16)).slice(-8); }
+function payDaysOk(v){ v = Math.round(num(v, 0)); return v >= 1 && v <= 30 ? v : 0; }
+// from the counts file (a: { tag: [days won, days needed, requested, payouts, last listed] }) or as kept here (k: { tag: payouts })
+function payKept(p){
+  if (!p || typeof p !== 'object') return null;
+  var src = p.a && typeof p.a === 'object' ? p.a : p.k && typeof p.k === 'object' ? p.k : null; if (!src) return null;
+  var k = {}; Object.keys(src).forEach(function(t){ var v = Array.isArray(src[t]) ? src[t][3] : src[t]; if (/^[0-9a-f]{8}$/.test(t) && num(v, -1) >= 0) k[t] = Math.round(num(v, 0)); });
+  return { d1: payDaysOk(p.d1), d: payDaysOk(p.d), k: k };
+}
+function payRule(){ var p = state.g1 && state.g1.kp; return { d1: p && p.d1 ? p.d1 : FIXED.payDays1, d: p && p.d ? p.d : FIXED.payDays }; }
+// (an account the counter has not listed yet came into the flips since its last read: it has just won its funded trade)
+function paidOf(tag){ var p = state.g1 && state.g1.kp; return p && tag ? (p.k[tag] !== undefined ? p.k[tag] : 0) : undefined; }
 function mixOf(m){ if (!m || typeof m !== 'object') return null; var out = {}, n = 0; Object.keys(m).forEach(function(f){ var v = num(m[f], 0); if (v > 0 && v <= 1){ out[f] = v; n++; } }); return n ? out : null; }
 function fleetMix(){ var g = state.g1; return g && g.ko > 0 && g.km ? g.km : null; }
 function seats(){ var g = state.g1; return g && g.ko > 0 ? g.ko : g && g.sig && g.sig.max > 0 ? g.sig.max : undefined; }
@@ -1662,6 +1695,7 @@ function planFirms(rr, all){
   var on = dayOn(), late = on ? lateShare() : 0;
   return state.firms.map(function(f){
     var x = boxed(clone(f), rr);
+    if (Array.isArray(x.g1Flips)) x.g1Flips.forEach(function(z){ if (z){ var p = paidOf(z.tag); if (p !== undefined) z.paid = p; } });
     x.firmCap = slotsAt(normFirm(f.firm)); x.slots = slotsAt(unitKey(f));
     x.idle = idleOf(f); x.dayOn = on; x.lateShare = late;
     if ((!all && skipped(f)) || !inSet(f)) x.skip = true;
@@ -1671,7 +1705,7 @@ function planFirms(rr, all){
 // 12 weeks from today, plus the average month once the first wave is through (per size and in total); all = with no firm skipped
 function outcome(rr, all){
   var firms = planFirms(rr, all), cap = seats(), res = runAll(firms, rr, WEEKS, cap);
-  res.runs = monthlyUnits(firms, rr, cap); res.run = res.runs.reduce(function(a, b){ return a + b; }, 0);
+  res.runs = monthlyUnits(firms, rr, cap); res.run = res.runs.reduce(function(a, b){ return a + b; }, 0); res.runFrom = runningFrom(res.runs.weeks, res.run, rr.wd0);
   // the evals to buy: on the plan's first day, or with NEXT_WEEK on its first 5 trading days added up
   var span = NEXT_WEEK ? 5 : 1;
   res.buy = 0; res.cost = 0; res.per.forEach(function(p){ for (var d = 0; d < span; d++) if (p.days[d]){ res.buy += p.days[d].buy; res.cost += p.days[d].evalCost; } });
@@ -1749,6 +1783,7 @@ function update(){
   document.getElementById('t-buy').innerHTML = res ? res.buy + ' evals' + (res.buy > 0 ? ' <small>' + money(res.cost) + '</small>' : '') : '–';
   document.getElementById('t-need').textContent = res ? money(res.need) : '–';
   var tn = document.getElementById('t-net'); tn.textContent = res ? signed(res.net) : '–'; tn.className = 'v' + (res ? (res.net >= 0 ? ' pos' : ' neg') : '');
+  var trd = document.getElementById('t-run-d'), rf = res && res.runFrom >= 0 ? weekStart(res.runFrom) : null; trd.hidden = !rf; trd.textContent = rf ? 'From ' + ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][rf.getDay()] + ' ' + dShort(rf) : '';
   var tr = document.getElementById('t-run'); tr.innerHTML = res ? signed(res.run) + '<small>/mo</small>' : '–'; tr.className = 'v' + (res ? (res.run >= 0 ? ' pos' : ' neg') : '');
 
   // a tick box per firm: unticked, the plan buys no new evals there (the accounts already held keep running). Locked
@@ -2473,7 +2508,7 @@ function counted(k){
         var o = m[1] === 'wired' ? came.wired : m[1] === 'pass' ? came.passes : null;
         if (o) o[m[2]] = (o[m[2]] || 0) + 1;
       });
-      return { life: life, came: cameOf(came), cash: cashOf(j.cash), open: openKept(j.open), mix: openMix(j.open), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
+      return { life: life, came: cameOf(came), cash: cashOf(j.cash), open: openKept(j.open), mix: openMix(j.open), pk: payKept(j.pk), unread: typeof j.unread === 'string' && isFinite(Date.parse(j.unread)) ? j.unread : '' };
     })
     .catch(function(){ return null; });
 }
@@ -2584,7 +2619,7 @@ function parseG1(html, K){
   // G1 shows "n/4 days" before the first payout and "n/5 days" after one; net = the total of its flips since the last payout
   rows('p-' + K + '-flip').forEach(function(c){
     var m = /(\d+)\s*\/\s*(\d+)\s*days/i.exec(c[3]), room = moneyNum(c[4]), u = unit(c[1], g1Size(c[0], c[3], false));
-    u.flips.push({ rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null, net: moneyNum(c[3]), done: traded(c), req: /payout requested/i.test(c[3]), ago: ago(c), lost: (moneyNum(c[5]) || 0) < 0 });
+    u.flips.push({ tag: tagOf(c[0]), rem: m ? +m[2] - +m[1] : null, cycle: m && +m[2] > 4 ? 2 : 1, room: room !== null && room > 0 ? room : null, net: moneyNum(c[3]), done: traded(c), req: /payout requested/i.test(c[3]), ago: ago(c), lost: (moneyNum(c[5]) || 0) < 0 });
   });
   // eval signals: the "Avg signals" row of the summary table that has an Evals column
   var sig = null;
@@ -2623,7 +2658,7 @@ function applyG1(g){
     if (!f) f = addRow(state.firms, x.firm, x.size + 'K');
     else if (!inSet(f)) f.firm = x.firm;                 // (a row kept with the dashboard's code for a name: its name)
     f.openEvals = x.evals; f.passedNow = x.passed; f.passedDone = x.passedDone; f.fundedNow = x.fundeds; f.inProfitNow = x.flips.length;
-    f.g1Flips = x.flips.map(function(z){ return { rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net, done: z.done ? 1 : undefined, req: z.req ? 1 : undefined, ago: z.req && z.ago !== null ? z.ago : undefined, back: z.req && z.lost ? 1 : undefined }; });
+    f.g1Flips = x.flips.map(function(z){ return { tag: z.tag, rem: z.rem === null ? undefined : z.rem, cycle: z.cycle, room: z.room === null ? undefined : z.room, net: z.net === null ? undefined : z.net, done: z.done ? 1 : undefined, req: z.req ? 1 : undefined, ago: z.req && z.ago !== null ? z.ago : undefined, back: z.req && z.lost ? 1 : undefined }; });
     f.g1Evals = x.evalsAt; f.g1Funded = x.fundedsAt;
     f.g1 = true; seen.push(f);
   });
@@ -2634,7 +2669,7 @@ function applyG1(g){
     return inSet(f);
   });
   // a dashboard without its Lifetime table leaves the last counts read in place
-  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, kc: (state.g1 && state.g1.kc) || null, ko: (state.g1 && state.g1.ko) || 0, km: (state.g1 && state.g1.km) || null, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
+  state.g1 = { at: g.updated, day: g.day, sig: g.sig, total: g.total, cash: g.cash, kc: (state.g1 && state.g1.kc) || null, ko: (state.g1 && state.g1.ko) || 0, km: (state.g1 && state.g1.km) || null, kp: (state.g1 && state.g1.kp) || null, life: g.life ? lifeOf(g.life) : (state.g1 && state.g1.life) || {}, came: cameOf(state.g1 && state.g1.came) };
   save(); syncRates(); update(); drawG1(false);
 }
 var g1El = document.getElementById('g1'), g1Fail = false, keptFail = false, lastSync = 0;
@@ -2670,7 +2705,7 @@ function syncG1(){
     if (c){
       if (!state.g1) state.g1 = { life: {}, came: cameOf(null) };
       if (!(g && g.life)) state.g1.life = c.life;
-      state.g1.came = c.came; unreadAt = c.unread; if (c.cash) state.g1.kc = c.cash; if (c.open){ state.g1.ko = c.open; state.g1.km = c.mix || null; }
+      state.g1.came = c.came; unreadAt = c.unread; if (c.cash) state.g1.kc = c.cash; if (c.open){ state.g1.ko = c.open; state.g1.km = c.mix || null; } if (c.pk) state.g1.kp = c.pk;
       save(); syncRates(); update();
     } else if (!liveCounts()) update();
     drawG1();

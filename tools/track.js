@@ -48,7 +48,7 @@ const fs = require('fs'), path = require('path'), crypto = require('crypto'), cp
 const FLEETS = ['g1', 'v2'], KEYS = ['pass', 'win', 'flip', 'flip25'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', times: '×', minus: '-' };
-const OTHERS = ['rm'], FULL_LIST = 7, KEEP_SEEN_DAYS = 120, KEEP_OPEN_DAYS = 40, KEEP_BOUGHT_DAYS = 14;
+const OTHERS = ['rm'], FULL_LIST = 7, KEEP_SEEN_DAYS = 120, KEEP_OPEN_DAYS = 40, KEEP_BOUGHT_DAYS = 14, KEEP_PAY_DAYS = 30;
 const KEEP_GONE_DAYS = 10, LOG_LINES = 400, MARK_LINES = 400, SAVE_EVERY = 200;
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -83,7 +83,8 @@ function pane(sec, k, name){
   return rows.slice(1).filter(c => c.length >= 6 && c[0]).map(c => {
     const total = c[3], d = /^(\d\d-\d\d)\b/.exec(c[5]), of = /of \$([\d,]+)/.exec(total);
     return { id: c[0], firm: firmName(c[1]), passed: /PASSED/i.test(total), dead: /LIQUIDATED|RETIRED/i.test(total),
-      dayPnl: money(c[2]), pnl: money(total), target: of ? int(of[1]) : null, room: money(c[4]), day: d ? d[1] : '' };
+      dayPnl: money(c[2]), pnl: money(total), target: of ? int(of[1]) : null, room: money(c[4]), day: d ? d[1] : '',
+      days: (x => x ? [int(x[1]), int(x[2])] : null)(/(\d+)\s*\/\s*(\d+)\s*days/i.exec(total)), req: /payout requested/i.test(total) };
   });
 }
 
@@ -171,6 +172,41 @@ function buyStep(O, snap, day){
   const old = new Date(Date.parse(day + 'T00:00:00Z') - KEEP_BOUGHT_DAYS * 864e5).toISOString().slice(0, 10);
   Object.keys(O.seen).forEach(h => { if (O.seen[h] < old) delete O.seen[h]; });
   const ds = Object.keys(O.days).sort(), cut = ds.length > KEEP_OPEN_DAYS ? ds[ds.length - KEEP_OPEN_DAYS] : ''; Object.keys(O.buys).forEach(d => { if (d < cut) delete O.buys[d]; });
+}
+// Payouts, account by account (pk of a counts file). The owner, 28 Nov 2026: "if we keep buying and math get bad or good it
+// updates automatically". The page told an account's payout cycle by its count: "n/4 days" before its first payout, "n/5 days"
+// after one. Since 26 Nov 2026 both dashboards show "n/5 days" before every payout (FuturesElite did from its first accounts on
+// 23 Nov), so the count no longer tells it, and an account still before its first payout was taken for one after it.
+// pk.a = { tagOf(account): [days won so far, days its payout needs, 1 while "payout requested", payouts seen, the New York date
+// it was last listed] }. A payout: its count falls (the dashboard starts a new count after each payout). Not the end of
+// "payout requested": a row can go back to its full count ("5/5 days") until the money is out, or show the request after
+// its new count has started (V2's Lucid on 18 Nov 2026, G1's Aqua on 15 to 24 Nov). At the change of 26 Nov counts rose, none fell.
+// An account new in the flips has had none (it has just won its funded trade); only on the first build read (pk.s = 0) are
+// they older accounts, told by the count of then (4 before the first payout, 5 after). pk.d1, pk.d = the count most accounts
+// show before their first payout and after one, as the rows show them now.
+function tagOf(id){
+  const s = String(id || '').trim().replace(/\s+/g, ' '); let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return ('0000000' + h.toString(16)).slice(-8);
+}
+function payNew(){ return { d1: 4, d: 5, s: 0, a: {} }; }
+function payStep(P, snap, day){
+  const seed = !P.s;
+  snap.flip.forEach(r => {
+    const t = tagOf(r.id), n = r.days ? r.days[0] : null, m = r.days ? r.days[1] : null, a = P.a[t];
+    if (!a){ P.a[t] = [n, m, r.req ? 1 : 0, seed && m !== null && m > 4 ? 1 : 0, day]; return; }
+    a[4] = day;
+    if (r.req){ a[2] = 1; return; }
+    if (n === null) return;
+    if (a[0] !== null && n < a[0]) a[3]++;
+    a[0] = n; a[1] = m; a[2] = 0;
+  });
+  P.s = 1;
+  // the counts the rows show now: the one most of them show, before a first payout and after one
+  const most = (x) => { let b = null, bn = 0; Object.keys(x).forEach(m => { if (x[m] > bn){ b = +m; bn = x[m]; } }); return b; }, c0 = {}, c1 = {};
+  snap.flip.forEach(r => { if (!r.days) return; const a = P.a[tagOf(r.id)], c = a[3] ? c1 : c0; c[r.days[1]] = (c[r.days[1]] || 0) + 1; });
+  if (most(c0)) P.d1 = most(c0); if (most(c1)) P.d = most(c1);
+  Object.keys(P.a).forEach(t => { if (dayNo(day) - dayNo(P.a[t][4]) > KEEP_PAY_DAYS) delete P.a[t]; });
 }
 function openStep(O, n, day, firms){
   const up = !(O.days[day] >= n);
@@ -356,7 +392,7 @@ function step(st, snap, meta){
 // one remembered account and one log line per line, so a change shows as a short diff
 function dump(st){
   const rows = Object.keys(st.acc).map(h => '  ' + JSON.stringify(h) + ': ' + JSON.stringify(st.acc[h])).join(',\n');
-  const head = ['v', 'at', 'built', 'unread', 'day', 'counts', 'flipDone', 'base', 'today', 'cash', 'open'].filter(k => st[k] !== undefined).map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
+  const head = ['v', 'at', 'built', 'unread', 'day', 'counts', 'flipDone', 'base', 'today', 'cash', 'open', 'pk'].filter(k => st[k] !== undefined).map(k => ' ' + JSON.stringify(k) + ': ' + JSON.stringify(st[k])).join(',\n');
   const lines = a => a.length ? '\n' + a.map(l => '  ' + JSON.stringify(l)).join(',\n') + '\n ' : '';
   return '{\n' + head + ',\n "marks": [' + lines(st.marks || []) + '],\n "acc": {' + (rows ? '\n' + rows + '\n ' : '') + '},\n "log": [' + lines(st.log) + ']\n}\n';
 }
@@ -374,18 +410,19 @@ function page(dir, sha){ return git(dir, ['show', sha + ':index.html']); }
 function reaches(dir, sha){ try { git(dir, ['merge-base', '--is-ancestor', sha, 'HEAD']); return true; } catch (e){ return false; } }
 
 function main(){
-  const dir = process.argv[2], dash = process.argv[3], mode = process.argv[4], refill = mode === '--cash' || mode === '--open';
+  const dir = process.argv[2], dash = process.argv[3], mode = process.argv[4], refill = mode === '--cash' || mode === '--open' || mode === '--pays';
   if (!dir || !dash){ console.error('usage: node tools/track.js <folder> <clone of the dashboard repository>'); process.exit(2); }
   const cache = {}, shown = sha => cache[sha] || (cache[sha] = page(dash, sha));
   if (refill){
     // every build once, oldest first, up to the one each counts file has read: its cash from the start
     const sts = {}, all = builds(dash);
-    FLEETS.forEach(k => { try { const st = JSON.parse(fs.readFileSync(path.join(dir, k + '.json'), 'utf8')); if (st && st.v === 2 && st.at){ if (mode === '--cash') st.cash = cashNew(); else st.open = { days: {}, avg: {}, buys: {} }; sts[k] = { st: st, done: false }; } } catch (e) {} });
+    FLEETS.forEach(k => { try { const st = JSON.parse(fs.readFileSync(path.join(dir, k + '.json'), 'utf8')); if (st && st.v === 2 && st.at){ if (mode === '--cash') st.cash = cashNew(); else if (mode === '--pays') st.pk = payNew(); else st.open = { days: {}, avg: {}, buys: {} }; sts[k] = { st: st, done: false }; } } catch (e) {} });
     for (const b of all){
       const live = Object.keys(sts).filter(k => !sts[k].done); if (!live.length) break;
       let html = ''; try { html = page(dash, b.sha); } catch (e) {}
       live.forEach(k => {
         if (mode === '--cash'){ const c = html && cashOf(html, k, b.built); if (c) cashStep(sts[k].st.cash, c, nyDate(b.built)); }
+        else if (mode === '--pays'){ const snap = html && read(html, k, b.built); if (snap) payStep(sts[k].st.pk, snap, nyDate(b.built)); }
         else { const snap = html && read(html, k, b.built); if (snap){ openStep(sts[k].st.open, openOf(snap), nyDate(b.built), firmsOf(snap)); buyStep(sts[k].st.open, snap, nyDate(b.built)); } }
         if (b.sha === sts[k].st.at) sts[k].done = true;
       });
@@ -395,6 +432,7 @@ function main(){
       if (!sts[k].done){ console.log(k + ': the history does not reach the build read last: not written'); return; }
       fs.writeFileSync(path.join(dir, k + '.json'), dump(sts[k].st));
       if (mode === '--open'){ console.log(k + ': open evals ' + JSON.stringify(sts[k].st.open.days)); return; }
+      if (mode === '--pays'){ const P = sts[k].st.pk; console.log(k + ': payout days ' + P.d1 + ' then ' + P.d + ' | ' + Object.keys(P.a).length + ' accounts | ' + JSON.stringify(P.a)); return; }
       console.log(k + ': cash from ' + C.open + ' | received ' + C.sum[0] + ', spent ' + C.sum[1] + ' | ' + Object.keys(C.days).length + ' days');
     });
     return;
@@ -419,7 +457,7 @@ function main(){
     let unread = 0;
     for (const b of list){
       const snap = read(shown(b.sha), k, b.built);
-      if (snap){ st = step(st, snap, b); delete st.unread; if (st.open){ openStep(st.open, openOf(snap), nyDate(b.built), firmsOf(snap)); buyStep(st.open, snap, nyDate(b.built)); } }
+      if (snap){ st = step(st, snap, b); delete st.unread; if (st.open){ openStep(st.open, openOf(snap), nyDate(b.built), firmsOf(snap)); buyStep(st.open, snap, nyDate(b.built)); } if (st.pk) payStep(st.pk, snap, nyDate(b.built)); }
       else { unread++; if (st && !st.unread) st.unread = b.built; }
       // the cash box is read on its own: a build whose tables cannot be trusted still shows it
       if (st && st.cash){ const c = cashOf(shown(b.sha), k, b.built); if (c) cashStep(st.cash, c, nyDate(b.built)); }
@@ -433,4 +471,4 @@ function main(){
   }
 }
 if (require.main === module) main();
-module.exports = { buyStep: buyStep, firmsOf: firmsOf, openOf: openOf, openStep: openStep, cashOf: cashOf, cashStep: cashStep, cashNew: cashNew, nyDate: nyDate, read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
+module.exports = { tagOf: tagOf, payStep: payStep, payNew: payNew, buyStep: buyStep, firmsOf: firmsOf, openOf: openOf, openStep: openStep, cashOf: cashOf, cashStep: cashStep, cashNew: cashNew, nyDate: nyDate, read: read, step: step, dump: dump, text: text, money: money, key: key, small: small, tradingDay: tradingDay };
